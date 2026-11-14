@@ -297,7 +297,8 @@
     "green_at_percent": {"value": 25, "unit": "%", "status": ["NASA figure"], "status_inferred": true, "status_note": "Label inferred from the source name; to confirm.", "source": "GSFC-STD-1000 Rev I, Table 1.06-1", "note": "Pre-Phase A value. Green at 25 or more, yellow when positive under 25, red when negative."}
   },
   "constants": {
-    "lunar_month_hours": {"value": 708.73, "unit": "h", "status": [], "status_note": "A physical constant; none of the eight labels applies.", "source": "source to add", "note": "One lunar month."}
+    "lunar_month_hours": {"value": 708.73, "unit": "h", "status": [], "status_note": "A physical constant; none of the eight labels applies.", "source": "source to add", "note": "One lunar month."},
+    "standard_gravity": {"value": 9.80665, "unit": "m/s^2", "status": [], "status_note": "A defined constant; none of the eight labels applies.", "source": "source to add", "note": "Standard gravity, g0, used by the rocket equation."}
   },
   "reference": [
     {

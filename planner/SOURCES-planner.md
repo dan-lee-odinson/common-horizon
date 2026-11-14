@@ -23,6 +23,9 @@ other tools below are for testing and building, and are not shipped with it.
 
 None of these is of Chinese origin.
 
+Delta-v from `rocket_delta_v` is worked out by this module from the numbers
+typed in, and is labelled "our estimate"; it has no outside source.
+
 ## Datasets and images
 
 None. The module contains no images, logos, insignia, flags or lettering.
@@ -69,6 +72,7 @@ These figures are in the catalog with `source to add`:
 - Solar array mast VSAT 10 kW and VSAT-XL 50 kW (company figure)
 - Regenerative fuel cell 10 kW (NASA goal)
 - One lunar month: 708.73 hours (a physical constant)
+- Standard gravity: 9.80665 m/s^2 (a defined constant, used by the rocket equation)
 - Crew rover recharge 2 kW and about 16 kWh per drive day; work-site lighting 1 kW (our estimate: the team's own figures, to be written up)
 - Apollo landing Sun elevations, 5 to 25 degrees (reference only; NASA figure, inferred, to confirm)
 

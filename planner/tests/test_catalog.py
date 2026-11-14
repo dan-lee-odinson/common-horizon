@@ -81,6 +81,7 @@ EXPECTED = {
     "margin_rule/green_at_percent": (
         25, "%", ["NASA figure"], "GSFC-STD-1000 Rev I, Table 1.06-1"),
     "constants/lunar_month_hours": (708.73, "h", [], TBA),
+    "constants/standard_gravity": (9.80665, "m/s^2", [], TBA),
     # Reference values
     "reference/dv_halo_to_surface_2018": (2850, "m/s", ["NASA figure"], "NASA 2018"),
     "reference/dv_halo_to_surface_2019": (2750, "m/s", ["NASA figure"], "NASA 2019"),

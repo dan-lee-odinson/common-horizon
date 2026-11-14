@@ -14,6 +14,9 @@ The backend imports it and calls four functions:
 | `power_check(...)` | Do these power sources and this storage carry these loads, day and night? |
 | `site_energy(...)` | How much energy does this site's darkness add (night penalty plus heating penalty)? |
 
+One more function, `rocket_delta_v(...)`, works out delta-v with the rocket
+equation and labels the answer `our estimate`.
+
 ## Contents
 
 - [Install](#install)
@@ -23,6 +26,7 @@ The backend imports it and calls four functions:
 - [`fit_check`](#fit_check)
 - [`power_check`](#power_check)
 - [`site_energy`](#site_energy)
+- [`rocket_delta_v`](#rocket_delta_v)
 - [Errors](#errors)
 - [Decisions made in this module](#decisions-made-in-this-module)
 - [Running the tests and the build](#running-the-tests-and-the-build)
@@ -332,6 +336,41 @@ The last line is the night load only; adding `crew_rover_keep_warm` adds
 Helpers: `dark_hours_from_percent(percent, months=1.0)`,
 `margin_percent(available, load)`, `margin_status(margin, available, load)`,
 `LUNAR_MONTH_HOURS` (708.73), `GREEN_AT_PERCENT` (25).
+
+## `rocket_delta_v`
+
+```python
+rocket_delta_v(isp_s, dry_mass, propellant_mass, payload_mass=0.0, mass_unit="t")
+```
+
+The rocket equation for a stage that burns all its propellant:
+
+delta-v = Isp x 9.80665 x ln(start mass / final mass)
+
+- start mass = dry + propellant + payload
+- final mass = dry + payload
+- 9.80665 m/s^2 is standard gravity (`STANDARD_GRAVITY`, in the catalog
+  constants)
+
+| Parameter | Meaning |
+| --- | --- |
+| `isp_s` | Specific impulse in seconds (more than 0). |
+| `dry_mass`, `propellant_mass`, `payload_mass` | Masses in any one unit; only their ratio matters. |
+| `mass_unit` | The unit the masses were typed in, echoed back for display. Default `t`. |
+
+The result is labelled `our estimate` and carries every input, so anyone can
+redo the sum: `delta_v_m_s`, `status`, `source`, `formula`, `inputs`
+(including `g0_m_s2`), `start_mass`, `final_mass`, `mass_ratio`, `message`.
+
+```python
+result = rocket_delta_v(380, dry_mass=85, propellant_mass=1200, payload_mass=100)
+result["delta_v_m_s"]   # 7501.87...
+result["message"]       # 'About 7,502 m/s (our estimate): 380 s x 9.80665 m/s^2 x ln(1385 t / 185 t).'
+```
+
+For comparison, `list_catalog("reference")` holds the published delta-v from
+the Artemis halo orbit to the surface (2,850, 2,750 and 2,700 m/s). They are
+reference values only; this function does not check against them.
 
 ## Errors
 
