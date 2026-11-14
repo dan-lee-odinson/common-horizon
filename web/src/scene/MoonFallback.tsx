@@ -1,11 +1,14 @@
 // Shown instead of the 3D Moon when the browser has no WebGL (or the address has ?webgl=off).
 // A flat orthographic drawing of the Moon that still lets the visitor pick sites and points.
+// "Zoom in to this site" scales the drawing up towards the site (GSAP) before the site view opens.
 
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import gsap from 'gsap';
 import type { Geometry } from '../api/types';
 import type { KnownSite } from '../state/data';
 import type { View } from '../state/app';
-import { clamp } from '../state/app';
+import { actions, appStore, clamp } from '../state/app';
+import { useStore } from '../state/store';
 import { DEG, RAD, normalizeLon360 } from '../util/geo';
 import { Icon } from '../components/Icon';
 
@@ -76,6 +79,30 @@ export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, o
     if (highlighted) setCenter({ lat: clamp(highlighted.lat, -75, 75), lon: highlighted.lon_east });
   }, [highlighted]);
   const lines = useMemo(() => graticule(center.lat, center.lon), [center]);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const flight = useStore(appStore, (s) => s.flight);
+  const activePoint = highlighted ? project(highlighted.lat, highlighted.lon_east, center.lat, center.lon) : null;
+
+  // The flat stand-in for the camera flight: scale the drawing up around the site, or back down.
+  useLayoutEffect(() => {
+    const el = svgRef.current;
+    if (!el || flight === null) return;
+    if (!activePoint?.visible) {
+      if (flight === 'in') actions.finishFlightIn();
+      else actions.finishFlightOut();
+      return;
+    }
+    const origin = `${(activePoint.x / 400) * 100}% ${(activePoint.y / 400) * 100}%`;
+    const tween =
+      flight === 'in'
+        ? gsap.fromTo(el, { scale: 1, opacity: 1 }, { scale: 5, opacity: 0.15, transformOrigin: origin, duration: 0.8, ease: 'power2.in', onComplete: actions.finishFlightIn })
+        : gsap.fromTo(el, { scale: 5, opacity: 0.15 }, { scale: 1, opacity: 1, transformOrigin: origin, duration: 0.8, ease: 'power2.out', onComplete: actions.finishFlightOut });
+    return () => {
+      tween.kill();
+      gsap.set(el, { clearProps: 'transform,opacity' });
+    };
+    // Run once per flight; the site stays put while it runs.
+  }, [flight]);
 
   function onDiscClick(e: MouseEvent<SVGCircleElement>) {
     if (view === 'globe') return onMoonClick();
@@ -98,7 +125,7 @@ export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, o
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4" style={leftInset ? { paddingLeft: leftInset } : undefined} data-testid="moon-fallback">
       <p className="m-0 max-w-md text-center text-[12px] text-muted">3D is not available in this browser, so this is a flat view of the Moon.</p>
-      <svg viewBox="0 0 400 400" className="h-auto max-h-[70%] w-full max-w-[min(70vh,520px)]" role="img" aria-label="Flat view of the Moon">
+      <svg ref={svgRef} viewBox="0 0 400 400" className="h-auto max-h-[70%] w-full max-w-[min(70vh,520px)]" role="img" aria-label="Flat view of the Moon">
         <circle cx={C} cy={C} r={R} fill="var(--ch-moon-dark)" stroke="var(--ch-line-strong)" onClick={onDiscClick} className="cursor-pointer" />
         {lines.map((d, i) => (
           <path key={i} d={d} fill="none" stroke="var(--ch-line-strong)" strokeWidth={0.6} pointerEvents="none" />
@@ -128,7 +155,7 @@ export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, o
                   key={s.id}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${s.name}${active ? ', highlighted: press again to open' : ''}`}
+                  aria-label={`${s.name}${active ? ', highlighted: press again to zoom in' : ''}`}
                   onClick={() => onSiteClick(s)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -149,6 +176,27 @@ export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, o
               );
             })
           : null}
+        {view === 'sites' && highlighted && activePoint?.visible && flight === null ? (
+          <g
+            role="button"
+            tabIndex={0}
+            aria-label={`Zoom in to this site: ${highlighted.name}`}
+            className="cursor-pointer"
+            onClick={() => actions.zoomToSite()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                actions.zoomToSite();
+              }
+            }}
+            data-testid="zoom-to-site-label"
+          >
+            <rect x={Math.min(activePoint.x + 8, 262)} y={activePoint.y + 2} width={130} height={20} rx={6} fill="var(--ch-accent)" />
+            <text x={Math.min(activePoint.x + 8, 262) + 65} y={activePoint.y + 16} fontSize={11} fontWeight={600} textAnchor="middle" fill="var(--ch-accent-ink)">
+              Zoom in to this site
+            </text>
+          </g>
+        ) : null}
       </svg>
       <div className="flex items-center gap-1" role="group" aria-label="Turn the Moon">
         <button type="button" className="btn btn-icon" aria-label="Turn west" onClick={() => nudge(0, -20)}>

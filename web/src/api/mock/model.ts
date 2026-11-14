@@ -5,16 +5,20 @@
 //   * each site gets an invented terrain skyline (seeded, so it is the same on every load);
 //   * the stay is sampled in time steps: is the Sun above the skyline? is Earth?
 // None of this is ephemeris-grade. The backend replaces it.
+// The power checks follow the planner module's rules (see ./power.ts and planner/README.md).
 
 import modelJson from '../examples/mock-model.json';
 import catalogJson from '../examples/catalog.json';
 import type {
   CatalogItem,
   CheckResponse,
+  DayCheck,
   EarthLink,
   Geometry,
   HardwareChoice,
   HorizonResponse,
+  NightBasis,
+  NightCheck,
   SiteEvaluation,
   SiteRef,
   SkyBox,
@@ -24,6 +28,7 @@ import type {
 } from '../types';
 import { azElFromSubpoint, normalizeLon360, sampleProfile, wrap180 } from '../../util/geo';
 import { DAY_MS, HOUR_MS, toIsoUtc } from '../../util/time';
+import { powerCheck, type PowerResult } from './power';
 
 interface Terrain {
   slope_deg: number;
@@ -193,11 +198,16 @@ function stepsForStay(stayDays: number): number {
 
 // ---------- hardware and power ----------
 
+/**
+ * The selected hardware in the planner module's terms. Each mock catalog row has a day load and a
+ * night load; a source either needs the Sun (works in sunlight only) or works day and night.
+ */
 interface PowerTotals {
   genSunKw: number;
   genAlwaysKw: number;
   loadDayKw: number;
   loadNightKw: number;
+  perNightKwh: number;
 }
 
 function selectedItems(hardware: HardwareChoice[], catalog: CatalogItem[]) {
@@ -207,19 +217,86 @@ function selectedItems(hardware: HardwareChoice[], catalog: CatalogItem[]) {
 }
 
 function powerTotals(hardware: HardwareChoice[], catalog: CatalogItem[]): PowerTotals {
-  const totals: PowerTotals = { genSunKw: 0, genAlwaysKw: 0, loadDayKw: 0, loadNightKw: 0 };
+  const totals: PowerTotals = { genSunKw: 0, genAlwaysKw: 0, loadDayKw: 0, loadNightKw: 0, perNightKwh: 0 };
   for (const { item, count } of selectedItems(hardware, catalog)) {
     if (item.gen_needs_sun) totals.genSunKw += item.gen_kw * count;
     else totals.genAlwaysKw += item.gen_kw * count;
     totals.loadDayKw += item.load_day_kw * count;
     totals.loadNightKw += item.load_night_kw * count;
+    // Per-night items belong to loads that draw in darkness.
+    if (item.load_night_kw > 0) totals.perNightKwh += (item.energy_per_night_kwh ?? 0) * count;
   }
   return totals;
 }
 
-function margin(gen: number, load: number): number | null {
-  if (load <= 0) return null;
-  return ((gen - load) / load) * 100;
+function runPowerCheck(p: PowerTotals, storageKwh: number, longestDarknessH: number | null): PowerResult {
+  return powerCheck({
+    dayLoadKw: p.loadDayKw,
+    nightLoadKw: p.loadNightKw,
+    perNightKwh: p.perNightKwh,
+    sunlightOnlySourcesKw: p.genSunKw,
+    continuousSourcesKw: p.genAlwaysKw,
+    storageKwh,
+    longestDarknessH,
+  });
+}
+
+/**
+ * The longest unbroken spell of darkness inside the stay, in hours. Each sample stands for one
+ * time step; the answer never exceeds the stay. 0 when the Sun is up for every sample.
+ */
+export function longestDarknessHours(samples: readonly Pick<Sample, 'sunAbove'>[], stayHours: number): number {
+  if (samples.length === 0 || stayHours <= 0) return 0;
+  const stepHours = samples.length > 1 ? stayHours / (samples.length - 1) : stayHours;
+  let run = 0;
+  let longest = 0;
+  for (const s of samples) {
+    run = s.sunAbove ? 0 : run + 1;
+    longest = Math.max(longest, run);
+  }
+  return Math.min(stayHours, longest * stepHours);
+}
+
+const BASIS: Record<PowerResult['night']['basis'], NightBasis> = {
+  'energy over the longest darkness': 'energy',
+  'power: sources in darkness carry the night': 'power',
+  'power (no darkness duration given)': 'power only',
+  'no darkness': 'no darkness',
+};
+
+function dayCheckOf(r: PowerResult): DayCheck {
+  const d = r.day;
+  return {
+    needed: d.status !== 'none',
+    generation_kw: round(d.available, 2),
+    load_kw: round(d.load_kw, 2),
+    refill_kw: round(d.refill_kw, 2),
+    refill_kwh: round(d.refill_kwh, 1),
+    refill_hours: d.refill_hours === null ? null : round(d.refill_hours, 1),
+    margin_percent: nullableRound(d.margin_percent, 2),
+    status: d.status,
+    passes: d.passes,
+  };
+}
+
+function nightCheckOf(r: PowerResult): NightCheck {
+  const n = r.night;
+  return {
+    needed: n.status !== 'none',
+    basis: BASIS[n.basis],
+    generation_kw: round(n.sources_kw, 2),
+    load_kw: round(n.load_kw, 2),
+    per_night_kwh: round(n.per_night_kwh, 2),
+    longest_darkness_h: n.longest_darkness_h === null ? null : round(n.longest_darkness_h, 1),
+    storage_kwh: n.storage_kwh,
+    // Rounded up, never down: typing the suggested figure must pass the night check.
+    storage_needed_kwh: n.storage_needed_kwh === null ? null : Math.ceil(n.storage_needed_kwh * 10 - 1e-9) / 10,
+    available_kwh: nullableRound(n.available_kwh, 1),
+    load_kwh: nullableRound(n.load_kwh, 1),
+    margin_percent: nullableRound(n.margin_percent, 2),
+    status: n.status,
+    passes: n.passes,
+  };
 }
 
 function fitCheck(hardware: HardwareChoice[], catalog: CatalogItem[], site: SiteRef | null): { fits: boolean; notes: string[] } {
@@ -256,6 +333,7 @@ export function evaluateSite(
   landingMs: number,
   stayDays: number,
   hardware: HardwareChoice[],
+  storageKwh = 0,
   catalog: CatalogItem[] = MOCK_CATALOG,
 ): SiteStay {
   const skyline = skylineFor(site);
@@ -263,18 +341,14 @@ export function evaluateSite(
   const samples = sampleWindow(site, landingMs, endMs, stepsForStay(stayDays), skyline);
   const lit = samples.filter((s) => s.sunAbove).length / samples.length;
   const earthShare = samples.filter((s) => s.earthVisible).length / samples.length;
-  const hasDark = lit < 1;
-  const hasLight = lit > 0;
   const stayHours = stayDays * 24;
+  const darkH = longestDarknessHours(samples, stayHours);
 
   const p = powerTotals(hardware, catalog);
   const genKwh = (p.genSunKw * lit + p.genAlwaysKw) * stayHours;
   const loadKwh = (p.loadDayKw * lit + p.loadNightKw * (1 - lit)) * stayHours;
-  const stayMargin = margin(genKwh, loadKwh);
-  const dayMargin = margin(p.genSunKw + p.genAlwaysKw, p.loadDayKw);
-  const nightMargin = margin(p.genAlwaysKw, p.loadNightKw);
-  const needed = [hasLight ? dayMargin : null, hasDark ? nightMargin : null].filter((m): m is number => m !== null);
-  const balance = needed.length ? Math.min(...needed) : null;
+  const power = runPowerCheck(p, storageKwh, darkH);
+  const balance = power.balance;
 
   const fit = fitCheck(hardware, catalog, site);
   const earthLink: EarthLink = earthShare >= 0.98 ? 'clear' : earthShare <= 0.02 ? 'none' : 'intermittent';
@@ -282,11 +356,13 @@ export function evaluateSite(
 
   let verdict: Verdict = { result: 'pass', requirement: null };
   if (!fit.fits) verdict = { result: 'fail', requirement: 'hardware fit' };
-  else if (hasDark && nightMargin !== null && nightMargin < 0) verdict = { result: 'fail', requirement: 'night power' };
-  else if (hasLight && dayMargin !== null && dayMargin < 0) verdict = { result: 'fail', requirement: 'day power' };
+  else if (!power.night.passes) verdict = { result: 'fail', requirement: 'night power' };
+  else if (!power.day.passes) verdict = { result: 'fail', requirement: 'day power' };
   else if (earthLink === 'none') verdict = { result: 'fail', requirement: 'Earth contact' };
 
-  const powerScore = stayMargin === null ? 50 : Math.min(100, Math.max(0, 50 + stayMargin / 2));
+  // Power counts for 15 % of the score: the balance margin, mapped from -100..+100 % onto 0..100.
+  const powerScore =
+    balance.status === 'none' ? 50 : balance.margin_percent === null ? 0 : 50 + Math.min(100, Math.max(-100, balance.margin_percent)) / 2;
   let score = 0.45 * lit * 100 + 0.25 * earthShare * 100 + 0.15 * clearSky + 0.15 * powerScore;
   if (!fit.fits) score *= 0.5;
   else if (verdict.result === 'fail') score *= 0.75;
@@ -300,35 +376,41 @@ export function evaluateSite(
     earth_link: earthLink,
     hardware_fits: fit.fits,
     energy_added_kwh: Math.round(genKwh - loadKwh),
-    power_margin_percent: nullableRound(balance),
+    power_margin_percent: nullableRound(balance.margin_percent, 2),
+    power_status: balance.status,
     verdict,
   };
   const check: CheckResponse = {
     fits: fit.fits,
     fit_notes: fit.notes,
-    day: { generation_kw: round(p.genSunKw + p.genAlwaysKw, 2), load_kw: round(p.loadDayKw, 2), margin_percent: nullableRound(dayMargin), needed: hasLight },
-    night: { generation_kw: round(p.genAlwaysKw, 2), load_kw: round(p.loadNightKw, 2), margin_percent: nullableRound(nightMargin), needed: hasDark },
-    balance_margin_percent: nullableRound(balance),
+    day: dayCheckOf(power),
+    night: nightCheckOf(power),
+    balance: { margin_percent: nullableRound(balance.margin_percent, 2), status: balance.status, limiting: balance.limiting },
+    power_notes: power.notes,
     energy_added_kwh: Math.round(genKwh - loadKwh),
   };
   return { evaluation, check };
 }
 
-/** Day / night check when no site is picked yet: assume both day and night happen, half each. */
-export function genericCheck(stayDays: number, hardware: HardwareChoice[], catalog: CatalogItem[] = MOCK_CATALOG): CheckResponse {
+/**
+ * Day / night check when no site is picked yet. Without a site there is no darkness length, so,
+ * as in the planner module, the night check compares power only and storage is not counted.
+ * The energy figure assumes half the stay is sunlit.
+ */
+export function genericCheck(stayDays: number, hardware: HardwareChoice[], storageKwh = 0, catalog: CatalogItem[] = MOCK_CATALOG): CheckResponse {
   const p = powerTotals(hardware, catalog);
-  const dayMargin = margin(p.genSunKw + p.genAlwaysKw, p.loadDayKw);
-  const nightMargin = margin(p.genAlwaysKw, p.loadNightKw);
-  const both = [dayMargin, nightMargin].filter((m): m is number => m !== null);
+  const power = runPowerCheck(p, storageKwh, null);
   const hours = stayDays * 24;
   const energy = (p.genSunKw * 0.5 + p.genAlwaysKw - (p.loadDayKw + p.loadNightKw) * 0.5) * hours;
   const fit = fitCheck(hardware, catalog, null);
+  const notes = storageKwh > 0 || p.perNightKwh > 0 ? ['No site picked yet: storage counts once a site gives the length of its darkness.'] : [];
   return {
     fits: fit.fits,
     fit_notes: fit.notes,
-    day: { generation_kw: round(p.genSunKw + p.genAlwaysKw, 2), load_kw: round(p.loadDayKw, 2), margin_percent: nullableRound(dayMargin), needed: true },
-    night: { generation_kw: round(p.genAlwaysKw, 2), load_kw: round(p.loadNightKw, 2), margin_percent: nullableRound(nightMargin), needed: true },
-    balance_margin_percent: both.length ? round(Math.min(...both), 1) : null,
+    day: dayCheckOf(power),
+    night: nightCheckOf(power),
+    balance: { margin_percent: nullableRound(power.balance.margin_percent, 2), status: power.balance.status, limiting: power.balance.limiting },
+    power_notes: notes,
     energy_added_kwh: Math.round(energy),
   };
 }
@@ -383,6 +465,6 @@ function round(x: number, digits: number): number {
   return Math.round(x * f) / f + 0;
 }
 
-function nullableRound(x: number | null): number | null {
-  return x === null ? null : round(x, 1);
+function nullableRound(x: number | null, digits = 1): number | null {
+  return x === null ? null : round(x, digits);
 }

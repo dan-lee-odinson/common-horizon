@@ -4,17 +4,36 @@
     "Starship lander: ground slope 9.5° is steeper than its 8° limit."
   ],
   "day": {
+    "needed": true,
     "generation_kw": 6.6,
     "load_kw": 4.4,
-    "margin_percent": 50,
-    "needed": true
+    "refill_kw": 1.98,
+    "refill_kwh": 867.2,
+    "refill_hours": 437.7,
+    "margin_percent": 3.32,
+    "status": "yellow",
+    "passes": true
   },
   "night": {
+    "needed": true,
+    "basis": "energy",
     "generation_kw": 0,
     "load_kw": 3.2,
-    "margin_percent": -100,
-    "needed": true
+    "per_night_kwh": 0,
+    "longest_darkness_h": 271,
+    "storage_kwh": 0,
+    "storage_needed_kwh": 867.2,
+    "available_kwh": 0,
+    "load_kwh": 867.2,
+    "margin_percent": null,
+    "status": "red",
+    "passes": false
   },
-  "balance_margin_percent": -100,
+  "balance": {
+    "margin_percent": null,
+    "status": "red",
+    "limiting": "night"
+  },
+  "power_notes": [],
   "energy_added_kwh": -720
 }

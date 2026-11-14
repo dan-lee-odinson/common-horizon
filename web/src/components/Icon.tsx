@@ -20,7 +20,12 @@ export type IconName =
   | 'compare'
   | 'sun'
   | 'left'
-  | 'right';
+  | 'right'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'chevron-down'
+  | 'chevron-up'
+  | 'chat';
 
 const PATHS: Record<IconName, string> = {
   play: 'M7 5.5v13l11-6.5z',
@@ -43,6 +48,11 @@ const PATHS: Record<IconName, string> = {
   sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4',
   left: 'M19 12H5M11 6l-6 6 6 6',
   right: 'M5 12h14M13 6l6 6-6 6',
+  'zoom-in': 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.3 15.3L20 20M10.5 8v5M8 10.5h5',
+  'zoom-out': 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.3 15.3L20 20M8 10.5h5',
+  'chevron-down': 'M6 9l6 6 6-6',
+  'chevron-up': 'M6 15l6-6 6 6',
+  chat: 'M5 6.5h14v9H10l-4 3.5v-3.5H5z',
 };
 
 const FILLED = new Set<IconName>(['play', 'star-filled']);

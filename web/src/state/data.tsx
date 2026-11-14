@@ -41,6 +41,8 @@ export interface DataValue {
   siteById: Map<string, KnownSite>;
   highlighted: KnownSite | null;
   hardwareChosen: HardwareChoice[];
+  /** Battery storage typed in the planner, kWh (0 = none). */
+  storageKwh: number;
   landingMs: number | null;
   plannedLandingMs: number | null;
   /** Horizon timeline window: planned landing to the end of the (slipped) stay. */
@@ -85,6 +87,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const slipDays = useStore(appStore, (s) => s.slipDays);
   const stayDays = useStore(appStore, (s) => s.stayDays);
   const hardware = useStore(appStore, (s) => s.hardware);
+  const storageKwh = useStore(appStore, (s) => s.storageKwh);
   const highlightedId = useStore(appStore, (s) => s.highlightedId);
   const customSite = useStore(appStore, (s) => s.customSite);
   const saved = useStore(appStore, (s) => s.saved);
@@ -115,12 +118,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const hardwareChosen = useMemo(() => hardwareChoices(hardware), [hardware]);
 
   const siteRefs = useMemo<SiteRef[]>(() => allSites.map(({ id, name, lat, lon_east }) => ({ id, name, lat, lon_east })), [allSites]);
-  const evalKey = siteRefs.length ? JSON.stringify([siteRefs.map((s) => [s.id, s.lat, s.lon_east]), launchUtcMs, slipDays, stayDays, hardwareChosen]) : null;
+  const evalKey = siteRefs.length ? JSON.stringify([siteRefs.map((s) => [s.id, s.lat, s.lon_east]), launchUtcMs, slipDays, stayDays, hardwareChosen, storageKwh]) : null;
 
   const evaluation = useAsync<EvaluationBundle>(
     evalKey,
     async (signal) => {
-      const base = { sites: siteRefs, launch_utc: toIsoUtc(launchUtcMs), stay_days: stayDays, hardware: hardwareChosen };
+      const base = { sites: siteRefs, launch_utc: toIsoUtc(launchUtcMs), stay_days: stayDays, hardware: hardwareChosen, storage_kwh: storageKwh };
       const [current, planned] = await Promise.all([
         api.evaluate({ ...base, slip_days: slipDays }, signal),
         slipDays > 0 ? api.evaluate({ ...base, slip_days: 0 }, signal) : Promise.resolve(null),
@@ -137,10 +140,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const windowEndMs = landingMs === null ? null : landingMs + stayDays * DAY_MS;
 
   const highlightedRef = highlighted ? { id: highlighted.id, name: highlighted.name, lat: highlighted.lat, lon_east: highlighted.lon_east } : null;
-  const checkKey = landingMs === null ? null : JSON.stringify([highlightedRef, landingMs, stayDays, hardwareChosen]);
+  const checkKey = landingMs === null ? null : JSON.stringify([highlightedRef, landingMs, stayDays, hardwareChosen, storageKwh]);
   const check = useAsync(
     checkKey,
-    (signal) => api.check({ site: highlightedRef, landing_utc: toIsoUtc(landingMs!), stay_days: stayDays, hardware: hardwareChosen }, signal),
+    (signal) => api.check({ site: highlightedRef, landing_utc: toIsoUtc(landingMs!), stay_days: stayDays, hardware: hardwareChosen, storage_kwh: storageKwh }, signal),
     () => false,
     120,
   );
@@ -158,6 +161,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     siteById,
     highlighted,
     hardwareChosen,
+    storageKwh,
     landingMs,
     plannedLandingMs,
     windowStartMs,

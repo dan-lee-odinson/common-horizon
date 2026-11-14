@@ -133,6 +133,22 @@
     text-transform: uppercase;
     color: var(--ch-muted);
   }
+  /* The assistant's conversation: floats over the workspace, never pushes it. At most about 40 % of
+     the window height; with content, at least six lines tall (13 px text, 1.45 line height). */
+  .chat-panel {
+    max-height: 40vh;
+    max-height: 40dvh;
+    background: var(--ch-glass-strong);
+    -webkit-backdrop-filter: blur(12px) saturate(1.1);
+    backdrop-filter: blur(12px) saturate(1.1);
+    box-shadow: 0 -12px 32px var(--ch-shadow);
+  }
+  /* The log is a flex item: this explicit minimum (no min-h-0 utility on it, which would win over a
+     component rule) lets it shrink to six lines and scroll beyond that. */
+  .chat-log {
+    line-height: 1.45;
+    min-height: calc(6 * 1.45em + 1rem);
+  }
   /* Panels and scenes that appear: a short fade with a small lift. */
   .enter {
     animation: ch-enter 220ms var(--ease-out) both;

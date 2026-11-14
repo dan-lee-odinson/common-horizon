@@ -13,6 +13,7 @@ function ev(site_id: string, score: number): SiteEvaluation {
     hardware_fits: true,
     energy_added_kwh: 0,
     power_margin_percent: null,
+    power_status: 'none',
     verdict: { result: 'pass', requirement: null },
   };
 }

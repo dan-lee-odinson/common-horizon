@@ -96,6 +96,12 @@ export function catalog(signal?: AbortSignal): Promise<CatalogResponse> {
   return respond(signal, () => ({ items: MOCK_CATALOG }), () => ({ items: [] }));
 }
 
+/** Typed storage from a request; a missing, negative or non-number value counts as none. */
+function storageOf(req: { storage_kwh?: number }): number {
+  const kwh = req.storage_kwh;
+  return typeof kwh === 'number' && Number.isFinite(kwh) && kwh > 0 ? kwh : 0;
+}
+
 export function landingMsFor(launchUtc: string, slipDays: number): number {
   return Date.parse(launchUtc) + (TRANSIT_DAYS + slipDays) * DAY_MS;
 }
@@ -112,7 +118,7 @@ export function evaluate(req: EvaluateRequest, signal?: AbortSignal): Promise<Ev
   return respond(
     signal,
     () => {
-      const results = req.sites.map((site) => evaluateSite(site, landingMs, req.stay_days, req.hardware).evaluation);
+      const results = req.sites.map((site) => evaluateSite(site, landingMs, req.stay_days, req.hardware, storageOf(req)).evaluation);
       results.sort((a, b) => b.score - a.score || a.site_id.localeCompare(b.site_id));
       return { ...base, results };
     },
@@ -132,7 +138,7 @@ export function check(req: CheckRequest, signal?: AbortSignal): Promise<CheckRes
   const landingMs = Date.parse(req.landing_utc);
   return respond(
     signal,
-    () => (req.site ? evaluateSite(req.site, landingMs, req.stay_days, req.hardware).check : genericCheck(req.stay_days, req.hardware)),
+    () => (req.site ? evaluateSite(req.site, landingMs, req.stay_days, req.hardware, storageOf(req)).check : genericCheck(req.stay_days, req.hardware, storageOf(req))),
     () => genericCheck(req.stay_days, []),
   );
 }

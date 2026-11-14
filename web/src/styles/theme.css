@@ -15,6 +15,8 @@
   --ch-surface-2: #171e29;
   --ch-surface-3: #1e2734;
   --ch-glass: rgb(17 22 30 / 0.74);
+  /* The assistant's conversation panel: semi-opaque, a little denser than glass so text stays readable */
+  --ch-glass-strong: rgb(17 22 30 / 0.86);
   --ch-scrim: rgb(4 6 9 / 0.62);
   --ch-line: #232d3b;
   --ch-line-strong: #34425a;
