@@ -4,7 +4,8 @@
 //   1. measures the real bounding box from the .glb and fails if any size is more than
 //      1 percent off the JSON (width_x, height_y, depth_z, and any named parts);
 //   2. counts the triangles and fails if the count is 20,000 or more, or differs from the JSON;
-//   3. checks the frame: lowest point on the ground (y = 0), footprint centred on the origin;
+//   3. checks the frame: lowest point on the ground (y = 0) and footprint centred on the
+//      origin, both within 1 mm;
 //   4. checks the JSON against the brief (status label, brief sizes, required fields,
 //      the "illustrative shape, built with SI/AI-written code" note);
 //   5. checks for plain colours only: no images, textures or vertex colours;
@@ -22,7 +23,7 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import validator from 'gltf-validator';
 import { measureGLB } from './shared/glb-reader.mjs';
-import { BRIEF, TRIANGLE_LIMIT, SIZE_TOLERANCE, REQUIRED_NOTE } from './brief-figures.mjs';
+import { BRIEF, TRIANGLE_LIMIT, SIZE_TOLERANCE, ORIGIN_TOLERANCE_M, REQUIRED_NOTE } from './brief-figures.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_DIR = path.resolve(here, '../../web/public/models');
@@ -136,7 +137,9 @@ export function checkAgainstBrief(json, brief) {
           problems.push(`brief: default ${key} should be ${value} but the JSON says ${parameters.defaults?.[key]}`);
         }
         if (parameters[key] !== value) {
-          warnings.push(`built with ${key} = ${parameters[key]}, not the default ${value}`);
+          problems.push(
+            `brief: built with ${key} = ${parameters[key]}, not the default ${value}; rebuild with the defaults before committing`,
+          );
         }
       }
       if (relativeError(json.dimensions_m?.height_y, parameters.height_m) > SIZE_TOLERANCE + SLACK) {
@@ -176,14 +179,13 @@ export function checkMeasurements(json, measured) {
     problems.push(`triangles: found non-triangle primitives (modes ${[...new Set(measured.nonTriangleModes)].join(', ')})`);
   }
 
-  // 3. Frame: on the ground, footprint centred on the origin (within 1 percent of the size)
-  const [w, h, d] = measured.box.size;
+  // 3. Frame: on the ground, footprint centred on the origin (within 1 mm, whatever the size)
   const ground = measured.box.min[1];
   const [cx, , cz] = measured.box.center;
-  if (Math.abs(ground) > SIZE_TOLERANCE * h + SLACK) {
+  if (Math.abs(ground) > ORIGIN_TOLERANCE_M) {
     problems.push(`frame: lowest point is at y = ${ground.toFixed(3)} m; it should be on the ground (y = 0)`);
   }
-  if (Math.abs(cx) > SIZE_TOLERANCE * w + SLACK || Math.abs(cz) > SIZE_TOLERANCE * d + SLACK) {
+  if (Math.abs(cx) > ORIGIN_TOLERANCE_M || Math.abs(cz) > ORIGIN_TOLERANCE_M) {
     problems.push(`frame: footprint centre is at x = ${cx.toFixed(3)}, z = ${cz.toFixed(3)} m; it should be at the origin`);
   }
 

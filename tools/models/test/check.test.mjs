@@ -100,6 +100,13 @@ test('check: model off the origin or off the ground fails', async () => {
   const shifted = sampleScene();
   shifted.children[0].position.x = 0.5;
   assert.match(checkMeasurements(sampleJson(), measureGLB(await exportGLB(shifted))).join('\n'), /footprint centre/);
+  // A small offset fails too: the rule is 1 mm, not a share of the model's size.
+  const nudged = sampleScene();
+  nudged.children[0].position.set(0, 0, 0.005);
+  assert.match(checkMeasurements(sampleJson(), measureGLB(await exportGLB(nudged))).join('\n'), /footprint centre/);
+  const almost = sampleScene();
+  almost.children[0].position.set(0.0005, 0, 0);
+  assert.deepEqual(checkMeasurements(sampleJson(), measureGLB(await exportGLB(almost))), []);
 });
 
 test('check: textures and vertex colours fail (plain colours only)', async () => {
@@ -181,4 +188,16 @@ test('check: the committed models pass', async () => {
   const problems = [...folderProblems, ...results.flatMap((r) => r.problems.map((p) => `${r.id}: ${p}`))];
   assert.equal(failed, false, problems.join('\n'));
   assert.equal(results.length, 5);
+});
+
+test('check: solar array mast built with non-default sizes fails the brief check', () => {
+  const json = sampleJson({
+    id: 'solar-array-mast',
+    status: BRIEF['solar-array-mast'].status,
+    dimensions_m: { width_x: 5, height_y: 12, depth_z: 2 },
+    parameters: { height_m: 12, panel_width_m: 5, defaults: { height_m: 10, panel_width_m: 4 } },
+  });
+  const { problems } = checkAgainstBrief(json, BRIEF['solar-array-mast']);
+  assert.match(problems.join('\n'), /built with height_m = 12, not the default 10/);
+  assert.match(problems.join('\n'), /built with panel_width_m = 5, not the default 4/);
 });

@@ -7,6 +7,8 @@
 
 export const TRIANGLE_LIMIT = 20000; // "Under 20,000 triangles each"
 export const SIZE_TOLERANCE = 0.01; // "fails if a size is more than 1 percent off its JSON"
+// Origin rule ("origin at the centre of the footprint on the ground"): our own tolerance, 1 mm.
+export const ORIGIN_TOLERANCE_M = 0.001;
 export const REQUIRED_NOTE = 'illustrative shape, built with SI/AI-written code';
 
 export const STATUS_LABELS = Object.freeze({

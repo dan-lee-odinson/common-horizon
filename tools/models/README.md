@@ -52,7 +52,8 @@ npm run check
 
 Loads every `.glb` with its own small reader (not three.js), measures the bounding box and the
 triangle count, and fails if a size is more than 1 percent off its JSON, if a model has
-20,000 triangles or more, if the model is off the ground or off centre, if the JSON disagrees
+20,000 triangles or more, if the model is more than 1 mm off the ground or off centre, if the
+solar array mast was not built with its default sizes, if the JSON disagrees
 with the brief (`brief-figures.mjs`), if a model uses textures or vertex colours, or if the
 Khronos glTF validator reports an error.
 
