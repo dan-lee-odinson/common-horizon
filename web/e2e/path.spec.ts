@@ -141,7 +141,13 @@ async function sceneBox(page: Page) {
 
 test('chat: opening the conversation does not move or resize the scene behind it', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('[data-testid="moon-scene"] canvas')).toBeVisible();
+  // Wait until the 3D canvas has sized itself to the workspace (it starts at the browser's 300 x 150).
+  await expect
+    .poll(async () => {
+      const { workspace, canvas } = await sceneBox(page);
+      return Boolean(workspace && canvas && Math.abs(canvas.width - workspace.width) < 1 && Math.abs(canvas.height - workspace.height) < 1);
+    })
+    .toBe(true);
   const before = await sceneBox(page);
   const box = page.getByRole('textbox', { name: 'Ask the assistant' });
 
