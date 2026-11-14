@@ -86,7 +86,7 @@ test('solar-array-mast: rejects impossible parameters', () => {
 
 test('griffin-lander: nothing reaches beyond 2.25 m from the centre in any direction', () => {
   // The published width is about 4.5 m, so the pad-to-pad span must not exceed it on the
-  // diagonals either (legs on the diagonals would reach about 3.2 m).
+  // diagonals either (legs on the diagonals would reach about 3.06 m).
   const { scene } = MODELS.find((m) => m.id === 'griffin-lander').build();
   let farthest = 0;
   scene.updateMatrixWorld(true);

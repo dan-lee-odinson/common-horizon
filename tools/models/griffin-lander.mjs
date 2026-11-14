@@ -87,7 +87,7 @@ export function build() {
   // Four legs, one on each side of the deck, on the +X, -X, +Z and -Z axes. Each leg is a main
   // strut from under the middle of a deck edge and two braces from the lower corners of the
   // body, all meeting at a round foot pad. With the legs on the axes the pad-to-pad span is
-  // 4.5 m in every direction (on the diagonals it would be about 6.4 m).
+  // 4.5 m in every direction (with the legs on the diagonals it would be about 6.1 m).
   const legs = new Part('landing-legs');
   for (const [ux, uz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
     const [vx, vz] = [-uz, ux]; // sideways direction along the deck edge
