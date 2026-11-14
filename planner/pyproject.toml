@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "common-horizon-planner"
+version = "0.1.0"
+description = "Lunar landing site planner: hardware catalog, payload fit check and power arithmetic."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.setuptools]
+packages = ["planner", "planner.data"]
+
+[tool.setuptools.package-data]
+"planner.data" = ["*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
