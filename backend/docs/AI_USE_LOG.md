@@ -46,14 +46,14 @@ clock reading.
 - Validation bounds in `app/models/limits.py` (date window 2000–2100, stay ≤ 365 days,
   time step 60–86 400 s, launch delay ≤ 30 days).
 - Launch delay read as a sweep (0, step, … max) and `hardware_requirements` schema: both are
-  proposals pending the physics owner's answer.
+  provisional (see "Provisional technical assumptions" in `API_CONTRACT.md`).
 - Requirement checks and launch-delay orchestration live in the backend for now (threshold
   comparisons on engine values only).
 
 ### Human review status
 
 - [ ] Backend owner reviewed every changed file
-- [ ] Physics owner confirmed or corrected the open questions in `API_CONTRACT.md`
+- [ ] Provisional technical assumptions in `API_CONTRACT.md` validated against the physics engine
 - [ ] Independent teammate review before merge
 
 ## Phase 1 review fixes: Codex review of `c34f59e` on PR #4 (2026-11-14)
@@ -73,10 +73,16 @@ the source files' modification times.
 ### Not addressed here (nonblocking review items)
 
 - Docker build tooling: bundled `pip` advisories, unpinned transitive dependencies and image digest.
-  Left for an infrastructure change agreed with Dan.
-- Physics conventions (coordinates, elevation, metric definitions, launch-delay semantics) still
-  need Isabella's confirmation.
+  Left for a separate, team-approved infrastructure change.
+- Physics conventions (coordinates, elevation, metric definitions, launch-delay semantics) remain
+  provisional (see "Provisional technical assumptions" in `API_CONTRACT.md`).
 - The Starlette/httpx test warning filter stays until the move to `httpx2` (accepted as temporary).
 - A request containing an integer literal of more than 4 300 digits gets FastAPI's own 400
   ("There was an error parsing the body"), not 422: Python's integer-size limit fails while parsing the JSON.
   The response is structured, never 500.
+
+## Documentation organization (2026-11-14)
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 15:28:19 | 17:28:19 | Drafted with Claude Code: open coordination questions in `API_CONTRACT.md` restated as neutral provisional technical assumptions and engine integration requirements; private working notes moved to a git-ignored `.local-notes/` directory | No change to the API, code behaviour or OpenAPI contract |

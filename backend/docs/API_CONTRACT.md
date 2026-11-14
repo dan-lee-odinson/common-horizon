@@ -1,6 +1,7 @@
 # API contract v0.1.0 (draft)
 
-Status: **draft for review** by the physics owner (Isabella) and the frontend owner (Dan).
+Status: **draft**. The items under [Provisional technical assumptions](#provisional-technical-assumptions)
+have not yet been validated against the physics engine.
 Source of the field list: the team document *Physics Engine-to-website Integration*.
 Machine-readable version: [`../contract/openapi.json`](../contract/openapi.json).
 
@@ -112,29 +113,33 @@ smooth horizon, no terrain). It exists only so the frontend and tests can run be
 exist. Its curves look plausible on purpose but **must not be presented as results**. A sample
 counts as visible when any part of the disc is above the horizon. That definition is a placeholder.
 
-## Open questions for physics (Isabella)
+## Provisional technical assumptions
 
-1. **Coordinates:** planetocentric latitude, east-positive longitude in -180…180, `MOON_ME` frame:
-   correct? Which kernels (e.g. DE440, `moon_pa`/`moon_me` frame kernels)?
-2. **Elevation reference:** is altitude relative to the 1737.4 km sphere? When the user gives an
-   altitude, should it override the LOLA value, or should the input be removed?
-3. **Position vectors:** origin at the Moon's centre or at the landing site? Which aberration
-   correction (e.g. `LT+S`)?
-4. **Visibility definitions:** is the Sun "visible" when any part of the disc is up, when the centre is
-   up, or weighted by fraction? Is there an elevation mask for Earth communication?
-5. **Obstruction states:** are `visible / partial / terrain_blocked / below_horizon` the right classes?
-6. **Metric definitions:** how are sunlight hours and longest darkness computed (sample-and-hold vs
-   interpolated crossings)? What do time-to-sunset and time-to-Earthset mean if the body is already
-   down at mission start (currently null)?
-7. **Launch delay:** a sweep up to a maximum slip (implemented) or one fixed slip? Whole days only?
-8. **Limits:** supported date range (kernel coverage), maximum stay, minimum time step, and runtime
-   per simulation. These decide whether launch-delay sweeps fit in one synchronous request
-   (API Gateway ~29 s).
-9. **Ownership:** should the requirements checker and the launch-delay sweep live in the engine
-   or stay in the backend (current)? What requirement fields does your checker expect, and does
-   `hardware_id` map to a catalogue?
-10. **Python interface:** package/module name, function signatures, return types (numpy arrays,
-    dicts?), dependencies (spiceypy, numpy, …), kernel/terrain data size and location (image vs S3).
-11. **Terrain outputs:** skyline azimuth resolution; elevation-grid extent, resolution and format for
-    the 3D view.
-12. **Observer height:** how is it used (horizon dip, terrain line of sight), and what default?
+The backend implements the assumptions below so the contract and the frontend can be built now. They
+have not yet been validated against the physics engine and may change. A breaking change to request or
+response shapes bumps `contract_version`.
+
+| Area | Current assumption (implemented) | Not yet defined |
+|---|---|---|
+| Coordinates | Planetocentric latitude, east-positive longitude in -180 … 180, `MOON_ME` frame | Kernel set (e.g. DE440, `moon_pa` / `moon_me` frame kernels) |
+| Elevation reference | `altitude_m` and `site.elevation_m` are relative to the 1737.4 km sphere. A supplied altitude is passed to the engine; `null` means the engine derives it from terrain. `site.elevation_source` reports which applied | Precedence between a supplied altitude and the terrain-model (LOLA) value |
+| Position vectors | `position_km` from the Moon's centre; `direction_unit` from the observer to the body; both in `MOON_ME` | Aberration correction (e.g. `LT+S`) |
+| Visibility | A body counts as visible when any part of its disc is above the horizon (`visibility_fraction > 0`) | Centre-of-disc or fraction-weighted definitions; elevation mask for Earth communication |
+| Obstruction states | `visible`, `partial`, `terrain_blocked`, `below_horizon` | Whether these four classes are sufficient |
+| Metrics | Sample-and-hold: each interval takes the state sampled at its start. `time_to_sunset_hours` / `time_to_earthset_hours` are `null` when the body is already down at mission start or does not set | Interpolated crossings; meaning of time-to-set when the body starts below the horizon |
+| Launch delay | Sweep of whole-day delays 0, step, 2·step, … up to `launch_delay_days` | Whether a single fixed slip is needed instead |
+| Limits | Values in `app/models/limits.py` (see [Inputs](#inputs-website--engine-missioninput)) | Kernel coverage and per-simulation runtime, which bound the date window and whether a launch-delay sweep fits one synchronous request (API Gateway ~29 s) |
+| Requirement checks, launch-delay sweep | Run in the backend as threshold comparisons on engine values. `hardware_id` is echoed in the response, not passed to the engine, and not mapped to a catalogue | Whether these move into the engine; which requirement fields the engine uses |
+| Observer height | Default 0 m. The synthetic model applies it only as horizon dip | Its role in terrain line-of-sight |
+
+## Physics engine integration requirements
+
+To replace the stub in `app/physics/engine_adapter.py`, the engine integration needs:
+
+- A Python entry point: package/module name, function signatures and return types (e.g. numpy arrays or
+  dicts), which the adapter converts into `SimulationResult`.
+- Runtime dependencies (e.g. spiceypy, numpy) and their size, since they ship in the Lambda container image.
+- Location and size of kernel and terrain data (container image or S3).
+- Per-simulation runtime for the largest allowed request.
+- Terrain outputs: skyline azimuth resolution; extent, resolution and format of the elevation grid
+  (planned as a separate endpoint).

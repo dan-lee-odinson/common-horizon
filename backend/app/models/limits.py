@@ -1,7 +1,7 @@
 """Validation limits for mission inputs.
 
-PROVISIONAL: these bounds are backend proposals awaiting confirmation from the
-physics owner (see backend/docs/API_CONTRACT.md, "Open questions for physics").
+PROVISIONAL: these bounds are backend proposals not yet validated against the
+physics engine (see backend/docs/API_CONTRACT.md, "Provisional technical assumptions").
 They live in one place so they can be tuned without touching the models.
 """
 
