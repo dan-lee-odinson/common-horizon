@@ -57,6 +57,9 @@ npx playwright install chromium
 
   then edit `.env.local`, for example `VITE_API_BASE=http://localhost:8000`, and restart `npm run dev`.
 
+  The backend must allow cross-origin requests (CORS) from the address the website is served
+  from, unless both are served from the same address.
+
 The mock answers change with the slip (the Sun's position over each site moves through the lunar
 day), so the ranking visibly reorders. They are **not** real data: the geometry is simplified and the
 terrain is invented. See `src/api/examples/mock-model.json`.
