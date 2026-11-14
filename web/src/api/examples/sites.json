@@ -1,7 +1,7 @@
 {
-  "_note": "Preset sites for mock mode (latitude, east longitude 0-360). Values from the team brief; to be replaced by the team's sourced list.",
+  "_note": "Preset sites for mock mode (latitude, east longitude 0-360). Sources for each entry are in web/SOURCES-web.md.",
   "sites": [
-    { "id": "shackleton-ridge", "name": "Shackleton Connecting Ridge", "lat": -89.684, "lon_east": 196.739, "note": null },
+    { "id": "shackleton-ridge", "name": "Shackleton Connecting Ridge", "lat": -89.684, "lon_east": 196.739, "note": "Planned landing area of Blue Moon Mark 1 (Moon Base I); its landing point is not published" },
     { "id": "nobile", "name": "Nobile region", "lat": -85.42088, "lon_east": 31.6218, "note": "VIPER study area, Mons Mouton; Griffin's landing point is not published", "default_hardware": ["griffin"] },
     { "id": "apollo-11", "name": "Apollo 11", "lat": 0.67416, "lon_east": 23.47314, "note": null },
     { "id": "apollo-12", "name": "Apollo 12", "lat": -3.0128, "lon_east": 336.5781, "note": null },
@@ -10,8 +10,12 @@
     { "id": "apollo-16", "name": "Apollo 16", "lat": -8.9734, "lon_east": 15.5011, "note": null },
     { "id": "apollo-17", "name": "Apollo 17", "lat": 20.1911, "lon_east": 30.7723, "note": null },
     { "id": "im-1-odysseus", "name": "IM-1 Odysseus", "lat": -80.13, "lon_east": 1.44, "note": null },
-    { "id": "im-2-athena", "name": "IM-2 Athena", "lat": -84.7906, "lon_east": 29.1957, "note": null },
+    { "id": "im-2-athena", "name": "IM-2 Athena", "lat": -84.7906, "lon_east": 29.1957, "note": "Mons Mouton; IM-4 is also planned for Mons Mouton" },
     { "id": "blue-ghost-m1", "name": "Blue Ghost Mission 1", "lat": 18.562, "lon_east": 61.81, "note": null },
+    { "id": "im-3-reiner-gamma", "name": "IM-3 (planned)", "lat": 7.585, "lon_east": 301.275, "note": "Reiner Gamma; the selected landing point" },
+    { "id": "blue-ghost-m2", "name": "Blue Ghost Mission 2 (planned)", "lat": -24.9, "lon_east": 177.4, "note": "Far side, near Nassau crater; crater center shown, landing point not published" },
+    { "id": "blue-ghost-m3", "name": "Blue Ghost Mission 3 (planned)", "lat": 36.56, "lon_east": 319.28, "note": "Mons Gruithuisen Gamma; dome location shown. Peregrine Mission-1 was bound for nearby Sinus Viscositatis and did not reach the Moon" },
+    { "id": "draper-cp12", "name": "Draper SERIES-2 (planned)", "lat": -75.0, "lon_east": 132.4, "note": "Far side, Schrodinger basin; basin center shown, landing point not published" },
     { "id": "chandrayaan-3", "name": "Chandrayaan-3", "lat": -69.373, "lon_east": 32.319, "note": null },
     { "id": "slim", "name": "SLIM", "lat": -13.316, "lon_east": 25.251, "note": null }
   ]

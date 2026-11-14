@@ -24,6 +24,10 @@
     "im-1-odysseus": { "slope_deg": 11.0, "horizon_scale_deg": 2.0, "horizon_offset_deg": 0.8 },
     "im-2-athena": { "slope_deg": 8.5, "horizon_scale_deg": 2.2, "horizon_offset_deg": 0.7 },
     "blue-ghost-m1": { "slope_deg": 2.5, "horizon_scale_deg": 0.8, "horizon_offset_deg": 0.2 },
+    "im-3-reiner-gamma": { "slope_deg": 2.0, "horizon_scale_deg": 0.6, "horizon_offset_deg": 0.2 },
+    "blue-ghost-m2": { "slope_deg": 4.0, "horizon_scale_deg": 1.6, "horizon_offset_deg": 0.6 },
+    "blue-ghost-m3": { "slope_deg": 7.0, "horizon_scale_deg": 2.0, "horizon_offset_deg": 0.8 },
+    "draper-cp12": { "slope_deg": 3.5, "horizon_scale_deg": 2.6, "horizon_offset_deg": 1.0 },
     "chandrayaan-3": { "slope_deg": 6.0, "horizon_scale_deg": 1.4, "horizon_offset_deg": 0.5 },
     "slim": { "slope_deg": 12.5, "horizon_scale_deg": 1.5, "horizon_offset_deg": 0.5 }
   }

@@ -34,9 +34,9 @@ describe('mock mode (VITE_API_BASE unset)', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('lists the 13 preset sites with east longitudes', async () => {
+  it('lists the 17 preset sites with east longitudes', async () => {
     const r = await api.listSites();
-    expect(r.sites).toHaveLength(13);
+    expect(r.sites).toHaveLength(17);
     for (const s of r.sites) {
       expect(s.lon_east).toBeGreaterThanOrEqual(0);
       expect(s.lon_east).toBeLessThan(360);
@@ -55,7 +55,7 @@ describe('mock mode (VITE_API_BASE unset)', () => {
 
   it('evaluates every site with every field the list shows', async () => {
     const r = await api.evaluate(request(0));
-    expect(r.results).toHaveLength(13);
+    expect(r.results).toHaveLength(17);
     expect(Date.parse(r.landing_utc)).toBeGreaterThan(Date.parse(LAUNCH));
     for (const e of r.results) {
       expect(e.score).toBeGreaterThanOrEqual(0);
