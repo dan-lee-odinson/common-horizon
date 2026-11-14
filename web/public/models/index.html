@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lunar Hardware Models</title>
+<meta name="description" content="Review page for the code-built, true-scale lunar hardware models: sizes, sources and a turning view of each model.">
+<style>
+  :root {
+    --bg: #f5f5f3;
+    --fg: #1c1e21;
+    --muted: #596069;
+    --card: #ffffff;
+    --line: #d8dadd;
+    --badge-bg: #e7edf3;
+    --badge-fg: #23415f;
+    --warn-bg: #fbf1dc;
+    --warn-fg: #5d4310;
+    --canvas: #15171a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121417;
+      --fg: #e7e8ea;
+      --muted: #a2a8b0;
+      --card: #1b1e22;
+      --line: #2e3238;
+      --badge-bg: #22303d;
+      --badge-fg: #bcd3e8;
+      --warn-bg: #3a2f17;
+      --warn-fg: #f0d9a4;
+      --canvas: #0e1012;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121417;
+    --fg: #e7e8ea;
+    --muted: #a2a8b0;
+    --card: #1b1e22;
+    --line: #2e3238;
+    --badge-bg: #22303d;
+    --badge-fg: #bcd3e8;
+    --warn-bg: #3a2f17;
+    --warn-fg: #f0d9a4;
+    --canvas: #0e1012;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 56px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.2rem; margin: 0 0 6px; }
+  h3 { font-size: 0.95rem; margin: 14px 0 4px; }
+  p { margin: 0 0 10px; }
+  .lede { color: var(--muted); max-width: 70ch; }
+  .notice {
+    background: var(--warn-bg);
+    color: var(--warn-fg);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 12px 0;
+  }
+  .notice:empty { display: none; }
+  .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 16px 0; }
+  button {
+    font: inherit;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-weight: 600; color: var(--muted); font-size: 0.85rem; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .badge {
+    display: inline-block;
+    background: var(--badge-bg);
+    color: var(--badge-fg);
+    border-radius: 999px;
+    padding: 1px 10px;
+    font-size: 0.82rem;
+  }
+  section { margin-top: 28px; }
+  .viewer { position: relative; }
+  canvas { display: block; width: 100%; background: var(--canvas); border-radius: 6px; }
+  .viewer canvas { aspect-ratio: 1 / 1; }
+  #lineup canvas { aspect-ratio: 21 / 9; }
+  .caption { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+  .card {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 20px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  @media (max-width: 760px) { .card { grid-template-columns: minmax(0, 1fr); } }
+  dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 8px 0; }
+  dt { color: var(--muted); }
+  dd { margin: 0; font-variant-numeric: tabular-nums; }
+  ul { margin: 4px 0; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .muted { color: var(--muted); }
+  .note { font-style: italic; }
+  footer { margin-top: 36px; color: var(--muted); font-size: 0.85rem; }
+  code { font-size: 0.9em; }
+</style>
+<script>
+  // Choose where three.js is loaded from, before any module script runs.
+  // Default: the jsDelivr CDN (same version as tools/models/package.json).
+  // "?three=local": /vendor/three/, served by `npm run preview` in tools/models (works offline).
+  (function () {
+    var local = new URLSearchParams(location.search).get('three') === 'local';
+    var base = local ? '/vendor/three/' : 'https://cdn.jsdelivr.net/npm/three@0.187.0/';
+    var map = document.createElement('script');
+    map.type = 'importmap';
+    map.textContent = JSON.stringify({
+      imports: {
+        three: base + 'build/three.module.js',
+        'three/addons/': base + 'examples/jsm/'
+      }
+    });
+    document.head.appendChild(map);
+  })();
+</script>
+</head>
+<body data-state="loading">
+<main>
+  <h1>Lunar hardware models</h1>
+  <p class="lede">
+    Simple, true-to-size shapes of lunar hardware, built with code for the Common Horizon
+    site (NASA Space Apps 2026, Lunar Landing Site Navigator). Units are meters, Y is up, and
+    each model's origin is the centre of its footprint on the ground. Every model is an
+    illustrative shape, built with SI/AI-written code; its sizes and their sources are listed
+    below, read from the JSON file next to each model.
+  </p>
+  <div id="notice" class="notice" role="status"></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Model</th>
+          <th scope="col">Width x height x depth (m)</th>
+          <th scope="col">Triangles</th>
+          <th scope="col">Status</th>
+        </tr>
+      </thead>
+      <tbody id="summary"></tbody>
+    </table>
+  </div>
+
+  <div class="toolbar">
+    <button id="spin-toggle" type="button" aria-pressed="true">Pause turning</button>
+    <span class="muted" id="spin-note"></span>
+  </div>
+
+  <section id="lineup" aria-labelledby="lineup-title">
+    <h2 id="lineup-title">All models at the same scale</h2>
+    <canvas id="lineup-canvas" aria-label="All models side by side at the same scale, turning"></canvas>
+    <p class="caption" id="lineup-caption"></p>
+  </section>
+
+  <div id="cards"></div>
+
+  <footer>
+    <p>
+      Built by the scripts in <code>tools/models/</code>; sources are listed in
+      <code>tools/models/SOURCES-models.md</code>. 3D views use three.js. Sizes are checked by
+      <code>npm run check</code> in <code>tools/models/</code>.
+    </p>
+  </footer>
+</main>
+
+<script type="module">
+  // Models in the order of the brief. Each has <id>.glb (shape) and <id>.json (facts) here.
+  const MODEL_IDS = ['starship-lander', 'habitat-unit', 'fission-power-unit', 'solar-array-mast', 'griffin-lander'];
+  const DIM_LABEL = { width_x: 'Width (x)', height_y: 'Height (y)', depth_z: 'Depth (z)' };
+  const BACKGROUND = 0x15171a;
+
+  const notice = document.getElementById('notice');
+  const say = (text) => { notice.textContent = text; };
+
+  // Small helper to build elements with text only (no HTML from the JSON files is trusted).
+  function el(tag, props = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+      if (key === 'class') node.className = value;
+      else if (key === 'text') node.textContent = value;
+      else node.setAttribute(key, value);
+    }
+    for (const child of children) if (child) node.append(child);
+    return node;
+  }
+
+  const fmt = (value) => Number(value.toFixed(3)).toString();
+  const sizeText = (d) => `${fmt(d.width_x)} x ${fmt(d.height_y)} x ${fmt(d.depth_z)}`;
+
+  async function loadFacts() {
+    return Promise.all(MODEL_IDS.map(async (id) => {
+      const response = await fetch(`./${id}.json`);
+      if (!response.ok) throw new Error(`${id}.json: HTTP ${response.status}`);
+      return response.json();
+    }));
+  }
+
+  function renderSummary(facts) {
+    const body = document.getElementById('summary');
+    for (const f of facts) {
+      body.append(el('tr', {},
+        el('td', {}, el('a', { href: `#${f.id}`, text: f.name })),
+        el('td', { class: 'num', text: sizeText(f.dimensions_m) }),
+        el('td', { class: 'num', text: `${f.triangles.toLocaleString('en-US')}` }),
+        el('td', {}, el('span', { class: 'badge', text: f.status })),
+      ));
+    }
+  }
+
+  function renderCard(f) {
+    const canvas = el('canvas', { 'aria-label': `${f.name}, turning` });
+    const caption = el('p', { class: 'caption', text: 'Loading the 3D view...' });
+    const viewer = el('div', { class: 'viewer', 'data-model': f.id, 'data-state': 'loading' }, canvas, caption);
+
+    const facts = el('dl', {},
+      el('dt', { text: 'Overall size' }), el('dd', { text: `${sizeText(f.dimensions_m)} m (width x height x depth)` }),
+      el('dt', { text: 'Triangles' }), el('dd', { text: `${f.triangles.toLocaleString('en-US')} (limit ${f.triangle_limit.toLocaleString('en-US')})` }),
+      el('dt', { text: 'Status' }), el('dd', {}, el('span', { class: 'badge', text: f.status })),
+      el('dt', { text: 'Files' }), el('dd', {},
+        el('a', { href: `./${f.file}`, text: f.file }), ' and ', el('a', { href: `./${f.id}.json`, text: `${f.id}.json` })),
+    );
+
+    const sources = el('ul');
+    for (const s of f.dimension_sources) {
+      sources.append(el('li', {},
+        el('strong', { text: `${DIM_LABEL[s.dimension] ?? s.dimension}: ${fmt(s.value_m)} m. ` }),
+        `${s.meaning}. Source: ${s.source}. Status: ${s.status}.`));
+    }
+
+    const right = el('div', {},
+      el('h2', { text: f.name }),
+      facts,
+      el('h3', { text: 'Where each size comes from' }), sources);
+
+    if (f.parts?.length) {
+      const parts = el('ul');
+      for (const p of f.parts) {
+        parts.append(el('li', {},
+          el('strong', { text: `${p.node}: ${sizeText(p.dimensions_m)} m. ` }),
+          `Source: ${p.source}. Status: ${p.status}.`));
+      }
+      right.append(el('h3', { text: 'Measured parts' }), parts);
+    }
+    if (f.parameters) {
+      const p = f.parameters;
+      right.append(el('h3', { text: 'Parameters' }), el('p', {
+        text: `Height ${fmt(p.height_m)} m, panel width ${fmt(p.panel_width_m)} m ` +
+          `(defaults ${fmt(p.defaults.height_m)} m and ${fmt(p.defaults.panel_width_m)} m). ` +
+          'Change them with: node solar-array-mast.mjs --height 12 --panel-width 5',
+      }));
+    }
+    const simplifications = el('ul');
+    for (const s of f.simplifications) simplifications.append(el('li', { text: s }));
+    right.append(el('h3', { text: 'Simplifications' }), simplifications, el('p', { class: 'note', text: f.note }));
+
+    const card = el('article', { class: 'card', id: f.id }, viewer, right);
+    document.getElementById('cards').append(card);
+    return { canvas, caption, viewer };
+  }
+
+  // ---------- 3D views ----------
+
+  // A "nice" grid step (0.5, 1, 2, 5, 10 ... m) that puts roughly 4 to 10 squares across `span`.
+  function gridStep(span) {
+    const steps = [0.5, 1, 2, 5, 10, 20, 50];
+    return steps.find((s) => span / s <= 10) ?? 100;
+  }
+
+  function createViewer(THREE, canvas, { objects, cameraElevationDeg = 16, padding = 1.08 }) {
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(BACKGROUND);
+    scene.add(new THREE.HemisphereLight(0xe4e9ef, 0x4a4540, 1.6));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+    scene.add(sun);
+
+    const holder = new THREE.Group();
+    const turntables = [];
+    for (const { object, x = 0 } of objects) {
+      const turntable = new THREE.Group();
+      turntable.position.x = x;
+      turntable.add(object);
+      holder.add(turntable);
+      turntables.push(turntable);
+    }
+    scene.add(holder);
+
+    // Frame everything: the box of all objects at every turn angle fits inside their
+    // footprint circles, so use those circles to size the view.
+    let minX = Infinity, maxX = -Infinity, maxR = 0, maxH = 0;
+    for (const { object, x = 0 } of objects) {
+      const box = new THREE.Box3().setFromObject(object);
+      const r = Math.max(Math.hypot(box.min.x, box.min.z), Math.hypot(box.max.x, box.max.z),
+        Math.hypot(box.min.x, box.max.z), Math.hypot(box.max.x, box.min.z));
+      minX = Math.min(minX, x - r);
+      maxX = Math.max(maxX, x + r);
+      maxR = Math.max(maxR, r);
+      maxH = Math.max(maxH, box.max.y);
+    }
+    const spanX = maxX - minX;
+    const step = gridStep(Math.max(spanX, 2 * maxR));
+    const gridSize = Math.ceil((Math.max(spanX, 2 * maxR) * 1.3) / step / 2) * step * 2;
+    const grid = new THREE.GridHelper(gridSize, Math.round(gridSize / step), 0x5d646d, 0x30353b);
+    grid.position.x = (minX + maxX) / 2;
+    scene.add(grid);
+
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 5000);
+    const center = new THREE.Vector3((minX + maxX) / 2, maxH / 2, 0);
+    const halfW = spanX / 2;
+    const halfH = maxH / 2;
+    function place(aspect) {
+      camera.aspect = aspect;
+      const vFov = THREE.MathUtils.degToRad(camera.fov);
+      const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+      const distance = padding * Math.max(halfH / Math.tan(vFov / 2), halfW / Math.tan(hFov / 2)) + maxR;
+      const elevation = THREE.MathUtils.degToRad(cameraElevationDeg);
+      camera.position.set(center.x, center.y + distance * Math.sin(elevation), distance * Math.cos(elevation));
+      camera.near = Math.max(0.05, distance / 200);
+      camera.far = distance * 10;
+      camera.lookAt(center);
+      camera.updateProjectionMatrix();
+      sun.position.set(center.x - distance, center.y + distance, distance * 0.8);
+    }
+
+    function resize() {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (width === 0 || height === 0) return;
+      renderer.setSize(width, height, false);
+      place(width / height);
+    }
+    new ResizeObserver(resize).observe(canvas);
+    resize();
+
+    return {
+      step,
+      turn(angle) { for (const t of turntables) t.rotation.y = angle; },
+      render() { renderer.render(scene, camera); },
+      // Fraction of pixels that are not background, with the grid hidden (used by the page test).
+      coverage() {
+        grid.visible = false;
+        renderer.render(scene, camera);
+        const gl = renderer.getContext();
+        const w = gl.drawingBufferWidth;
+        const h = gl.drawingBufferHeight;
+        const pixels = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        grid.visible = true;
+        // The canvas shows the background colour as written (sRGB), e.g. 0x15171a = (21, 23, 26).
+        const bg = [(BACKGROUND >> 16) & 255, (BACKGROUND >> 8) & 255, BACKGROUND & 255];
+        let hits = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          const distance = Math.abs(pixels[i] - bg[0]) + Math.abs(pixels[i + 1] - bg[1]) + Math.abs(pixels[i + 2] - bg[2]);
+          if (distance > 24) hits++;
+        }
+        return hits / (w * h);
+      },
+    };
+  }
+
+  async function start() {
+    let facts;
+    try {
+      facts = await loadFacts();
+    } catch (error) {
+      say(`Could not read the model files (${error.message}). Open this page through a web server, ` +
+        'for example run "npm run preview" in tools/models, not as a local file.');
+      document.body.dataset.state = 'error';
+      return;
+    }
+    renderSummary(facts);
+    const views = facts.map(renderCard);
+
+    let THREE, GLTFLoader;
+    try {
+      THREE = await import('three');
+      ({ GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js'));
+    } catch (error) {
+      say('The sizes and sources are listed below, but the 3D views could not start: three.js did not load ' +
+        `(${error.message}). They need internet access to cdn.jsdelivr.net, or run "npm run preview" in ` +
+        'tools/models and open the page with ?three=local.');
+      for (const v of views) { v.caption.textContent = '3D view unavailable.'; v.viewer.dataset.state = 'error'; }
+      document.body.dataset.state = 'error';
+      return;
+    }
+
+    const loader = new GLTFLoader();
+    const viewers = [];
+    const report = [];
+    const loaded = await Promise.all(facts.map(async (f, i) => {
+      const v = views[i];
+      try {
+        const gltf = await loader.loadAsync(`./${f.file}`);
+        const object = gltf.scene;
+        const box = new THREE.Box3().setFromObject(object);
+        const size = box.getSize(new THREE.Vector3());
+        let triangles = 0;
+        object.traverse((o) => {
+          if (o.isMesh) triangles += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
+        });
+        const viewer = createViewer(THREE, v.canvas, { objects: [{ object }] });
+        v.caption.textContent = `Grid squares are ${viewer.step} m. Measured in the browser: ` +
+          `${fmt(size.x)} x ${fmt(size.y)} x ${fmt(size.z)} m.`;
+        v.viewer.dataset.state = 'ready';
+        viewers.push(viewer);
+        report.push({ id: f.id, size: size.toArray(), triangles, coverage: () => viewer.coverage() });
+        return { f, object };
+      } catch (error) {
+        v.caption.textContent = `Could not load ${f.file}: ${error.message}`;
+        v.viewer.dataset.state = 'error';
+        return null;
+      }
+    }));
+
+    // Line-up: every model side by side, same scale, left to right in the order of the brief.
+    const ok = loaded.filter(Boolean);
+    if (ok.length > 0) {
+      const objects = [];
+      let cursor = 0;
+      const gap = 6;
+      for (const { object } of ok) {
+        const copy = object.clone(true);
+        const box = new THREE.Box3().setFromObject(copy);
+        const r = Math.max(Math.hypot(box.min.x, box.min.z), Math.hypot(box.max.x, box.max.z),
+          Math.hypot(box.min.x, box.max.z), Math.hypot(box.max.x, box.min.z));
+        objects.push({ object: copy, x: cursor + r });
+        cursor += 2 * r + gap;
+      }
+      const lineup = createViewer(THREE, document.getElementById('lineup-canvas'), { objects, cameraElevationDeg: 10, padding: 1.02 });
+      viewers.push(lineup);
+      document.getElementById('lineup-caption').textContent =
+        `Left to right: ${ok.map(({ f }) => f.name).join('; ')}. Grid squares are ${lineup.step} m.`;
+      report.push({ id: 'lineup', coverage: () => lineup.coverage() });
+    }
+
+    // Turning. Starts paused for people who ask their system for reduced motion.
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let spinning = !reduceMotion;
+    let angle = 0.6;
+    let last = performance.now();
+    const toggle = document.getElementById('spin-toggle');
+    const updateToggle = () => {
+      toggle.textContent = spinning ? 'Pause turning' : 'Resume turning';
+      toggle.setAttribute('aria-pressed', String(spinning));
+      document.getElementById('spin-note').textContent =
+        reduceMotion && !spinning ? 'Paused because your system asks for reduced motion.' : '';
+    };
+    toggle.addEventListener('click', () => { spinning = !spinning; updateToggle(); });
+    updateToggle();
+
+    function frame(now) {
+      const dt = Math.min((now - last) / 1000, 0.1);
+      last = now;
+      if (spinning) angle += dt * 0.35; // radians per second
+      for (const viewer of viewers) { viewer.turn(angle); viewer.render(); }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    window.__modelViewers = report; // read by tools/models/test-page/page-smoke.mjs
+    document.body.dataset.state = loaded.every(Boolean) ? 'ready' : 'error';
+  }
+
+  start();
+</script>
+</body>
+</html>
