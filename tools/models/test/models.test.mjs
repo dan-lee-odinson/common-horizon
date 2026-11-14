@@ -83,3 +83,17 @@ test('solar-array-mast: rejects impossible parameters', () => {
   assert.throws(() => solar.build({ panelWidth: 0 }), /panel width/);
   assert.throws(() => solar.build({ height: Number.NaN }), /height/);
 });
+
+test('griffin-lander: nothing reaches beyond 2.25 m from the centre in any direction', () => {
+  // The published width is about 4.5 m, so the pad-to-pad span must not exceed it on the
+  // diagonals either (legs on the diagonals would reach about 3.2 m).
+  const { scene } = MODELS.find((m) => m.id === 'griffin-lander').build();
+  let farthest = 0;
+  scene.updateMatrixWorld(true);
+  scene.traverse((child) => {
+    if (!child.isMesh) return;
+    const pos = child.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) farthest = Math.max(farthest, Math.hypot(pos.getX(i), pos.getZ(i)));
+  });
+  assert.ok(farthest <= 2.25 + 1e-6, `farthest point is ${farthest.toFixed(3)} m from the centre`);
+});

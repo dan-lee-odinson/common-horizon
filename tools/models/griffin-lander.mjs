@@ -22,21 +22,21 @@ export const SPEC = {
     {
       dimension: 'width_x',
       value_m: WIDTH,
-      meaning: 'overall width across the leg foot pads, about 4.5 m',
+      meaning: 'overall width across the leg foot pads (outer edge to outer edge), about 4.5 m',
       source: WIDTH_SOURCE,
       status: STATUS,
     },
     {
       dimension: 'depth_z',
       value_m: WIDTH,
-      meaning: 'same as the width: we assume a square leg footprint',
-      source: `${WIDTH_SOURCE}; square footprint is our simplification`,
-      status: `${STATUS}; square footprint is our simplification`,
+      meaning: 'same as the width: the four legs sit on the X and Z axes, so the lander is 4.5 m across both ways',
+      source: `${WIDTH_SOURCE}; legs on two perpendicular axes is our simplification`,
+      status: `${STATUS}; leg layout is our simplification`,
     },
   ],
   simplifications: [
     'Only the overall height (about 2 m) and width (about 4.5 m) come from the sources; we use exactly 2.0 m and 4.5 m.',
-    'We assume a square leg footprint, 4.5 m by 4.5 m, with the four legs on the diagonals.',
+    'We place the four legs on the X and Z axes (one each side of the deck), so the lander measures 4.5 m from foot pad to foot pad in both directions and nowhere more, including across the diagonals.',
     'Deck size, tanks, engine, payload boxes, side panel and antenna are our illustration of "a low deck on four wide-set legs".',
     'No markings, logos or lettering.',
   ],
@@ -44,7 +44,7 @@ export const SPEC = {
 };
 
 const PAD = { radius: 0.3, height: 0.06 };
-const FOOT = WIDTH / 2 - PAD.radius; // foot pad centres at (+/-1.95, +/-1.95)
+const FOOT = WIDTH / 2 - PAD.radius; // foot pad centres 1.95 m from the centre, on the X and Z axes
 const DECK = { half: 1.25, bottom: 1.05, top: 1.2 };
 const BODY = { half: 1.1, bottom: 0.55 };
 
@@ -84,16 +84,20 @@ export function build() {
     .add(legGrey, cylinder({ radius: 0.03, bottom: DECK.top, top: 1.75, x: -0.95, z: -0.95, segments: 8 }))
     .add(deckGrey, cylinder({ radius: 0.18, bottom: 1.75, top: 1.8, x: -0.95, z: -0.95, segments: 16 }));
 
-  // Four legs on the diagonals: a main strut from the deck corner and two braces from the
-  // lower body, all meeting at a round foot pad.
+  // Four legs, one on each side of the deck, on the +X, -X, +Z and -Z axes. Each leg is a main
+  // strut from under the middle of a deck edge and two braces from the lower corners of the
+  // body, all meeting at a round foot pad. With the legs on the axes the pad-to-pad span is
+  // 4.5 m in every direction (on the diagonals it would be about 6.4 m).
   const legs = new Part('landing-legs');
-  for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-    const foot = [sx * FOOT, PAD.height, sz * FOOT];
+  for (const [ux, uz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const [vx, vz] = [-uz, ux]; // sideways direction along the deck edge
+    const at = (out, side, y) => [ux * out + vx * side, y, uz * out + vz * side];
+    const foot = at(FOOT, 0, PAD.height);
     legs.add(
       legGrey,
-      strut([sx * 1.15, DECK.bottom + 0.05, sz * 1.15], foot, 0.07),
-      strut([sx * BODY.half, BODY.bottom + 0.05, sz * 0.85], foot, 0.04),
-      strut([sx * 0.85, BODY.bottom + 0.05, sz * BODY.half], foot, 0.04),
+      strut(at(1.2, 0, DECK.bottom + 0.05), foot, 0.07),
+      strut(at(BODY.half, 0.95, BODY.bottom + 0.05), foot, 0.04),
+      strut(at(BODY.half, -0.95, BODY.bottom + 0.05), foot, 0.04),
       cylinder({ radius: PAD.radius, bottom: 0, top: PAD.height, x: foot[0], z: foot[2], segments: 24 }),
     );
   }

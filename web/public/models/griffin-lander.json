@@ -22,23 +22,23 @@
     {
       "dimension": "width_x",
       "value_m": 4.5,
-      "meaning": "overall width across the leg foot pads, about 4.5 m",
+      "meaning": "overall width across the leg foot pads (outer edge to outer edge), about 4.5 m",
       "source": "Voyager's lunar missions page (link to add)",
       "status": "company figure, secondary source"
     },
     {
       "dimension": "depth_z",
       "value_m": 4.5,
-      "meaning": "same as the width: we assume a square leg footprint",
-      "source": "Voyager's lunar missions page (link to add); square footprint is our simplification",
-      "status": "company figure, secondary source; square footprint is our simplification"
+      "meaning": "same as the width: the four legs sit on the X and Z axes, so the lander is 4.5 m across both ways",
+      "source": "Voyager's lunar missions page (link to add); legs on two perpendicular axes is our simplification",
+      "status": "company figure, secondary source; leg layout is our simplification"
     }
   ],
   "triangles": 3480,
   "triangle_limit": 20000,
   "simplifications": [
     "Only the overall height (about 2 m) and width (about 4.5 m) come from the sources; we use exactly 2.0 m and 4.5 m.",
-    "We assume a square leg footprint, 4.5 m by 4.5 m, with the four legs on the diagonals.",
+    "We place the four legs on the X and Z axes (one each side of the deck), so the lander measures 4.5 m from foot pad to foot pad in both directions and nowhere more, including across the diagonals.",
     "Deck size, tanks, engine, payload boxes, side panel and antenna are our illustration of \"a low deck on four wide-set legs\".",
     "No markings, logos or lettering."
   ],
