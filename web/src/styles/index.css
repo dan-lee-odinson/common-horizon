@@ -1,0 +1,141 @@
+@import 'tailwindcss';
+@import './theme.css';
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --breakpoint-md: 48rem;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--ch-bg);
+    color: var(--ch-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ch-focus);
+    outline-offset: 2px;
+  }
+  input[type='range'] {
+    accent-color: var(--ch-accent);
+  }
+  input[type='checkbox'] {
+    accent-color: var(--ch-accent);
+  }
+  ::selection {
+    background: var(--ch-accent-soft);
+  }
+}
+
+@layer components {
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .panel {
+    background: var(--ch-surface);
+    border: 1px solid var(--ch-line);
+  }
+  .glass {
+    background: var(--ch-glass);
+    border: 1px solid var(--ch-line);
+    -webkit-backdrop-filter: blur(10px) saturate(1.1);
+    backdrop-filter: blur(10px) saturate(1.1);
+    box-shadow: 0 12px 32px var(--ch-shadow);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 2rem;
+    padding: 0 0.7rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--ch-line-strong);
+    background: var(--ch-surface-2);
+    color: var(--ch-ink);
+    font-size: 13px;
+    transition: background-color 150ms ease, border-color 150ms ease, transform 100ms ease;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--ch-surface-3);
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .btn-primary {
+    background: var(--ch-accent);
+    border-color: var(--ch-accent);
+    color: var(--ch-accent-ink);
+    font-weight: 600;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--ch-focus);
+  }
+  .btn-icon {
+    width: 2rem;
+    padding: 0;
+  }
+  .field {
+    min-height: 2rem;
+    padding: 0 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--ch-line-strong);
+    background: var(--ch-surface-2);
+  }
+  .label {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ch-muted);
+  }
+  .skeleton {
+    background: linear-gradient(90deg, var(--ch-surface-2), var(--ch-surface-3), var(--ch-surface-2));
+    background-size: 200% 100%;
+    animation: ch-shimmer 1.4s ease-in-out infinite;
+    border-radius: 0.375rem;
+  }
+}
+
+@keyframes ch-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
