@@ -1,0 +1,53 @@
+{
+  "id": "solar-array-mast",
+  "name": "Solar array mast (sizes are parameters)",
+  "file": "solar-array-mast.glb",
+  "status": "our estimate, to be replaced by a published figure",
+  "note": "illustrative shape, built with SI/AI-written code",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 4,
+    "height_y": 10,
+    "depth_z": 2
+  },
+  "dimension_sources": [
+    {
+      "dimension": "height_y",
+      "value_m": 10,
+      "meaning": "mast height, ground to mast top (parameter \"height\", default 10 m)",
+      "source": "no published size on file; our estimate",
+      "status": "our estimate, to be replaced by a published figure"
+    },
+    {
+      "dimension": "width_x",
+      "value_m": 4,
+      "meaning": "solar panel width (parameter \"panel width\", default 4 m), or the 2 m base if wider",
+      "source": "no published size on file; our estimate",
+      "status": "our estimate, to be replaced by a published figure"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 2,
+      "meaning": "square base footprint",
+      "source": "no published size on file; our estimate",
+      "status": "our estimate, to be replaced by a published figure"
+    }
+  ],
+  "parameters": {
+    "height_m": 10,
+    "panel_width_m": 4,
+    "defaults": {
+      "height_m": 10,
+      "panel_width_m": 4
+    }
+  },
+  "triangles": 812,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "No published size is on file: the mast height and panel width are parameters (defaults 10 m and 4 m), and the 2 m square base, the panel height and the mast thickness are our estimates.",
+    "The solar blanket is one flat sheet split by the mast, with a bar along its top and bottom and a plain grid of lighter strips standing in for cell rows. Individual cells, wiring and the sun-tracking drive are not shown.",
+    "No markings or lettering."
+  ],
+  "built_by": "tools/models/solar-array-mast.mjs"
+}

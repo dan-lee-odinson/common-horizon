@@ -1,0 +1,68 @@
+{
+  "id": "habitat-unit",
+  "name": "Habitat unit (inflatable and metal sections)",
+  "file": "habitat-unit.glb",
+  "status": "NASA study",
+  "note": "illustrative shape, built with SI/AI-written code",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 6.5,
+    "height_y": 7.8,
+    "depth_z": 6.5
+  },
+  "dimension_sources": [
+    {
+      "dimension": "width_x",
+      "value_m": 6.5,
+      "meaning": "inflatable section diameter (the widest part)",
+      "source": "Burke, Howard and Kessler, AIAA ASCEND 2022 (link to add)",
+      "status": "NASA study"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 6.5,
+      "meaning": "inflatable section diameter (round section)",
+      "source": "Burke, Howard and Kessler, AIAA ASCEND 2022 (link to add)",
+      "status": "NASA study"
+    },
+    {
+      "dimension": "height_y",
+      "value_m": 7.8,
+      "meaning": "metal section height 2.6 m plus inflatable section height 5.2 m, stacked",
+      "source": "Burke, Howard and Kessler, AIAA ASCEND 2022 (link to add) for each section height; adding them is our simplification (how the sections join)",
+      "status": "NASA study; stacking is our simplification (how the sections join)"
+    }
+  ],
+  "parts": [
+    {
+      "node": "inflatable-section",
+      "dimensions_m": {
+        "width_x": 6.5,
+        "height_y": 5.2,
+        "depth_z": 6.5
+      },
+      "source": "Burke, Howard and Kessler, AIAA ASCEND 2022 (link to add)",
+      "status": "NASA study"
+    },
+    {
+      "node": "metal-section",
+      "dimensions_m": {
+        "width_x": 4.4,
+        "height_y": 2.6,
+        "depth_z": 4.4
+      },
+      "source": "Burke, Howard and Kessler, AIAA ASCEND 2022 (link to add)",
+      "status": "NASA study"
+    }
+  ],
+  "triangles": 6332,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "How the two sections join is our simplification: the inflatable section sits directly on top of the metal section, on one vertical axis. The source gives the size of each section, not this arrangement.",
+    "The inflatable section is drawn as a rounded drum (a superellipse revolved around the vertical axis). Its true inflated shape, straps and seams are not shown.",
+    "The hatch on the metal section (1.1 m wide, 1.6 m tall, our estimate) is a separate part and is not counted in the metal section size.",
+    "No windows, markings or lettering."
+  ],
+  "built_by": "tools/models/habitat-unit.mjs"
+}

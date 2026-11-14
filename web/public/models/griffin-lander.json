@@ -1,0 +1,46 @@
+{
+  "id": "griffin-lander",
+  "name": "Griffin lander",
+  "file": "griffin-lander.glb",
+  "status": "company figure, secondary source",
+  "note": "illustrative shape, built with SI/AI-written code",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 4.5,
+    "height_y": 2,
+    "depth_z": 4.5
+  },
+  "dimension_sources": [
+    {
+      "dimension": "height_y",
+      "value_m": 2,
+      "meaning": "overall height, about 2 m",
+      "source": "Space.com's report of the 15 June 2026 unveiling (link to add)",
+      "status": "company figure, secondary source"
+    },
+    {
+      "dimension": "width_x",
+      "value_m": 4.5,
+      "meaning": "overall width across the leg foot pads (outer edge to outer edge), about 4.5 m",
+      "source": "Voyager's lunar missions page (link to add)",
+      "status": "company figure, secondary source"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 4.5,
+      "meaning": "same as the width: the four legs sit on the X and Z axes, so the lander is 4.5 m across both ways",
+      "source": "Voyager's lunar missions page (link to add); legs on two perpendicular axes is our simplification",
+      "status": "company figure, secondary source; leg layout is our simplification"
+    }
+  ],
+  "triangles": 3480,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "Only the overall height (about 2 m) and width (about 4.5 m) come from the sources; we use exactly 2.0 m and 4.5 m.",
+    "We place the four legs on the X and Z axes (one each side of the deck), so the lander measures 4.5 m from foot pad to foot pad in both directions and nowhere more, including across the diagonals.",
+    "Deck size, tanks, engine, payload boxes, side panel and antenna are our illustration of \"a low deck on four wide-set legs\".",
+    "No markings, logos or lettering."
+  ],
+  "built_by": "tools/models/griffin-lander.mjs"
+}
