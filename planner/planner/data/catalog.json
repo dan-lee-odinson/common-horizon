@@ -274,7 +274,7 @@
       "name": "Habitat's own solar array",
       "works": "light",
       "works_text": "in sunlight",
-      "power": {"value": [10, 15], "kind": "range", "default": 10, "unit": "kW", "status": ["NASA study"], "status_inferred": true, "status_note": "Published as a NASA reference design, which is not one of the eight labels; NASA study is the closest. To confirm.", "source": "NTRS 20210026557", "note": "Published range 10 to 15 kW; the low end is the default, the harder end for a power source."}
+      "power": {"value": [10, 15], "kind": "range", "default": 10, "unit": "kW", "status": ["NASA study"], "source": "Schunk, NTRS 20210026557 (conceptual thermal design based on NASA's Surface Habitat reference design)", "note": "Published range 10 to 15 kW; the low end is the default, the harder end for a power source."}
     },
     {
       "id": "regenerative_fuel_cell",
@@ -289,9 +289,9 @@
   },
   "heating": {
     "about": "Heating penalty for an uncrewed habitat in darkness. It replaces the flat 2 kW uncrewed load. Penalty = (heat leak + radiator protection) x dark hours.",
-    "heat_leak": {"value": 1550, "unit": "W", "status": ["NASA study"], "status_inferred": true, "status_note": "Published as a NASA reference design, which is not one of the eight labels; NASA study is the closest. To confirm.", "source": "Schunk, NTRS 20210026557"},
-    "radiator_protection_deployed": {"value": 3840, "unit": "W", "status": ["NASA study"], "status_inferred": true, "status_note": "Published as a NASA reference design, which is not one of the eight labels; NASA study is the closest. To confirm.", "source": "Schunk, NTRS 20210026557", "note": "Radiator deployed; the default."},
-    "radiator_protection_stowed": {"value": 700, "unit": "W", "qualifier": "about", "status": ["NASA study"], "status_inferred": true, "status_note": "Published as a NASA reference design, which is not one of the eight labels; NASA study is the closest. To confirm.", "source": "Schunk, NTRS 20210026557", "note": "Radiator stowed."}
+    "heat_leak": {"value": 1550, "unit": "W", "status": ["NASA study"], "source": "Schunk, NTRS 20210026557 (conceptual thermal design based on NASA's Surface Habitat reference design)"},
+    "radiator_protection_deployed": {"value": 3840, "unit": "W", "status": ["NASA study"], "source": "Schunk, NTRS 20210026557 (conceptual thermal design based on NASA's Surface Habitat reference design)", "note": "Radiator deployed; the default."},
+    "radiator_protection_stowed": {"value": 700, "unit": "W", "qualifier": "about", "status": ["NASA study"], "source": "Schunk, NTRS 20210026557 (conceptual thermal design based on NASA's Surface Habitat reference design)", "note": "Radiator stowed."}
   },
   "margin_rule": {
     "green_at_percent": {"value": 25, "unit": "%", "status": ["NASA figure"], "status_inferred": true, "status_note": "Label inferred from the source name; to confirm.", "source": "GSFC-STD-1000 Rev I, Table 1.06-1", "note": "Pre-Phase A value. Green at 25 or more, yellow when positive under 25, red when negative."}

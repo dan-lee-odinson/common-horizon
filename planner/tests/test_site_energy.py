@@ -40,7 +40,8 @@ def test_heating_100_dark_hours_deployed_is_539_kwh():
     # The heating model replaces the flat 2 kW.
     assert result["night_penalty_kwh"] == 0
     assert result["total_kwh"] == pytest.approx(539)
-    assert result["heating"]["heat_leak_figure"]["source"] == "Schunk, NTRS 20210026557"
+    assert result["heating"]["heat_leak_figure"]["source"].startswith("Schunk, NTRS 20210026557")
+    assert "status_inferred" not in result["heating"]["heat_leak_figure"]
 
 
 def test_heating_100_dark_hours_stowed_is_225_kwh():

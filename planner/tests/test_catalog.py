@@ -14,7 +14,10 @@ HLS = "SpaceX HLS program manager, 2022"
 GRIFFIN = "Astrobotic (now Voyager Lunar Systems)"
 KALDON = "Kaldon et al., IAC 2024, NTRS 20240011694"
 CSANK = "Csank 2023, NTRS 20230002896"
-SCHUNK = "Schunk, NTRS 20210026557"
+SCHUNK = (
+    "Schunk, NTRS 20210026557 (conceptual thermal design based on NASA's "
+    "Surface Habitat reference design)"
+)
 TILT = "NASA HLS-R-0071, through a secondary source"
 
 # path -> (value, unit, status labels, source)
@@ -71,7 +74,7 @@ EXPECTED = {
     "power_sources/fission_40kwe/power": (40, "kW", ["NASA goal"], TBA),
     "power_sources/vsat/power": (10, "kW", ["company figure"], TBA),
     "power_sources/vsat_xl/power": (50, "kW", ["company figure"], TBA),
-    "power_sources/hab_array/power": ([10, 15], "kW", ["NASA study"], "NTRS 20210026557"),
+    "power_sources/hab_array/power": ([10, 15], "kW", ["NASA study"], SCHUNK),
     "power_sources/regenerative_fuel_cell/power": (10, "kW", ["NASA goal"], TBA),
     # Heating
     "heating/heat_leak": (1550, "W", ["NASA study"], SCHUNK),
@@ -113,10 +116,6 @@ QUALIFIERS = {
 
 # Labels the team did not state for these figures; inferred, flagged, to confirm.
 INFERRED = {
-    "power_sources/hab_array/power",
-    "heating/heat_leak",
-    "heating/radiator_protection_deployed",
-    "heating/radiator_protection_stowed",
     "margin_rule/green_at_percent",
     "reference/dv_halo_to_surface_2018",
     "reference/dv_halo_to_surface_2019",
