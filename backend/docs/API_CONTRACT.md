@@ -41,7 +41,7 @@ always strict JSON.
 | Landing altitude | `landing_site.altitude_m` | m vs 1737.4 km sphere | no (null → from terrain) | -10 000 … 11 000 |
 | Observer height | `observer_height_m` | m above surface | no (0) | 0 … 1 000 |
 | Mission start | `mission_start_utc` | ISO 8601 with timezone | yes | 2000-01-01 ≤ start < 2100-01-01 (error on `mission_start_utc`); end incl. max delay ≤ 2100-01-01; naive times, date-only strings, Unix numbers and offsets with no UTC equivalent (e.g. `0001-01-01T00:00:00+01:00`) rejected; offsets normalised to UTC |
-| Stay duration | `stay_duration_days` | days | yes | > 0 … 365 |
+| Stay duration | `stay_duration_days` | days | yes | > 0 … 365.25 (one Julian year); still subject to the 10 000-sample cap |
 | Time step | `time_step_s` | s (integer) | yes | 60 … 86 400, ≤ stay duration |
 | Launch delay | `launch_delay_days` | whole days | no (0 = off) | 0 … 30 |
 | (backend addition) | `launch_delay_step_days` | whole days | no (1) | 1 … 30, ≤ `launch_delay_days` |

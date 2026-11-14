@@ -19,11 +19,12 @@ clock reading.
 | Tool | Version | Use |
 |---|---|---|
 | Claude Code (desktop app), model Claude Opus 5.5 | `claude-opus-5-5` | Drafted backend code, tests and docs; ran git, tests and Docker locally |
-| Python | 3.11.9 (local), 3.12-slim (Docker image) | Runtime |
+| Python | 3.11.9 (local), 3.12-slim → 3.12.16-slim-trixie pinned by digest (Docker image) | Runtime |
 | FastAPI / Pydantic / Uvicorn | 0.162.7 / 2.14.3 / 0.54.0 | API framework and validation |
 | pytest / httpx / openapi-spec-validator | 9.2.0 / 0.28.1 / 0.9.0 | Tests and OpenAPI validation |
-| ruff | latest at install time (local lint only, not a project dependency) | Lint |
-| Docker / AWS Lambda Web Adapter | 29.5.2 / 0.9.1 | Container build and Lambda compatibility |
+| ruff | 0.17.5 (local lint only, not a project dependency) | Lint |
+| pip-audit | latest at run time, in a throwaway container (not in the image) | Dependency advisory scan |
+| Docker / AWS Lambda Web Adapter | 29.5.2 / 0.9.1 → 1.1.0 | Container build and Lambda compatibility |
 | OpenAI Codex | not stated in the review | Independent review of `c34f59e`, posted on PR #4; no code changes |
 
 ## Phase 1: backend contract and minimal FastAPI implementation (2026-11-14)
@@ -86,3 +87,32 @@ the source files' modification times.
 | UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
 |---|---|---|---|
 | 15:28:19 | 17:28:19 | Drafted with Claude Code: open coordination questions in `API_CONTRACT.md` restated as neutral provisional technical assumptions and engine integration requirements; private working notes moved to a git-ignored `.local-notes/` directory | No change to the API, code behaviour or OpenAPI contract |
+
+## Deployment readiness (2026-11-14)
+
+Branch `feat/backend-deploy-readiness`, created from `main` after PR #4 was merged (GitHub:
+19:27:13 UTC). Drafted by Claude Code (Claude Opus 5.5). Times marked "~" are file-modification times.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 19:22 | 21:22 | Checked Git state before branching | PR #4 still an open draft; stopped and reported |
+| 19:28:02 | 21:28:02 | PR #4 merge verified; `main` fast-forwarded; branch created (git reflog) | Baseline: 143 passed |
+| between 19:28:02 and 19:32:44 | between 21:28:02 and 21:32:44 | Audited the existing image in a throwaway container with `pip-audit` | 12 advisories, all in the base image's bundled `pip 25.0.1`; adapter 0.9.1 predates the v1.0.1 fix for 4 Rust dependency advisories |
+| ~19:32:44 | ~21:32:44 | Wrote CORS and stay-duration tests before the code | New tests failed for the expected reasons |
+| ~19:33:19–19:33:40 | ~21:33:19–21:33:40 | CORS origin normalisation and env config; stay limit 365 → 365.25 d; contract regenerated; full runtime dependency pin set | First run: 197 passed, contract drift test failed on the stale schema; after export 198 passed; only `stay_duration_days.maximum` changed |
+| 19:34:49 | 21:34:49 | Rebuilt the image (digest-pinned base and adapter, pip 26.3, `--no-deps` + `pip check`, non-root user, `.dockerignore`) | Build OK; `pip check` clean; `pip-audit`: no known vulnerabilities |
+| ~19:35–19:36 | ~21:35–21:36 | Read-only container smoke test with all capabilities dropped | `/health` 200; evaluate 200; 365.25 d → 367 samples; 365.26 d → 422; preflight 200 for production, localhost:5173 and the env-added Amplify origin, 400 for foreign origins; wildcard config exits 1 at startup |
+| ~19:36:21 | ~21:36:21 | ruff 0.17.5 lint fixes | Lint clean; 198 passed |
+
+### Decisions made with AI assistance
+
+- Stay duration widened to 365.25 days (the website's limit). Widening an input bound is not a breaking
+  change, so `contract_version` stays `0.1.0`; the sample cap and payload test are unchanged.
+- `CH_CORS_ORIGINS` keeps replacing the defaults; the new `CH_CORS_EXTRA_ORIGINS` appends (for the
+  Amplify URL) so the production domains cannot be dropped by accident.
+- Lambda Web Adapter upgraded to 1.1.0 for the security fixes. Its 1.0 breaking changes (removed
+  `AWS_LWA_READINESS_CHECK_MIN_UNHEALTHY_STATUS`; non-prefixed variables deprecated) are handled by
+  switching `PORT` to `AWS_LWA_PORT`. The adapter only runs inside Lambda, so it is not exercised by
+  the local smoke test.
+- `# noqa: TRY004` on the timestamp-type check in `mission.py`: Pydantic only turns `ValueError` into a
+  422, so the suggested `TypeError` would surface as a 500.

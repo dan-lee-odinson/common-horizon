@@ -1,4 +1,24 @@
-# Runtime dependencies (installed in the Docker / Lambda image). Pinned for reproducibility.
+# Runtime dependencies (installed in the Docker / Lambda image).
+# Complete pinned set: direct dependencies AND every transitive dependency, at the versions the
+# test suite and the Docker smoke test ran against. The Docker build installs with --no-deps and
+# then runs `pip check`, so a missing or incompatible pin fails the build instead of pulling an
+# unpinned package. Upgrade deliberately: change pins, rebuild, rerun tests, pip-audit and smoke test.
+
+# Direct
 fastapi==0.162.7
 pydantic==2.14.3
 uvicorn==0.54.0
+
+# Transitive
+annotated-doc==0.0.6           # fastapi
+annotated-types==0.8.0         # pydantic
+anyio==4.16.0                  # starlette
+click==8.5.1                   # uvicorn
+colorama==0.4.6 ; sys_platform == "win32"  # click, Windows development only
+h11==0.16.0                    # uvicorn
+idna==3.20                     # anyio
+opentelemetry-api==1.45.2      # fastapi
+pydantic-core==2.50.4          # pydantic
+starlette==1.10.0              # fastapi
+typing-extensions==4.16.0      # pydantic, fastapi, starlette
+typing-inspection==0.4.5       # pydantic

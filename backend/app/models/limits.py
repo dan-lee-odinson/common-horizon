@@ -24,7 +24,8 @@ OBSERVER_HEIGHT_MAX_M = 1_000.0
 MISSION_WINDOW_START_UTC = datetime(2000, 1, 1, tzinfo=UTC)
 MISSION_WINDOW_END_UTC = datetime(2100, 1, 1, tzinfo=UTC)
 
-STAY_DURATION_MAX_DAYS = 365.0
+# One Julian year (365.25 d), matching the website. MAX_SAMPLES still bounds the response size.
+STAY_DURATION_MAX_DAYS = 365.25
 TIME_STEP_MIN_S = 60
 TIME_STEP_MAX_S = 86_400
 
