@@ -207,12 +207,20 @@
   const fmt = (value) => Number(value.toFixed(3)).toString();
   const sizeText = (d) => `${fmt(d.width_x)} x ${fmt(d.height_y)} x ${fmt(d.depth_z)}`;
 
+  // Read every model's JSON. A file that cannot be read is reported, and the others still show.
   async function loadFacts() {
-    return Promise.all(MODEL_IDS.map(async (id) => {
+    const results = await Promise.allSettled(MODEL_IDS.map(async (id) => {
       const response = await fetch(`./${id}.json`);
-      if (!response.ok) throw new Error(`${id}.json: HTTP ${response.status}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     }));
+    const facts = [];
+    const missing = [];
+    results.forEach((result, i) => {
+      if (result.status === 'fulfilled') facts.push(result.value);
+      else missing.push(`${MODEL_IDS[i]}.json (${result.reason.message})`);
+    });
+    return { facts, missing };
   }
 
   function renderSummary(facts) {
@@ -380,15 +388,14 @@
   }
 
   async function start() {
-    let facts;
-    try {
-      facts = await loadFacts();
-    } catch (error) {
-      say(`Could not read the model files (${error.message}). Open this page through a web server, ` +
+    const { facts, missing } = await loadFacts();
+    if (facts.length === 0) {
+      say(`Could not read the model files (${missing.join(', ')}). Open this page through a web server, ` +
         'for example run "npm run preview" in tools/models, not as a local file.');
       document.body.dataset.state = 'error';
       return;
     }
+    if (missing.length > 0) say(`Could not read: ${missing.join(', ')}. The other models are shown below.`);
     renderSummary(facts);
     const views = facts.map(renderCard);
 
@@ -479,7 +486,7 @@
     requestAnimationFrame(frame);
 
     window.__modelViewers = report; // read by tools/models/test-page/page-smoke.mjs
-    document.body.dataset.state = loaded.every(Boolean) ? 'ready' : 'error';
+    document.body.dataset.state = loaded.every(Boolean) && missing.length === 0 ? 'ready' : 'error';
   }
 
   start();

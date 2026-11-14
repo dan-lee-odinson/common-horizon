@@ -35,19 +35,7 @@ try {
   process.exit(0);
 }
 
-const problems = [];
-const fail = (message) => problems.push(message);
-
-const { server, url } = await startServer({ port: 0 });
-const browser = await playwright.chromium.launch();
-try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
-  const consoleErrors = [];
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text());
-  });
-  page.on('pageerror', (error) => consoleErrors.push(error.message));
-
+async function inspect(page, consoleErrors) {
   await page.goto(`${url}/index.html?three=local`);
   await page.waitForFunction(() => document.body.dataset.state !== 'loading', null, { timeout: 60000 });
   const state = await page.evaluate(() => document.body.dataset.state);
@@ -73,14 +61,21 @@ try {
   // Let a few frames run, then read what the browser measured and drew.
   await page.waitForTimeout(500);
   const report = await page.evaluate(() =>
-    window.__modelViewers.map((v) => ({ id: v.id, size: v.size, triangles: v.triangles, coverage: v.coverage() })),
+    (window.__modelViewers ?? []).map((v) => ({ id: v.id, size: v.size, triangles: v.triangles, coverage: v.coverage() })),
   );
+  for (const id of Object.keys(facts)) {
+    if (!report.some((r) => r.id === id)) fail(`${id}: the page has no 3D view for it`);
+  }
   for (const r of report) {
     const label = r.id === 'lineup' ? 'line-up view' : `${r.id} view`;
     console.log(`${label}: ${(r.coverage * 100).toFixed(1)}% of pixels show the model`);
     if (!(r.coverage > 0.002)) fail(`${label} looks empty (${(r.coverage * 100).toFixed(2)}% of pixels drawn)`);
     if (r.id === 'lineup') continue;
     const json = facts[r.id];
+    if (!json) {
+      fail(`${r.id}: shown on the page but has no JSON file in the folder`);
+      continue;
+    }
     const dims = [json.dimensions_m.width_x, json.dimensions_m.height_y, json.dimensions_m.depth_z];
     r.size.forEach((measured, i) => {
       const error = Math.abs(measured - dims[i]) / dims[i];
@@ -95,7 +90,8 @@ try {
   await page.screenshot({ path: path.join(outDir, 'page-full.png'), fullPage: true });
   await page.locator('#lineup').screenshot({ path: path.join(outDir, 'lineup.png') });
   for (const id of Object.keys(facts)) {
-    await page.locator(`#${id} .viewer canvas`).screenshot({ path: path.join(outDir, `${id}.png`) });
+    const canvas = page.locator(`#${id} .viewer canvas`);
+    if ((await canvas.count()) === 1) await canvas.screenshot({ path: path.join(outDir, `${id}.png`) });
   }
   console.log(`Screenshots: ${outDir}`);
 
@@ -105,6 +101,26 @@ try {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   if (overflow > 1) fail(`page scrolls sideways by ${overflow}px at 375px wide`);
   await page.screenshot({ path: path.join(outDir, 'page-phone.png'), fullPage: false });
+}
+
+const problems = [];
+const fail = (message) => problems.push(message);
+
+const { server, url } = await startServer({ port: 0 });
+const browser = await playwright.chromium.launch();
+try {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const consoleErrors = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', (error) => consoleErrors.push(error.message));
+
+  try {
+    await inspect(page, consoleErrors);
+  } catch (error) {
+    fail(`test stopped early: ${error.message.split('\n')[0]}`);
+  }
 } finally {
   await browser.close();
   server.close();
