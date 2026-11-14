@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lunar Hardware Models</title>
-<meta name="description" content="Review page for the code-built, true-scale lunar hardware models: sizes, sources and a turning view of each model.">
+<meta name="description" content="Review page for the code-built lunar hardware models: sizes, sources and a turning view of each model.">
 <style>
   :root {
     --bg: #f5f5f3;
@@ -81,6 +81,7 @@
   tr:last-child td { border-bottom: 0; }
   th { font-weight: 600; color: var(--muted); font-size: 0.85rem; }
   td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .qualifier { color: var(--muted); font-size: 0.8rem; white-space: normal; }
   .badge {
     display: inline-block;
     background: var(--badge-bg);
@@ -139,11 +140,12 @@
 <main>
   <h1>Lunar hardware models</h1>
   <p class="lede">
-    Simple, true-to-size shapes of lunar hardware, built with code for the Common Horizon
-    site (NASA Space Apps 2026, Lunar Landing Site Navigator). Units are meters, Y is up, and
-    each model's origin is the centre of its footprint on the ground. Every model is an
-    illustrative shape, built with SI/AI-written code; its sizes and their sources are listed
-    below, read from the JSON file next to each model.
+    Simple shapes of lunar hardware, built with code for the Common Horizon site (NASA Space
+    Apps 2026, Lunar Landing Site Navigator) and drawn at true scale from the sizes listed
+    below: published figures where we have them, our own estimates where marked. Units are
+    meters, Y is up, and each model's origin is the centre of its footprint on the ground.
+    Every model is an illustrative shape, built with SI/AI-written code. The facts on this page
+    are read from the JSON file next to each model.
   </p>
   <div id="notice" class="notice" role="status"></div>
 
@@ -162,13 +164,13 @@
   </div>
 
   <div class="toolbar">
-    <button id="spin-toggle" type="button" aria-pressed="true">Pause turning</button>
+    <button id="spin-toggle" type="button">Pause turning</button>
     <span class="muted" id="spin-note"></span>
   </div>
 
   <section id="lineup" aria-labelledby="lineup-title">
     <h2 id="lineup-title">All models at the same scale</h2>
-    <canvas id="lineup-canvas" aria-label="All models side by side at the same scale, turning"></canvas>
+    <canvas id="lineup-canvas" role="img" aria-label="All models side by side at the same scale, turning"></canvas>
     <p class="caption" id="lineup-caption"></p>
   </section>
 
@@ -223,12 +225,21 @@
     return { facts, missing };
   }
 
+  // Which overall sizes are not purely from the model's source (their status differs from the
+  // model's status label, e.g. "our simplification" or "our illustration"), as a short note.
+  function sizeQualifier(f) {
+    const mixed = f.dimension_sources.filter((s) => s.status !== f.status);
+    if (mixed.length === 0) return null;
+    const names = mixed.map((s) => (DIM_LABEL[s.dimension] ?? s.dimension).toLowerCase());
+    return el('div', { class: 'qualifier', text: `${names.join(' and ')}: partly our own estimate or simplification` });
+  }
+
   function renderSummary(facts) {
     const body = document.getElementById('summary');
     for (const f of facts) {
       body.append(el('tr', {},
         el('td', {}, el('a', { href: `#${f.id}`, text: f.name })),
-        el('td', { class: 'num', text: sizeText(f.dimensions_m) }),
+        el('td', { class: 'num' }, sizeText(f.dimensions_m), sizeQualifier(f)),
         el('td', { class: 'num', text: `${f.triangles.toLocaleString('en-US')}` }),
         el('td', {}, el('span', { class: 'badge', text: f.status })),
       ));
@@ -236,12 +247,12 @@
   }
 
   function renderCard(f) {
-    const canvas = el('canvas', { 'aria-label': `${f.name}, turning` });
+    const canvas = el('canvas', { role: 'img', 'aria-label': `${f.name}, turning` });
     const caption = el('p', { class: 'caption', text: 'Loading the 3D view...' });
     const viewer = el('div', { class: 'viewer', 'data-model': f.id, 'data-state': 'loading' }, canvas, caption);
 
     const facts = el('dl', {},
-      el('dt', { text: 'Overall size' }), el('dd', { text: `${sizeText(f.dimensions_m)} m (width x height x depth)` }),
+      el('dt', { text: 'Overall size' }), el('dd', {}, `${sizeText(f.dimensions_m)} m (width x height x depth)`, sizeQualifier(f)),
       el('dt', { text: 'Triangles' }), el('dd', { text: `${f.triangles.toLocaleString('en-US')} (limit ${f.triangle_limit.toLocaleString('en-US')})` }),
       el('dt', { text: 'Status' }), el('dd', {}, el('span', { class: 'badge', text: f.status })),
       el('dt', { text: 'Files' }), el('dd', {},
@@ -267,7 +278,7 @@
           el('strong', { text: `${p.node}: ${sizeText(p.dimensions_m)} m. ` }),
           `Source: ${p.source}. Status: ${p.status}.`));
       }
-      right.append(el('h3', { text: 'Measured parts' }), parts);
+      right.append(el('h3', { text: 'Part sizes (checked against the .glb by npm run check)' }), parts);
     }
     if (f.parameters) {
       const p = f.parameters;
@@ -361,8 +372,13 @@
     new ResizeObserver(resize).observe(canvas);
     resize();
 
+    // Only views that are on screen need drawing each frame.
+    let visible = true;
+    new IntersectionObserver((entries) => { visible = entries[entries.length - 1].isIntersecting; }).observe(canvas);
+
     return {
       step,
+      onScreen() { return visible; },
       turn(angle) { for (const t of turntables) t.rotation.y = angle; },
       render() { renderer.render(scene, camera); },
       // Fraction of pixels that are not background, with the grid hidden (used by the page test).
@@ -469,7 +485,6 @@
     const toggle = document.getElementById('spin-toggle');
     const updateToggle = () => {
       toggle.textContent = spinning ? 'Pause turning' : 'Resume turning';
-      toggle.setAttribute('aria-pressed', String(spinning));
       document.getElementById('spin-note').textContent =
         reduceMotion && !spinning ? 'Paused because your system asks for reduced motion.' : '';
     };
@@ -480,7 +495,11 @@
       const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
       if (spinning) angle += dt * 0.35; // radians per second
-      for (const viewer of viewers) { viewer.turn(angle); viewer.render(); }
+      for (const viewer of viewers) {
+        if (!viewer.onScreen()) continue; // skip views scrolled out of sight
+        viewer.turn(angle);
+        viewer.render();
+      }
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);

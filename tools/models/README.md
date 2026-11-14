@@ -1,7 +1,8 @@
 # Lunar hardware models (code-built)
 
-Scripts in this folder build simple, true-to-size 3D models of lunar hardware and write them
-to `web/public/models/` for the website. Each model is a `.glb` file (the 3D shape) with a
+Scripts in this folder build simple 3D models of lunar hardware, drawn at true scale from the
+sizes in each model's JSON (published figures where we have them, our own estimates where
+marked), and write them to `web/public/models/` for the website. Each model is a `.glb` file (the 3D shape) with a
 `.json` file beside it (its sizes, where each size comes from, a status label and the
 triangle count).
 

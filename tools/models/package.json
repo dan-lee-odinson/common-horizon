@@ -2,7 +2,7 @@
   "name": "common-horizon-models",
   "version": "0.1.0",
   "private": true,
-  "description": "Code-built, true-scale lunar hardware models (GLB) for the Common Horizon site.",
+  "description": "Code-built lunar hardware models (GLB) drawn at true scale from published or estimated sizes, for the Common Horizon site.",
   "type": "module",
   "license": "Apache-2.0",
   "engines": {

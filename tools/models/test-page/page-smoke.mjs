@@ -103,6 +103,38 @@ async function inspect(page, consoleErrors) {
   await page.screenshot({ path: path.join(outDir, 'page-phone.png'), fullPage: false });
 }
 
+async function checkCdnPath(browserInstance) {
+  const threeDir = path.resolve(here, '../node_modules/three');
+  const threeVersion = JSON.parse(fs.readFileSync(path.join(threeDir, 'package.json'), 'utf8')).version;
+  const page = await browserInstance.newPage({ viewport: { width: 1280, height: 900 } });
+  const errors = [];
+  const cdnRequests = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('https://cdn.jsdelivr.net/**', async (route) => {
+    const requestUrl = route.request().url();
+    cdnRequests.push(requestUrl);
+    const match = requestUrl.match(/^https:\/\/cdn\.jsdelivr\.net\/npm\/three@([^/]+)\/(.+)$/);
+    if (!match || match[1] !== threeVersion) {
+      fail(`page asked the CDN for ${requestUrl}; expected three@${threeVersion}`);
+      return route.fulfill({ status: 404, body: 'not found' });
+    }
+    const file = path.resolve(threeDir, match[2]);
+    if (!file.startsWith(threeDir + path.sep) || !fs.existsSync(file)) return route.fulfill({ status: 404, body: 'not found' });
+    return route.fulfill({ status: 200, contentType: 'text/javascript', body: fs.readFileSync(file) });
+  });
+  await page.goto(`${url}/index.html`);
+  await page.waitForFunction(() => document.body.dataset.state !== 'loading', null, { timeout: 60000 });
+  const state = await page.evaluate(() => document.body.dataset.state);
+  if (state !== 'ready') fail(`CDN path: page state is "${state}", expected "ready"`);
+  if (cdnRequests.length === 0) fail('CDN path: the page made no requests to cdn.jsdelivr.net');
+  for (const message of errors) fail(`CDN path: browser console error: ${message}`);
+  console.log(`CDN path: page ready, ${cdnRequests.length} three.js files requested from cdn.jsdelivr.net (served locally)`);
+  await page.close();
+}
+
 const problems = [];
 const fail = (message) => problems.push(message);
 
@@ -120,6 +152,15 @@ try {
     await inspect(page, consoleErrors);
   } catch (error) {
     fail(`test stopped early: ${error.message.split('\n')[0]}`);
+  }
+
+  // Second pass: the page's default path, which loads three.js from the jsDelivr CDN. The CDN
+  // requests are answered from the local copy in node_modules (same version, same bytes as the
+  // npm package), so this tests the page's CDN import map without needing the internet.
+  try {
+    await checkCdnPath(browser);
+  } catch (error) {
+    fail(`CDN path test stopped early: ${error.message.split('\n')[0]}`);
   }
 } finally {
   await browser.close();
