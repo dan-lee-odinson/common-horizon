@@ -1,0 +1,10 @@
+# Web lane (web/) only
+node_modules/
+dist/
+test-results/
+playwright-report/
+blob-report/
+.vite/
+*.local
+.env.local
+.env.*.local
