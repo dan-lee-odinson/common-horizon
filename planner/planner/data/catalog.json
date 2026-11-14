@@ -166,7 +166,7 @@
       "runs": "always",
       "runs_text": "day and night",
       "power": {"value": 2, "unit": "kW", "status": ["NASA figure"], "source": "Csank 2023, NTRS 20230002896"},
-      "note": "In site_energy the heating model replaces this flat 2 kW during darkness."
+      "note": "In darkness the heating model (heat leak plus radiator protection) replaces this flat 2 kW, in power_check and site_energy alike, unless a power is typed."
     },
     {
       "id": "crew_rover_recharge",
@@ -174,8 +174,8 @@
       "runs": "light",
       "runs_text": "while charging",
       "runs_note": "Charging is placed in sunlight by default; type runs to change it.",
-      "power": {"value": 2, "unit": "kW", "status": ["our estimate"], "source": "Common Horizon team estimate"},
-      "energy_per_drive_day": {"value": 16, "unit": "kWh", "qualifier": "about", "status": ["our estimate"], "source": "Common Horizon team estimate", "note": "About 16 kWh per drive day."}
+      "power": {"value": 2, "unit": "kW", "status": ["our estimate"], "source": "source to add"},
+      "energy_per_drive_day": {"value": 16, "unit": "kWh", "qualifier": "about", "status": ["our estimate"], "source": "source to add", "note": "About 16 kWh per drive day."}
     },
     {
       "id": "crew_rover_keep_warm",
@@ -209,7 +209,7 @@
       "name": "Work-site lighting",
       "runs": "dark",
       "runs_text": "in darkness",
-      "power": {"value": 1, "unit": "kW", "status": ["our estimate"], "source": "Common Horizon team estimate"}
+      "power": {"value": 1, "unit": "kW", "status": ["our estimate"], "source": "source to add"}
     },
     {
       "id": "keep_alive_heat",
@@ -274,7 +274,7 @@
       "name": "Habitat's own solar array",
       "works": "light",
       "works_text": "in sunlight",
-      "power": {"value": [10, 15], "kind": "range", "default": 10, "unit": "kW", "status": ["NASA study"], "status_note": "Published as a NASA reference design.", "source": "NTRS 20210026557", "note": "Published range 10 to 15 kW; the low end is the default, the harder end for a power source."}
+      "power": {"value": [10, 15], "kind": "range", "default": 10, "unit": "kW", "status": ["NASA study"], "status_inferred": true, "status_note": "Published as a NASA reference design, which is not one of the eight labels; NASA study is the closest. To confirm.", "source": "NTRS 20210026557", "note": "Published range 10 to 15 kW; the low end is the default, the harder end for a power source."}
     },
     {
       "id": "regenerative_fuel_cell",
@@ -289,12 +289,12 @@
   },
   "heating": {
     "about": "Heating penalty for an uncrewed habitat in darkness. It replaces the flat 2 kW uncrewed load. Penalty = (heat leak + radiator protection) x dark hours.",
-    "heat_leak": {"value": 1550, "unit": "W", "status": ["NASA study"], "status_note": "Published as a NASA reference design.", "source": "Schunk, NTRS 20210026557"},
-    "radiator_protection_deployed": {"value": 3840, "unit": "W", "status": ["NASA study"], "status_note": "Published as a NASA reference design.", "source": "Schunk, NTRS 20210026557", "note": "Radiator deployed; the default."},
-    "radiator_protection_stowed": {"value": 700, "unit": "W", "qualifier": "about", "status": ["NASA study"], "status_note": "Published as a NASA reference design.", "source": "Schunk, NTRS 20210026557", "note": "Radiator stowed."}
+    "heat_leak": {"value": 1550, "unit": "W", "status": ["NASA study"], "status_inferred": true, "status_note": "Published as a NASA reference design, which is not one of the eight labels; NASA study is the closest. To confirm.", "source": "Schunk, NTRS 20210026557"},
+    "radiator_protection_deployed": {"value": 3840, "unit": "W", "status": ["NASA study"], "status_inferred": true, "status_note": "Published as a NASA reference design, which is not one of the eight labels; NASA study is the closest. To confirm.", "source": "Schunk, NTRS 20210026557", "note": "Radiator deployed; the default."},
+    "radiator_protection_stowed": {"value": 700, "unit": "W", "qualifier": "about", "status": ["NASA study"], "status_inferred": true, "status_note": "Published as a NASA reference design, which is not one of the eight labels; NASA study is the closest. To confirm.", "source": "Schunk, NTRS 20210026557", "note": "Radiator stowed."}
   },
   "margin_rule": {
-    "green_at_percent": {"value": 25, "unit": "%", "status": ["NASA figure"], "source": "GSFC-STD-1000 Rev I, Table 1.06-1", "note": "Pre-Phase A value. Green at 25 or more, yellow when positive under 25, red when negative."}
+    "green_at_percent": {"value": 25, "unit": "%", "status": ["NASA figure"], "status_inferred": true, "status_note": "Label inferred from the source name; to confirm.", "source": "GSFC-STD-1000 Rev I, Table 1.06-1", "note": "Pre-Phase A value. Green at 25 or more, yellow when positive under 25, red when negative."}
   },
   "constants": {
     "lunar_month_hours": {"value": 708.73, "unit": "h", "status": [], "status_note": "A physical constant; none of the eight labels applies.", "source": "source to add", "note": "One lunar month."}
@@ -303,37 +303,37 @@
     {
       "id": "dv_halo_to_surface_2018",
       "name": "Delta-v, Artemis halo orbit to the surface (2018)",
-      "figure": {"value": 2850, "unit": "m/s", "status": ["NASA figure"], "source": "NASA 2018"}
+      "figure": {"value": 2850, "unit": "m/s", "status": ["NASA figure"], "status_inferred": true, "status_note": "Label inferred from the source name; to confirm.", "source": "NASA 2018"}
     },
     {
       "id": "dv_halo_to_surface_2019",
       "name": "Delta-v, Artemis halo orbit to the surface (2019)",
-      "figure": {"value": 2750, "unit": "m/s", "status": ["NASA figure"], "source": "NASA 2019"}
+      "figure": {"value": 2750, "unit": "m/s", "status": ["NASA figure"], "status_inferred": true, "status_note": "Label inferred from the source name; to confirm.", "source": "NASA 2019"}
     },
     {
       "id": "dv_halo_to_surface_2023",
       "name": "Delta-v, Artemis halo orbit to the surface (2023)",
-      "figure": {"value": 2700, "unit": "m/s", "status": ["NASA figure"], "source": "NASA 2023"}
+      "figure": {"value": 2700, "unit": "m/s", "status": ["NASA figure"], "status_inferred": true, "status_note": "Label inferred from the source name; to confirm.", "source": "NASA 2023"}
     },
     {
       "id": "crew_lander_tilt_threshold",
       "name": "Landing tilt for crew landers, threshold",
-      "figure": {"value": [0, 8], "kind": "range", "unit": "deg", "status": ["NASA figure"], "source": "NASA HLS-R-0071, through a secondary source", "note": "Threshold: 0 to 8 degrees."}
+      "figure": {"value": [0, 8], "kind": "range", "unit": "deg", "status": ["NASA figure"], "status_inferred": true, "status_note": "Label inferred from the source name; to confirm.", "source": "NASA HLS-R-0071, through a secondary source", "note": "Threshold: 0 to 8 degrees."}
     },
     {
       "id": "crew_lander_tilt_goal",
       "name": "Landing tilt for crew landers, goal",
-      "figure": {"value": [0, 5], "kind": "range", "unit": "deg", "status": ["NASA goal"], "source": "NASA HLS-R-0071, through a secondary source", "note": "Goal: 0 to 5 degrees."}
+      "figure": {"value": [0, 5], "kind": "range", "unit": "deg", "status": ["NASA goal"], "status_inferred": true, "status_note": "Label inferred from the source name; to confirm.", "source": "NASA HLS-R-0071, through a secondary source", "note": "Goal: 0 to 5 degrees."}
     },
     {
       "id": "griffin_slope",
       "name": "Griffin slope tolerance",
-      "figure": {"value": 10, "unit": "deg", "status": ["company figure"], "source": "Voyager", "note": "Griffin handles a 10 degree slope."}
+      "figure": {"value": 10, "unit": "deg", "status": ["company figure"], "status_inferred": true, "status_note": "Label inferred from the source name; to confirm.", "source": "Voyager", "note": "Griffin handles a 10 degree slope."}
     },
     {
       "id": "apollo_sun_elevation",
       "name": "Apollo landing Sun elevation",
-      "figure": {"value": [5, 25], "kind": "range", "unit": "deg", "status": ["NASA figure"], "source": "Apollo landings; source to add", "note": "Reference only: Apollo landed at Sun elevations of 5 to 25 degrees."}
+      "figure": {"value": [5, 25], "kind": "range", "unit": "deg", "status": ["NASA figure"], "status_inferred": true, "status_note": "Label inferred: Apollo was a NASA programme; to confirm.", "source": "source to add", "note": "Reference only: Apollo landed at Sun elevations of 5 to 25 degrees."}
     },
     {
       "id": "crew_rover_battery",

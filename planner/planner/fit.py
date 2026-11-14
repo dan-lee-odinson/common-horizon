@@ -10,7 +10,9 @@ from typing import Any, Dict, Iterable, List, Optional, Union
 
 from .catalog import (
     PlannerInputError,
+    as_list,
     check_count,
+    clean_spec,
     check_number,
     figure_value,
     get_item,
@@ -23,12 +25,7 @@ PayloadSpec = Union[str, Dict[str, Any]]
 
 def _payload_line(spec: PayloadSpec) -> Dict[str, Any]:
     """Turn one payload request into a line of the result."""
-    if isinstance(spec, str):
-        spec = {"id": spec}
-    if not isinstance(spec, dict):
-        raise PlannerInputError(
-            f"A payload must be an id string or a dictionary, not {spec!r}."
-        )
+    spec = clean_spec(spec, "payload")
     unknown = set(spec) - {"id", "name", "mass_kg", "count"}
     if unknown:
         raise PlannerInputError(
@@ -86,6 +83,7 @@ def _capacity_checks(lander: Optional[str], capacity_kg: Any,
         if capacity_option is not None:
             raise PlannerInputError("Give capacity_kg or capacity_option, not both.")
         value = check_number(capacity_kg, "capacity_kg", allow_equal=False)
+        lander_info["name"] += f" (typed capacity {_kg(value)})"
         return lander_info, [{
             "option": "user",
             "label": "Payload to the surface (typed)",
@@ -111,6 +109,15 @@ def _capacity_checks(lander: Optional[str], capacity_kg: Any,
 
 def _kg(value: float) -> str:
     return f"{value:,.0f} kg"
+
+
+def _capacity_text(check: Dict[str, Any]) -> str:
+    """'12,000 kg, the bottom of 12,000 to 15,000 kg' for a range; '100,000 kg' otherwise."""
+    published = check["capacity_figure"].get("published_value")
+    if check["capacity_figure"].get("kind") == "range" and published:
+        low, high = published
+        return f"{_kg(check['capacity_kg'])}, the harder end of {low:,.0f} to {_kg(high)}"
+    return _kg(check["capacity_kg"])
 
 
 def fit_check(lander: Optional[str] = None,
@@ -145,9 +152,7 @@ def fit_check(lander: Optional[str] = None,
         in ``checks`` per capacity figure, the payload lines and messages.
         ``spare_kg`` is negative when the payload is over.
     """
-    if isinstance(payloads, (str, dict)):
-        payloads = [payloads]
-    lines = [_payload_line(spec) for spec in payloads]
+    lines = [_payload_line(spec) for spec in as_list(payloads, "payloads")]
     if not lines:
         raise PlannerInputError("Give at least one payload.")
     lander_info, capacities = _capacity_checks(lander, capacity_kg, capacity_option)
@@ -210,6 +215,6 @@ def fit_check(lander: Optional[str] = None,
                 text = f"does not fit: {_kg(-c['spare_kg'])} over"
             result["messages"].insert(
                 len(result["messages"]) - 1,
-                f"{lander_info['name']}, {c['label']} ({_kg(c['capacity_kg'])}): {text}.",
+                f"{lander_info['name']}, {c['label']} ({_capacity_text(c)}): {text}.",
             )
     return result

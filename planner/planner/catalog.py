@@ -166,7 +166,7 @@ def provenance(fig: Dict[str, Any]) -> Dict[str, Any]:
         "status": list(fig.get("status", [])),
         "source": fig.get("source"),
     }
-    for key in ("status_note", "qualifier", "note", "kind"):
+    for key in ("status_inferred", "status_note", "qualifier", "note", "kind"):
         if key in fig:
             out[key] = fig[key]
     if isinstance(fig.get("value"), list):
@@ -194,6 +194,31 @@ def check_number(value: Any, name: str, *, minimum: float = 0.0,
         relation = "at least" if allow_equal else "more than"
         raise PlannerInputError(f"{name} must be {relation} {minimum:g}, not {value!r}.")
     return number
+
+
+def clean_spec(spec: Any, what: str) -> Dict[str, Any]:
+    """Turn an id string or a dictionary into a dictionary, dropping null fields.
+
+    A field set to ``None`` (``null`` in JSON) counts as not typed, so the
+    catalog default applies.
+    """
+    if isinstance(spec, str):
+        return {"id": spec}
+    if isinstance(spec, dict):
+        return {key: value for key, value in spec.items() if value is not None}
+    raise PlannerInputError(f"A {what} must be an id string or a dictionary, not {spec!r}.")
+
+
+def as_list(items: Any, what: str) -> List[Any]:
+    """Accept one item, a list of items, or None (no items)."""
+    if items is None:
+        return []
+    if isinstance(items, (str, dict)):
+        return [items]
+    try:
+        return list(items)
+    except TypeError:
+        raise PlannerInputError(f"{what} must be a list, not {items!r}.") from None
 
 
 def check_count(value: Any, name: str = "count") -> int:
@@ -271,6 +296,8 @@ def validate_catalog(catalog: Optional[Dict[str, Any]] = None) -> List[str]:
                 problems.append(f"{path}: unknown status label {label!r}")
         if not status and not fig.get("status_note"):
             problems.append(f"{path}: no status label and no status_note")
+        if fig.get("status_inferred") and not fig.get("status_note"):
+            problems.append(f"{path}: an inferred label needs a status_note")
         value = fig.get("value")
         if isinstance(value, list):
             if fig.get("kind") not in ("range", "size"):

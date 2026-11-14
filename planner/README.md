@@ -84,18 +84,24 @@ unit it was published in, and looks like this:
 | `qualifier` | Optional: `about`, `under` or `up to`, as published. |
 | `kind` | For a pair: `range` (low to high) or `size` (for example 4 m by 6 m). |
 | `default` | For a range used in a check: the end the check uses. |
+| `status_inferred` | `true` where the label was not stated with the figure and was inferred (for example from the source name). Always comes with a `status_note`; to confirm. |
 | `status_note`, `note` | Optional plain-language notes. |
 
 **Status labels** (the only eight allowed): `built`, `company figure`,
 `NASA figure`, `NASA goal`, `NASA study`, `university study`,
 `research estimate`, `our estimate`.
 
-Two more markers appear in results, never in the catalog:
+Two markers appear in results:
 
 - `user value` (source `typed by user`) - a number the user typed in place of
-  a default. **Any default can be overridden** this way.
-- `our estimate` on numbers this module works out itself, such as the default
-  refill window.
+  a default. **Any default can be overridden** this way. It never appears in
+  the catalog. Dark hours and longest darkness from the physics engine carry
+  it too, with the source "given by the caller, such as the physics engine".
+- `our estimate` - besides the catalog figures that carry this label, numbers
+  this module works out itself, such as the default refill window.
+
+In every request a field set to `None` (`null` in JSON) counts as not typed,
+so the catalog default applies. A `None` list counts as an empty list.
 
 **Ranges.** Where a published figure is a range, the default is the end that
 makes a check harder to pass: the top for a load, the bottom for a power
@@ -153,8 +159,14 @@ Compares the total payload mass with the lander's payload to the surface.
 | --- | --- |
 | `fits` | `True`, `False`, or `None` when it depends on the capacity figure or a mass is missing. |
 | `verdict` | `fits`, `does not fit`, `depends on capacity figure` or `mass needed`. |
-| `spare_kg` | Capacity minus payload. Negative means over. `None` when there is more than one capacity figure. |
+| `spare_kg` | Capacity minus payload. Negative means over. |
 | `margin_percent` | Spare divided by capacity, times 100. |
+
+`spare_kg` and `margin_percent` are `None` when there is more than one capacity
+figure (read them in `checks`) or when a mass is missing.
+
+| Key | Meaning |
+| --- | --- |
 | `checks` | One entry per capacity figure: `option`, `label`, `capacity_kg`, `capacity_figure` (status, source), `payload_kg`, `fits`, `spare_kg`, `margin_percent`. |
 | `payload_total_kg`, `known_payload_kg` | Total mass; the total of the known masses. |
 | `payloads` | One line per payload, with `unit_mass_kg`, `line_mass_kg`, `mass_from` (`catalog` or `user`) and `mass_figure` (status, source, qualifier). |
@@ -185,7 +197,10 @@ fit_check("griffin", [{"id": "jaxa_pressurized_rover", "mass_kg": 500}])["verdic
 
 ```python
 power_check(loads=(), sources=(), storage_kwh=0.0,
-            longest_darkness_h=None, refill_hours=None)
+            longest_darkness_h=None, refill_hours=None,
+            radiator="deployed", uncrewed_hab_heating=None,
+            heat_leak_w=None, radiator_protection_w=None,
+            green_at_percent=None)
 ```
 
 | Parameter | Meaning |
@@ -194,7 +209,9 @@ power_check(loads=(), sources=(), storage_kwh=0.0,
 | `sources` | Ids from `power_sources`, or dictionaries with `id` plus any of `count`, `power_kw`, `works`. A custom source needs `name`, `power_kw` and `works`. |
 | `storage_kwh` | Typed storage in kWh. There is no default storage. |
 | `longest_darkness_h` | Longest darkness at the site in hours, from the physics engine. |
-| `refill_hours` | Sunlit hours to refill storage. Default: one lunar month (708.73 h) minus the longest darkness, labelled `our estimate`. |
+| `refill_hours` | Sunlit hours to refill storage. Default: one lunar month (708.73 h) minus the longest darkness (never below 0), labelled `our estimate`. |
+| `radiator`, `uncrewed_hab_heating`, `heat_leak_w`, `radiator_protection_w` | The heating model for an uncrewed habitat in darkness, the same as in `site_energy`. |
+| `green_at_percent` | A typed green line; default 25. |
 
 `runs` and `works` take `always` (day and night), `light` (sunlight only) or
 `dark` (darkness only). Typed powers are in **kW** (140 W is `0.14`).
@@ -203,29 +220,49 @@ power_check(loads=(), sources=(), storage_kwh=0.0,
 
 **The arithmetic**
 
-- Margin percent = (available - load) / available x 100.
+- Margin percent = (available - load) / available x 100, rounded to 9 decimal
+  places to remove floating-point noise (so 46.650000000000006 reads 46.65).
 - Colour: **green** at 25 or more, **yellow** from 0 up to 25, **red** when
   negative. The 25 percent line is the Pre-Phase A value in GSFC-STD-1000
   Rev I, Table 1.06-1.
 - **Day check:** sources working in sunlight (fission and solar) must cover
   the day load plus the power to refill storage. Refill power = energy taken
   from storage and from night-only sources / refill hours.
+- **Night load** counts loads that run `always` or `dark`. An uncrewed
+  habitat draws heat leak plus radiator protection in darkness (5.39 kW
+  deployed, 2.25 kW stowed) in place of its flat 2 kW, unless its power or
+  timing is typed or `uncrewed_hab_heating=False`.
+- **Per-night energy items** (such as rover keep-warm) count only for loads
+  that run in darkness, and only when there is darkness.
 - **Night check, with `longest_darkness_h`:** storage must cover
   (night load - sources working in darkness) x longest darkness, plus the
-  per-night energy items (such as rover keep-warm). The margin compares
-  energy over the darkness: available = sources in darkness x hours + storage;
-  load = night load x hours + per-night items.
+  per-night energy items. Sources are used in this order: continuous sources,
+  then night-only sources (the fuel cell), then storage.
+  - When the sources working in darkness carry the whole night on their own,
+    per-night items included, the night margin is their **power** margin
+    (`basis`: "power: sources in darkness carry the night"). This is the
+    worked example's 46.7 and 78.7 percent, whatever the darkness length.
+  - When storage is needed, the night margin is the **energy** margin over the
+    longest darkness (`basis`: "energy over the longest darkness"):
+    available = sources in darkness x hours + storage;
+    load = night load x hours + per-night items.
+  - Both views are always returned: `power_margin_percent` and
+    `energy_margin_percent`.
+  - With `longest_darkness_h=0` there is no night to check (`status` "none").
 - **Night check, without `longest_darkness_h`:** a power comparison only,
   sources in darkness against night load; storage and per-night items cannot
-  be counted without a duration, and a note says so.
-- **Balance:** the worse of the day and night margins.
+  be counted without a duration, and the refill is left out of the day check;
+  a note says so.
+- **Balance:** the worse of the day and night margins. `limiting` is "day",
+  "night", or "day and night" when they tie.
 
 **Result keys**
 
 | Key | Meaning |
 | --- | --- |
 | `day` | `available`, `load` (day load plus refill), `unit` (kW), `load_kw`, `refill_kw`, `refill_kwh`, `refill_hours`, `surplus`, `margin_percent`, `status`, `passes`. |
-| `night` | `basis`, `available`, `load`, `unit` (kWh or kW), `load_kw`, `sources_kw`, `per_night_kwh`, `storage_kwh`, `storage_needed_kwh`, `surplus`, `margin_percent`, `power_margin_percent` (sources against load, power only), `status`, `passes`. |
+| `night` | `basis`, `available`, `load`, `unit` (kW or kWh, following `basis`), `surplus`, `margin_percent`, `status`, `passes`, `load_kw`, `sources_kw`, `per_night_kwh`, `storage_kwh`, `storage_needed_kwh`, `power_margin_percent`, `energy_margin_percent`, and with a darkness length also `available_kwh`, `load_kwh`, `surplus_kwh`. |
+| `heating` | Whether the heating model was applied, the watts used, with status and source. |
 | `balance` | `margin_percent`, `status`, `limiting` (`day` or `night`). |
 | `passes` | `True` when both checks pass. |
 | `loads`, `sources` | One line each, with kW, timing, and status and source. |
@@ -246,6 +283,9 @@ power_check(site + ["isru_pilot"], ["fission_40kwe"])["day"]["surplus"]         
 
 power_check(site, [], longest_darkness_h=72)["night"]["storage_needed_kwh"]   # 1546.18
 power_check(site, [], longest_darkness_h=120)["night"]["storage_needed_kwh"]  # 2570.5 (about 2,571)
+
+# With the physics engine's darkness, fission still reads 46.65 and 78.66:
+power_check(site, ["fission_40kwe"], longest_darkness_h=72)["night"]["margin_percent"]  # 46.65
 ```
 
 ## `site_energy`
@@ -270,9 +310,9 @@ The energy a site adds through its darkness:
 | `loads` | The same load requests as `power_check`. |
 | `dark_hours` | Dark hours from the physics engine. |
 | `dark_percent`, `months` | Instead of `dark_hours`: a dark share in percent of `months` lunar months of 708.73 h. Give one of `dark_hours` or `dark_percent`. |
-| `nights` | How many times per-night items apply. Default 1. |
+| `nights` | How many times per-night items apply. Default 1. With zero dark hours there is no night and they do not apply. |
 | `radiator` | `deployed` or `stowed`. |
-| `uncrewed_hab_heating` | `None`: heating model on when `hab_uncrewed` is a load. `True`: on even without it. `False`: keep the flat 2 kW instead. |
+| `uncrewed_hab_heating` | `None`: heating model on for `hab_uncrewed` when its power and timing are not typed. `True`: on even without that load (one habitat). `False`: keep the flat 2 kW instead. |
 | `heat_leak_w`, `radiator_protection_w` | Typed values that override the catalog. |
 
 Result keys: `dark_hours`, `night_load_kw`, `per_night_kwh`,
@@ -313,12 +353,17 @@ and asks for a typed value.
    width and fueled mass), every figure in the entry carries that status and
    source. Where the two sources are not split by figure, both are listed.
 2. **"Built, company figure"** is stored as two labels: `["built", "company figure"]`.
-3. **"NASA reference design"** (the habitat's own array, heat leak and radiator
-   protection) is not one of the eight labels, so it carries `NASA study`
-   with a `status_note` saying it was published as a NASA reference design.
-4. **Unnamed sources** read `source to add`. **Unlabelled figures** (the JAXA
-   pressurized rover's dimensions, the lunar month constant) have an empty
-   status list and a `status_note`; no label was invented.
+3. **Inferred labels are flagged.** Twelve figures had no label stated with
+   them, or a label outside the eight, and carry an inferred one with
+   `status_inferred: true` and a `status_note` asking the team to confirm:
+   "NASA reference design" (the habitat's own array, heat leak, both radiator
+   figures) is mapped to `NASA study`; the 25 percent line and the NASA-sourced
+   reference values carry `NASA figure`; the tilt goal `NASA goal`; Griffin's
+   slope `company figure`; Apollo's Sun elevations `NASA figure`.
+4. **No source name invented.** Every unnamed source, including the team's own
+   estimates, reads `source to add`. Figures with no label and nothing to infer
+   it from (the JAXA pressurized rover's dimensions, the lunar month constant)
+   have an empty status list and a `status_note`.
 5. **Lander capacities** follow the power-source rule: the bottom of the
    Starship HLS cargo range (12,000 kg) is the default for that figure.
 6. **Pressurized rover recharge** defaults to the 9.5 kW peak (the harder end);
@@ -332,14 +377,18 @@ and asks for a typed value.
    labelled `our estimate`; the physics engine should pass `refill_hours`.
    Refill uses the full storage need even when typed storage falls short.
 10. **A margin of exactly 0** is yellow (it passes, with no margin to spare).
-11. **Night margin basis.** Without a darkness duration the night check is a
-    power comparison (this is how the worked example's 46.7 and 78.7 percent
-    come out). With one, it is an energy comparison that also counts storage
-    and per-night items; `power_margin_percent` still reports the power-only
-    figure.
+11. **Night margin basis.** When the sources working in darkness carry the
+    night on their own, the night margin is their power margin, so the worked
+    example's 46.7 and 78.7 percent hold whether or not the physics engine
+    sends a darkness length, and typed spare storage does not inflate it. When
+    storage is needed, it is the energy margin over the longest darkness.
 12. **No storage losses** are modelled: storage returns what is put in.
-13. **Reference values** with a NASA source name (delta-v, tilt threshold,
-    Apollo Sun elevations) carry `NASA figure`; the tilt goal carries `NASA goal`.
+13. **Uncrewed habitat heating applies in both checks.** `power_check` uses
+    the same heating model as `site_energy`, so storage sized by one agrees
+    with the energy counted by the other. A typed habitat power or timing is
+    kept as typed.
+14. **Per-night items need a night**: they count only for loads that run in
+    darkness, and not at a site with no darkness.
 
 ## Running the tests and the build
 

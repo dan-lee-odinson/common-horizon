@@ -51,13 +51,11 @@ figure; this table groups them by source.
 | NTRS 20220005798 | Keep-alive heat 140 W per lander or payload | NASA study | link to add |
 | arXiv 2508.10855 | Comms relay 200 W | research estimate | link to add |
 | NTRS 20190032521 | ISRU propellant pilot 20 kW | NASA figure | link to add |
-| NTRS 20210026557 (Schunk) | Habitat's own array 10 to 15 kW; heat leak 1,550 W; radiator protection 3,840 W deployed, about 700 W stowed | NASA study (published as a NASA reference design) | link to add |
-| GSFC-STD-1000 Rev I, Table 1.06-1 | 25 percent power margin, Pre-Phase A | NASA figure | link to add |
-| NASA 2018; NASA 2019; NASA 2023 | Delta-v, Artemis halo orbit to the surface: 2,850; 2,750; 2,700 m/s | NASA figure | link to add |
-| NASA HLS-R-0071, through a secondary source | Landing tilt for crew landers: 0 to 8 degrees threshold; 0 to 5 degrees goal | NASA figure; NASA goal | link to add |
-| Voyager | Griffin handles a 10 degree slope | company figure | link to add |
-| Apollo landings | Sun elevations of 5 to 25 degrees at landing (reference only) | NASA figure | link to add |
-| Common Horizon team estimate | Crew rover recharge 2 kW, about 16 kWh per drive day; work-site lighting 1 kW | our estimate | not applicable |
+| NTRS 20210026557 (Schunk) | Habitat's own array 10 to 15 kW; heat leak 1,550 W; radiator protection 3,840 W deployed, about 700 W stowed | NASA study (published as a NASA reference design; mapping to confirm) | link to add |
+| GSFC-STD-1000 Rev I, Table 1.06-1 | 25 percent power margin, Pre-Phase A | NASA figure (inferred, to confirm) | link to add |
+| NASA 2018; NASA 2019; NASA 2023 | Delta-v, Artemis halo orbit to the surface: 2,850; 2,750; 2,700 m/s | NASA figure (inferred, to confirm) | link to add |
+| NASA HLS-R-0071, through a secondary source | Landing tilt for crew landers: 0 to 8 degrees threshold; 0 to 5 degrees goal | NASA figure; NASA goal (inferred, to confirm) | link to add |
+| Voyager | Griffin handles a 10 degree slope | company figure (inferred, to confirm) | link to add |
 
 ### Figures whose source is still to add
 
@@ -71,12 +69,16 @@ These figures are in the catalog with `source to add`:
 - Solar array mast VSAT 10 kW and VSAT-XL 50 kW (company figure)
 - Regenerative fuel cell 10 kW (NASA goal)
 - One lunar month: 708.73 hours (a physical constant)
+- Crew rover recharge 2 kW and about 16 kWh per drive day; work-site lighting 1 kW (our estimate: the team's own figures, to be written up)
+- Apollo landing Sun elevations, 5 to 25 degrees (reference only; NASA figure, inferred, to confirm)
 
 ## SI/AI use
 
 Super Intelligence (SI) / artificial intelligence (AI): this lane (the planner
 module, its tests, this file and the README) was built with Claude Code
 (Anthropic). A separate Claude Code agent that did not write the code reviewed
-it. The figures, source names and status labels were supplied by the team; the
-AI tool entered them, wrote the code and tests, and recorded its own decisions
-in the README and the pull request.
+it and ran the tests itself; its findings and the fixes made are recorded on
+the pull request. The figures, source names and status labels were supplied
+by the team. The AI tool entered them, wrote the code and tests, and recorded
+its own decisions in the README. Where it inferred a label, the catalog says
+so.

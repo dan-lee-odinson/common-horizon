@@ -8,7 +8,6 @@ from planner import PlannerInputError, STATUS_LABELS, get_item, list_catalog, va
 from planner.catalog import _iter_figures
 
 TBA = "source to add"
-TEAM = "Common Horizon team estimate"
 MK1 = "Blue Origin; Gunter's Space Page"
 MK2 = "Blue Origin; Space.com"
 HLS = "SpaceX HLS program manager, 2022"
@@ -53,8 +52,8 @@ EXPECTED = {
     # Power loads
     "power_loads/hab_crewed/power": (20, "kW", ["NASA figure"], CSANK),
     "power_loads/hab_uncrewed/power": (2, "kW", ["NASA figure"], CSANK),
-    "power_loads/crew_rover_recharge/power": (2, "kW", ["our estimate"], TEAM),
-    "power_loads/crew_rover_recharge/energy_per_drive_day": (16, "kWh", ["our estimate"], TEAM),
+    "power_loads/crew_rover_recharge/power": (2, "kW", ["our estimate"], TBA),
+    "power_loads/crew_rover_recharge/energy_per_drive_day": (16, "kWh", ["our estimate"], TBA),
     "power_loads/crew_rover_keep_warm/energy_per_night": (
         9.7, "kWh", ["NASA study"], "NTRS 20240004621"),
     "power_loads/science_rover_recharge/power": (500, "W", ["NASA figure"], "NTRS 20220005893"),
@@ -62,7 +61,7 @@ EXPECTED = {
         9.5, "kW", ["university study"], "NTRS 19940021211"),
     "power_loads/pressurized_rover_recharge/power_options/average": (
         6.5, "kW", ["university study"], "NTRS 19940021211"),
-    "power_loads/worksite_lighting/power": (1, "kW", ["our estimate"], TEAM),
+    "power_loads/worksite_lighting/power": (1, "kW", ["our estimate"], TBA),
     "power_loads/keep_alive_heat/power": (140, "W", ["NASA study"], "NTRS 20220005798"),
     "power_loads/comms_relay/power": (200, "W", ["research estimate"], "arXiv 2508.10855"),
     "power_loads/isru_pilot/power": (20, "kW", ["NASA figure"], "NTRS 20190032521"),
@@ -89,8 +88,7 @@ EXPECTED = {
     "reference/crew_lander_tilt_threshold": ([0, 8], "deg", ["NASA figure"], TILT),
     "reference/crew_lander_tilt_goal": ([0, 5], "deg", ["NASA goal"], TILT),
     "reference/griffin_slope": (10, "deg", ["company figure"], "Voyager"),
-    "reference/apollo_sun_elevation": (
-        [5, 25], "deg", ["NASA figure"], "Apollo landings; source to add"),
+    "reference/apollo_sun_elevation": ([5, 25], "deg", ["NASA figure"], TBA),
     "reference/crew_rover_battery": (
         23.22, "kWh", ["NASA study"], "Venturi, NASA Aerospace Battery Workshop, Jan 2026"),
 }
@@ -109,6 +107,23 @@ QUALIFIERS = {
     "payloads/logistics/mass": "up to",
     "power_loads/crew_rover_recharge/energy_per_drive_day": "about",
     "heating/radiator_protection_stowed": "about",
+}
+
+
+# Labels the team did not state for these figures; inferred, flagged, to confirm.
+INFERRED = {
+    "power_sources/hab_array/power",
+    "heating/heat_leak",
+    "heating/radiator_protection_deployed",
+    "heating/radiator_protection_stowed",
+    "margin_rule/green_at_percent",
+    "reference/dv_halo_to_surface_2018",
+    "reference/dv_halo_to_surface_2019",
+    "reference/dv_halo_to_surface_2023",
+    "reference/crew_lander_tilt_threshold",
+    "reference/crew_lander_tilt_goal",
+    "reference/griffin_slope",
+    "reference/apollo_sun_elevation",
 }
 
 
@@ -138,6 +153,19 @@ def test_figure_matches(path):
     assert fig["status"] == status
     assert fig["source"] == source
     assert fig.get("qualifier") == QUALIFIERS.get(path)
+
+
+def test_inferred_labels_are_flagged_and_explained():
+    flagged = {path for path, fig in all_figures().items() if fig.get("status_inferred")}
+    assert flagged == INFERRED
+    for path in INFERRED:
+        assert "confirm" in all_figures()[path]["status_note"].lower()
+
+
+def test_validate_catalog_wants_a_note_for_an_inferred_label():
+    broken = list_catalog()
+    del broken["reference"][0]["figure"]["status_note"]
+    assert any("inferred label needs a status_note" in p for p in validate_catalog(broken))
 
 
 def test_range_defaults_take_the_harder_end():

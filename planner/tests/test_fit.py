@@ -82,8 +82,23 @@ def test_typed_capacity_overrides_the_lander():
     assert result["fits"] is True
     assert result["checks"][0]["capacity_figure"]["status"] == ["user value"]
     custom = fit_check(None, [{"name": "Drill", "mass_kg": 300}], capacity_kg=250)
-    assert custom["lander"]["name"] == "Custom lander"
+    assert custom["lander"]["name"] == "Custom lander (typed capacity 250 kg)"
     assert custom["spare_kg"] == pytest.approx(-50)
+
+
+def test_messages_name_the_range_and_the_typed_capacity():
+    hls = fit_check("starship_hls", ["surface_habitat", "logistics"])
+    assert any("12,000 kg, the harder end of 12,000 to 15,000 kg" in m for m in hls["messages"])
+    typed = fit_check("starship_hls", ["astrolab_clv1"], capacity_kg=1000)
+    assert typed["messages"][0].startswith("Starship HLS (typed capacity 1,000 kg): fits")
+
+
+def test_null_fields_count_as_not_typed():
+    result = fit_check("griffin", [{"id": "astrolab_clv1", "mass_kg": None, "count": None}],
+                       capacity_kg=None, capacity_option=None)
+    assert result["payload_total_kg"] == pytest.approx(907)
+    with pytest.raises(PlannerInputError, match="at least one payload"):
+        fit_check("griffin", None)
 
 
 def test_exactly_full_counts_as_a_fit():

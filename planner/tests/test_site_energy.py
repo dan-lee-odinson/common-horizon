@@ -23,8 +23,10 @@ def test_rover_keep_warm_adds_9_7_kwh_per_night():
     without = site_energy(NIGHT_LOADS, dark_percent=7.73)["night_penalty_kwh"]
     with_rover = site_energy(NIGHT_LOADS + ["crew_rover_keep_warm"], dark_percent=7.73)
     assert with_rover["night_penalty_kwh"] == pytest.approx(without + 9.7)
-    two_nights = site_energy(["crew_rover_keep_warm"], dark_hours=0, nights=2)
+    two_nights = site_energy(["crew_rover_keep_warm"], dark_hours=10, nights=2)
     assert two_nights["night_penalty_kwh"] == pytest.approx(19.4)
+    no_night = site_energy(["crew_rover_keep_warm"], dark_hours=0, nights=2)
+    assert no_night["night_penalty_kwh"] == 0
 
 
 def test_daytime_loads_add_nothing_at_night():
@@ -51,6 +53,19 @@ def test_flat_2_kw_is_kept_when_heating_is_off():
     result = site_energy(["hab_uncrewed"], dark_hours=100, uncrewed_hab_heating=False)
     assert result["heating_penalty_kwh"] == 0
     assert result["night_penalty_kwh"] == pytest.approx(200)
+
+
+def test_typed_hab_power_or_timing_is_respected():
+    typed = site_energy([{"id": "hab_uncrewed", "power_kw": 3}], dark_hours=100)
+    assert typed["heating"]["applied"] is False
+    assert typed["total_kwh"] == pytest.approx(300)
+    daylight = site_energy([{"id": "hab_uncrewed", "runs": "light"}], dark_hours=100)
+    assert daylight["total_kwh"] == 0
+
+
+def test_dark_hours_are_labelled_as_given_by_the_caller():
+    figure = site_energy(["hab_crewed"], dark_hours=10)["dark_hours_figure"]
+    assert figure["source"] == "given by the caller, such as the physics engine"
 
 
 def test_heating_can_be_forced_and_overridden():
