@@ -27,21 +27,20 @@ const TYPES = {
   '.md': 'text/plain; charset=utf-8',
 };
 
-// Map a URL path to a file, refusing anything outside the allowed folders.
-function resolveFile(urlPath) {
-  let root;
-  let rest;
+// Map a URL path to a file, refusing anything outside the allowed folders. The path is
+// resolved first and checked afterwards, so tricks like "build%2f..%2f" cannot escape.
+export function resolveFile(urlPath) {
+  if (urlPath.includes('\0')) return null;
+  const inside = (root, file) => file === root || file.startsWith(root + path.sep);
   if (urlPath.startsWith('/vendor/three/')) {
-    root = THREE_DIR;
-    rest = urlPath.slice('/vendor/three/'.length);
-    if (!rest.startsWith('build/') && !rest.startsWith('examples/jsm/')) return null;
-  } else {
-    root = PAGE_DIR;
-    rest = urlPath.slice(1) || 'index.html';
+    const file = path.resolve(THREE_DIR, `.${urlPath.slice('/vendor/three'.length)}`);
+    const relative = path.relative(THREE_DIR, file).split(path.sep).join('/');
+    if (!inside(THREE_DIR, file)) return null;
+    if (!relative.startsWith('build/') && !relative.startsWith('examples/jsm/')) return null;
+    return file;
   }
-  const file = path.resolve(root, rest);
-  if (file !== root && !file.startsWith(root + path.sep)) return null;
-  return file;
+  const file = path.resolve(PAGE_DIR, `.${urlPath === '/' ? '/index.html' : urlPath}`);
+  return inside(PAGE_DIR, file) ? file : null;
 }
 
 export function startServer({ port = 8080, host = '127.0.0.1' } = {}) {
@@ -67,8 +66,13 @@ export function startServer({ port = 8080, host = '127.0.0.1' } = {}) {
       'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream',
       'cache-control': 'no-store',
     });
-    if (request.method === 'HEAD') response.end();
-    else fs.createReadStream(file).pipe(response);
+    if (request.method === 'HEAD') {
+      response.end();
+      return;
+    }
+    const stream = fs.createReadStream(file);
+    stream.on('error', () => response.destroy()); // e.g. file removed mid-read: drop this response only
+    stream.pipe(response);
   });
   return new Promise((resolve, reject) => {
     server.once('error', reject);
