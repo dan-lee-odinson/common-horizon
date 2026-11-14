@@ -9,7 +9,7 @@ const SITES = sitesJson.sites as SiteRef[];
 const LAUNCH = '2027-02-10T15:00:00Z';
 
 function request(slip: number, overrides: Partial<EvaluateRequest> = {}): EvaluateRequest {
-  return { sites: SITES, launch_utc: LAUNCH, slip_days: slip, stay_days: 14, hardware: [{ id: 'starship', count: 1 }], ...overrides };
+  return { sites: SITES, launch_utc: LAUNCH, slip_days: slip, stay_days: 14, hardware: [{ id: 'starship', count: 1 }], storage_kwh: 0, ...overrides };
 }
 
 beforeAll(() => configureMock({ latencyMs: 0 }));
@@ -106,21 +106,25 @@ describe('mock mode (VITE_API_BASE unset)', () => {
         { id: 'hab', count: 1 },
         { id: 'nuclear', count: 1 },
       ],
+      storage_kwh: 0,
     });
     expect(c.day.needed && c.night.needed).toBe(true);
     expect(c.night.generation_kw).toBe(40);
-    expect(c.balance_margin_percent).toBe(Math.min(c.day.margin_percent!, c.night.margin_percent!));
+    // No site: no darkness length, so the night check compares power only (as in the planner module).
+    expect(c.night.basis).toBe('power only');
+    expect(c.night.storage_needed_kwh).toBeNull();
+    expect(c.balance.margin_percent).toBe(Math.min(c.day.margin_percent!, c.night.margin_percent!));
     expect(c.fits).toBe(true);
   });
 
   it('says cargo needs a lander', async () => {
-    const c = await api.check({ site: null, landing_utc: '2027-02-15T15:00:00Z', stay_days: 14, hardware: [{ id: 'hab', count: 1 }] });
+    const c = await api.check({ site: null, landing_utc: '2027-02-15T15:00:00Z', stay_days: 14, hardware: [{ id: 'hab', count: 1 }], storage_kwh: 0 });
     expect(c.fits).toBe(false);
     expect(c.fit_notes.join(' ')).toMatch(/lander/);
   });
 
   it('answers the assistant with a text example', async () => {
-    const r = await api.ask({ question: 'Why does the slip matter?', context: { site_id: null, launch_utc: LAUNCH, slip_days: 7, stay_days: 14, hardware: [] } });
+    const r = await api.ask({ question: 'Why does the slip matter?', context: { site_id: null, launch_utc: LAUNCH, slip_days: 7, stay_days: 14, hardware: [], storage_kwh: 0 } });
     expect(r.example).toBe(true);
     expect(r.answer).toMatch(/slip/i);
   });
@@ -140,7 +144,7 @@ describe('mock mode (VITE_API_BASE unset)', () => {
   it('can show the assistant as unavailable', async () => {
     configureMock({ scenario: { mode: 'normal', assistant: 'off' } });
     expect((await api.health()).assistant_available).toBe(false);
-    await expect(api.ask({ question: 'hi', context: { site_id: null, launch_utc: LAUNCH, slip_days: 0, stay_days: 1, hardware: [] } })).rejects.toMatchObject({ kind: 'unavailable' });
+    await expect(api.ask({ question: 'hi', context: { site_id: null, launch_utc: LAUNCH, slip_days: 0, stay_days: 1, hardware: [], storage_kwh: 0 } })).rejects.toMatchObject({ kind: 'unavailable' });
   });
 
   it('stops when the caller cancels', async () => {
@@ -178,7 +182,7 @@ describe('live mode (VITE_API_BASE set)', () => {
   it('maps HTTP 503 from the assistant to "unavailable" and other failures to errors', async () => {
     vi.stubEnv('VITE_API_BASE', 'http://backend.test');
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 503 })));
-    await expect(api.ask({ question: 'x', context: { site_id: null, launch_utc: LAUNCH, slip_days: 0, stay_days: 1, hardware: [] } })).rejects.toMatchObject({ kind: 'unavailable' });
+    await expect(api.ask({ question: 'x', context: { site_id: null, launch_utc: LAUNCH, slip_days: 0, stay_days: 1, hardware: [], storage_kwh: 0 } })).rejects.toMatchObject({ kind: 'unavailable' });
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 503 })));
     await expect(api.evaluate(request(0))).rejects.toMatchObject({ kind: 'http', status: 503 });
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 500 })));

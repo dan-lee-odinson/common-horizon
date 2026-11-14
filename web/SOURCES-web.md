@@ -66,7 +66,9 @@ No logos, insignia, flags or agency or company lettering are used anywhere. Name
 | Sub-solar latitude swing ±1.54° over 346.62 days | Mock Sun height at the poles | Moon's axis tilt to the ecliptic (≈1.54°) and the eclipse year; simplified | link to add |
 | Libration ±6.7° latitude (27.2122 d), ±7.9° longitude (27.5546 d) | Mock Earth wobble in the sky | Approximate optical libration amplitudes and the draconic and anomalistic months; simplified | link to add |
 | Transit 5 days from launch to landing | Mock landing time | Placeholder for the mock; the backend sets the real value | — |
-| Power colour thresholds: green at 25 % margin or more, yellow from 0 % to under 25 %, red below 0 % | Planner and ranked list | Team brief | — |
+| Power colour thresholds: green at 25 % margin or more, yellow from 0 % to under 25 %, red below 0 % | Planner and ranked list | Team brief; the same line as the planner module (GSFC-STD-1000 Rev I, Table 1.06-1, as cited in `planner/README.md`) | — |
+| Power check rules: margin = (available − load) / available × 100; night storage over the longest darkness; day refill | Mock power checks (`src/api/mock/power.ts`) | Planner module, `planner/README.md` ("power_check"), read only | — |
+| One lunar month 708.73 h | Default refill window in the mock power checks | Planner module catalog constant (`planner/README.md`) | — |
 
 ## SI/AI use
 

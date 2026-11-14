@@ -48,6 +48,14 @@ export function HardwareGlyph({ id, kind }: { id: string; kind: HardwareKind }) 
         </>
       );
       break;
+    case 'battery':
+      body = (
+        <>
+          <rect x="8" y="12" width="21" height="16" rx="2" {...common} />
+          <path d="M29 17 H32 V23 H29 M13 16 V24 M18 16 V24 M23 16 V24" {...common} />
+        </>
+      );
+      break;
     case 'solar':
       body = (
         <>

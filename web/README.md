@@ -85,20 +85,53 @@ regenerated from the backend's OpenAPI file. Sample answers the website expects 
 | health | `GET /health` | Is the backend up; is the assistant available? |
 | site list | `GET /sites` | Preset sites (latitude, east longitude 0–360). |
 | catalog | `GET /catalog` | Hardware rows for the planner. |
-| evaluate | `POST /evaluate` | Score each site for a launch time (UTC), slip (0–30 days), stay (days) and hardware. |
+| evaluate | `POST /evaluate` | Score each site for a launch time (UTC), slip (0–30 days), stay (days), hardware and battery storage (kWh). |
 | horizon | `POST /horizon` | Skyline, the Sun's path (above / hidden) and Earth's box for one site and time window. |
-| fit and power check | `POST /check` | Does the hardware fit; day and night power checks. |
+| fit and power check | `POST /check` | Does the hardware fit; day and night power checks, with battery storage (kWh). |
 | ask the assistant | `POST /assistant` | Text answer only. The assistant never controls the interface. |
 
 Every call shows four states in the interface — waiting, answer, empty, error — and the assistant
 has a fifth: unavailable (the backend answers HTTP 503, or `/health` says so).
 
+### Battery storage and the power checks (for the backend)
+
+The planner has a **Battery storage** row: a number typed in kWh (empty or 0 means none). It is not a
+catalog row. The website sends it as **`storage_kwh`** (a number, 0 = none) in three requests:
+`POST /evaluate`, `POST /check` and the `context` of `POST /assistant`.
+
+The power numbers follow the planner module's `power_check` (see `planner/README.md`). The backend
+can pass these straight through:
+
+| Website field (`src/api/types.ts`) | Planner module |
+| --- | --- |
+| request `storage_kwh` | `power_check(storage_kwh=...)` |
+| `night.longest_darkness_h` | `longest_darkness_h`: the longest unbroken darkness inside the stay, from the physics engine. `null` when no site is picked. |
+| `day.refill_hours` | `refill_hours` (default: one lunar month, 708.73 h, minus the longest darkness) |
+| `day`: `generation_kw`, `load_kw`, `refill_kw`, `refill_kwh`, `margin_percent`, `status`, `passes` | `day`: `available`, `load_kw`, `refill_kw`, `refill_kwh`, `margin_percent`, `status`, `passes` |
+| `night`: `generation_kw`, `load_kw`, `per_night_kwh`, `storage_kwh`, `storage_needed_kwh`, `available_kwh`, `load_kwh`, `margin_percent`, `status`, `passes` | `night`: `sources_kw`, `load_kw`, `per_night_kwh`, `storage_kwh`, `storage_needed_kwh`, `available_kwh`, `load_kwh`, `margin_percent`, `status`, `passes` |
+| `night.basis`: `energy`, `power`, `power only`, `no darkness` | `night.basis`: "energy over the longest darkness", "power: sources in darkness carry the night", "power (no darkness duration given)", "no darkness" |
+| `balance`: `margin_percent`, `status`, `limiting` | `balance`: the same three keys |
+| `power_notes` | `notes` |
+| evaluate: `power_margin_percent`, `power_status` | that site's `balance.margin_percent` and `balance.status` |
+
+* `status` is `green`, `yellow`, `red` or `none`. A margin can be `null` while the status is `red`
+  (a load with nothing at all to power it); the website then shows "no supply".
+* With no site picked there is no darkness length, so, as in the planner module, the night check
+  compares power only and storage is not counted. The planner says so in words.
+* The mock copies the planner's arithmetic in `src/api/mock/power.ts` (tests in
+  `src/api/mock/power.test.ts` use the planner README's figures). The mock catalog's
+  optional `energy_per_night_kwh` stands for per-night items such as rover keep-warm.
+
 ## How the screen is organised
 
 * **Top bar** (always): launch date and time (UTC), slip 0 to +30 days, UTC / LTC switch and, in the
   site scene, Play.
-* **Mission planner** (right; a drawer on phones): hardware rows, the power balance number (tap it for
-  the day and night checks), stay length 1–365.25 days, and the Earth link indicator.
+* **Mission planner** (right; a drawer on phones): hardware rows, a typed **Battery storage** figure
+  (kWh), the power balance number (tap it for the day and night checks), stay length 1–365.25 days,
+  and the Earth link indicator. Beside the balance number the words name the check that limits it,
+  for example "power short at night". When the night check fails, the planner shows about how much
+  storage would cover the picked site's darkness. Try the nuclear generator, then solar panels with
+  batteries, at a site with long darkness and at one with short darkness.
 * **Assistant** (bottom, always).
 * **View 1**: the Moon with Sun and Earth markers ("not to scale"). Click the Moon (or "Show landing sites").
 * **View 2**: site markers and the floating, movable Sites pane (coordinates, presets, ranked list,
@@ -108,8 +141,9 @@ has a fifth: unavailable (the backend answers HTTP 503, or `/health` says so).
 **Time.** LTC (model value) = UTC + 56.02 microseconds for every day counted from the landing time.
 The lunar time standard is still being defined, so it is labelled as a model value.
 
-**Power colours.** Margin of 25 % or more: green. From 0 % up to 25 %: yellow (exactly 0 % counts as
-yellow). Below 0 %: red. The word next to the number repeats the meaning.
+**Power colours.** Margin percent = (available − load) / available × 100, as in the planner module.
+Margin of 25 % or more: green. From 0 % up to 25 %: yellow (exactly 0 % counts as yellow). Below 0 %:
+red. The words next to the number repeat the meaning and name the limiting check.
 
 ## Folder map
 

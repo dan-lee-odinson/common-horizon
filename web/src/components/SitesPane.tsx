@@ -8,7 +8,7 @@ import { useData, type KnownSite } from '../state/data';
 import { useStore } from '../state/store';
 import { prefersReducedMotion, useIsPhone } from '../state/useMedia';
 import { formatLatLon, isValidLatitude, toEastLongitude, type Hemisphere } from '../util/geo';
-import { formatKwh, formatPercent, powerColorVar, powerLevel } from '../util/power';
+import { formatKwh, formatPercent, levelFromStatus, powerColorVar } from '../util/power';
 import { movedText, type RankedRow } from '../util/ranking';
 import { AsyncView, SkeletonLines } from './AsyncView';
 import { EARTH_LINK_COLOR, EARTH_LINK_WORD, HorizonPlot } from './HorizonPlot';
@@ -16,8 +16,8 @@ import { Icon } from './Icon';
 
 /** Suggested next step when every ranked site fails the same requirement. */
 const FIX_HINT: Record<string, string> = {
-  'night power': 'Nothing makes power at night: add the Nuclear generator, or shorten the stay so it has no night.',
-  'day power': 'Daytime load is more than daytime generation: add Solar panels or the Nuclear generator.',
+  'night power': 'Not enough power at night: add battery storage or the Nuclear generator, or shorten the stay so it has no night.',
+  'day power': 'Daytime generation does not cover the daytime load and the storage refill: add Solar panels or the Nuclear generator.',
   'hardware fit': 'See the fit notes under the power balance in the mission planner.',
   'Earth contact': 'Earth is never above the horizon: pick a near-side site.',
 };
@@ -316,7 +316,7 @@ function RankedList({
 
 function SiteRow({ row, site, highlighted, saved, quietVerdict }: { row: RankedRow; site: KnownSite; highlighted: boolean; saved: boolean; quietVerdict: boolean }) {
   const e = row.evaluation;
-  const level = powerLevel(e.power_margin_percent);
+  const level = levelFromStatus(e.power_status);
   const fail = e.verdict.result === 'fail';
   const verdictText = fail ? `fail: ${e.verdict.requirement}` : 'pass';
   return (

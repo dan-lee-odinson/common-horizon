@@ -22,6 +22,8 @@ export interface AppState {
   timeScale: TimeScale;
   stayDays: number;
   hardware: Record<string, HardwarePick>;
+  /** Battery storage typed in the planner, kWh. 0 = none. */
+  storageKwh: number;
   highlightedId: string | null;
   /** The point typed into the coordinate entry or clicked on the Moon. */
   customSite: SiteRef | null;
@@ -39,6 +41,8 @@ export const DEFAULT_STAY_DAYS = 14;
 export const MAX_SLIP_DAYS = 30;
 export const MIN_STAY_DAYS = 1;
 export const MAX_STAY_DAYS = 365.25;
+/** Upper limit for typed battery storage, kWh (far above anything a lander carries). */
+export const MAX_STORAGE_KWH = 1_000_000;
 const SAVED_KEY = 'common-horizon.saved-sites';
 
 function loadSaved(): SiteRef[] {
@@ -71,6 +75,7 @@ export const appStore = createStore<AppState>({
   timeScale: 'UTC',
   stayDays: DEFAULT_STAY_DAYS,
   hardware: {},
+  storageKwh: 0,
   highlightedId: null,
   customSite: null,
   saved: loadSaved(),
@@ -126,6 +131,10 @@ export const actions = {
     const hw = appStore.get().hardware;
     const pick = hw[id] ?? { selected: true, count: 1, userSet: false };
     appStore.set({ hardware: { ...hw, [id]: { ...pick, count: clamp(Math.round(count), 1, max), userSet: true } } });
+  },
+  /** Battery storage in kWh. Anything not a positive number means none. */
+  setStorage(kwh: number) {
+    appStore.set({ storageKwh: Number.isFinite(kwh) && kwh > 0 ? clamp(kwh, 0, MAX_STORAGE_KWH) : 0 });
   },
   /** Highlight a site. Items the visitor has not touched follow the site's default hardware. */
   highlight(id: string | null, site?: Pick<Site, 'default_hardware'> | null) {

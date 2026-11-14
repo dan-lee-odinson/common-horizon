@@ -50,6 +50,12 @@ export interface HardwareChoice {
   count: number;
 }
 
+/**
+ * Battery storage typed by the visitor, in kWh. 0 means none. It is not a catalog row: the planner
+ * module takes it as its own figure (`power_check(..., storage_kwh=...)`) and has no default storage.
+ */
+export type StorageKwh = number;
+
 // ---------- POST /evaluate ----------
 export interface EvaluateRequest {
   sites: SiteRef[];
@@ -60,6 +66,8 @@ export interface EvaluateRequest {
   /** Surface stay in days, 1..365.25. */
   stay_days: number;
   hardware: HardwareChoice[];
+  /** Battery storage in kWh; 0 = none. */
+  storage_kwh: StorageKwh;
 }
 
 export type EarthLink = 'clear' | 'intermittent' | 'none';
@@ -83,11 +91,13 @@ export interface SiteEvaluation {
   /** Net energy over the stay (generation minus load). Negative means a deficit. */
   energy_added_kwh: number;
   /**
-   * The site's power balance margin: the lower of the day and night checks that apply during the
-   * stay (the same number the planner shows for this site). Colours the energy figure.
-   * null when nothing draws power.
+   * The site's power balance margin: the worse of the day and night checks (the same number the
+   * planner shows for this site). null when there is nothing to check, and also when nothing
+   * makes power for a check that has a load: read power_status for the colour.
    */
   power_margin_percent: number | null;
+  /** Colour of the balance, as the planner module gives it. Colours the energy figure. */
+  power_status: PowerStatus;
   verdict: Verdict;
 }
 
@@ -168,6 +178,8 @@ export interface CatalogItem {
   max_slope_deg?: number;
   load_day_kw: number;
   load_night_kw: number;
+  /** Energy used once per night, per unit, by an item that draws in darkness (for example rover keep-warm). */
+  energy_per_night_kwh?: number;
   /** Power produced per unit. */
   gen_kw: number;
   /** True for solar: produces only while the Sun is up. */
@@ -188,23 +200,92 @@ export interface CheckRequest {
   landing_utc: IsoUtc;
   stay_days: number;
   hardware: HardwareChoice[];
+  /** Battery storage in kWh; 0 = none. */
+  storage_kwh: StorageKwh;
 }
 
-export interface PowerCheck {
-  generation_kw: number;
-  load_kw: number;
-  margin_percent: number | null;
-  /** False when the stay has no darkness (night check) or no daylight (day check). */
+/**
+ * Colours as the planner module names them: green at a margin of 25 % or more, yellow from 0 up to
+ * 25, red when negative (or when a load has nothing to power it), none when there is nothing to check.
+ */
+export type PowerStatus = 'green' | 'yellow' | 'red' | 'none';
+
+/**
+ * Day check: sources working in sunlight must cover the day load plus the power to refill storage.
+ * Margin percent = (available - load) / available x 100, where load = load_kw + refill_kw.
+ */
+export interface DayCheck {
+  /** False when there is nothing to check (status "none"). */
   needed: boolean;
+  /** Sources working in sunlight (solar and fission), kW. */
+  generation_kw: number;
+  /** Loads running in sunlight, kW. */
+  load_kw: number;
+  /** Power to refill storage over refill_hours, kW. */
+  refill_kw: number;
+  /** Energy to refill: the storage the longest darkness needs, kWh. */
+  refill_kwh: number;
+  /** Sunlit hours to refill; null when the darkness length is not known. */
+  refill_hours: number | null;
+  margin_percent: number | null;
+  status: PowerStatus;
+  passes: boolean;
+}
+
+/**
+ * How the night margin was worked out (the planner module's `basis`, shortened):
+ *   energy       storage is needed: energy over the longest darkness (kWh)
+ *   power        sources working in darkness carry the night on their own (kW)
+ *   power only   no darkness length known (no site picked): power compared, storage not counted
+ *   no darkness  the stay has no darkness, so there is no night to check
+ */
+export type NightBasis = 'energy' | 'power' | 'power only' | 'no darkness';
+
+/**
+ * Night check: storage must cover (night load - sources working in darkness) x the longest
+ * darkness, plus the per-night items.
+ */
+export interface NightCheck {
+  /** False when there is nothing to check (status "none"). */
+  needed: boolean;
+  basis: NightBasis;
+  /** Sources working in darkness, kW. */
+  generation_kw: number;
+  /** Loads running in darkness, kW. */
+  load_kw: number;
+  /** Per-night energy items of loads that run in darkness, kWh. */
+  per_night_kwh: number;
+  /** Longest darkness in the stay, hours. null when no site is picked. */
+  longest_darkness_h: number | null;
+  /** Storage as typed, kWh. */
+  storage_kwh: StorageKwh;
+  /** Storage that would cover the longest darkness, kWh. null when no site is picked. */
+  storage_needed_kwh: number | null;
+  /** With a darkness length: sources in darkness x hours + storage, kWh. */
+  available_kwh: number | null;
+  /** With a darkness length: night load x hours + per-night items, kWh. */
+  load_kwh: number | null;
+  margin_percent: number | null;
+  status: PowerStatus;
+  passes: boolean;
+}
+
+export interface PowerBalance {
+  /** The worse of the day and night margins. */
+  margin_percent: number | null;
+  status: PowerStatus;
+  /** The check that sets the balance: "day", "night", "day and night" (a tie) or null. */
+  limiting: 'day' | 'night' | 'day and night' | null;
 }
 
 export interface CheckResponse {
   fits: boolean;
   fit_notes: string[];
-  day: PowerCheck;
-  night: PowerCheck;
-  /** The one power number: the lower of the needed day and night margins. */
-  balance_margin_percent: number | null;
+  day: DayCheck;
+  night: NightCheck;
+  balance: PowerBalance;
+  /** What the power check could not count, in plain words. */
+  power_notes: string[];
   energy_added_kwh: number;
 }
 
@@ -217,6 +298,7 @@ export interface AskRequest {
     slip_days: number;
     stay_days: number;
     hardware: HardwareChoice[];
+    storage_kwh: StorageKwh;
   };
 }
 

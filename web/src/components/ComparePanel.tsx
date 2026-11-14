@@ -6,7 +6,7 @@ import { actions, appStore, simClock } from '../state/app';
 import { useData, useHorizonFor } from '../state/data';
 import { useStore } from '../state/store';
 import { formatLatLon } from '../util/geo';
-import { formatKwh, formatPercent, powerColorVar, powerLevel } from '../util/power';
+import { formatKwh, formatPercent, levelFromStatus, powerColorVar } from '../util/power';
 import { formatHours } from '../util/time';
 import { AsyncView } from './AsyncView';
 import { EARTH_LINK_COLOR, EARTH_LINK_WORD, HorizonPlot, naturalElRange } from './HorizonPlot';
@@ -105,7 +105,7 @@ function CompareColumn({ site, elRange, onRange }: { site: SiteRef; elRange: { m
             {e.hardware_fits ? 'fits' : 'does not fit'}
           </dd>
           <dt className="text-muted">Added energy</dt>
-          <dd className="m-0 text-right" style={{ color: powerColorVar(powerLevel(e.power_margin_percent)) }}>
+          <dd className="m-0 text-right" style={{ color: powerColorVar(levelFromStatus(e.power_status)) }}>
             {formatKwh(e.energy_added_kwh)}
           </dd>
           <dt className="text-muted">Result</dt>

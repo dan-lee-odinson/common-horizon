@@ -57,7 +57,7 @@ export function AssistantBar() {
       .ask(
         {
           question: q,
-          context: { site_id: highlighted?.id ?? null, launch_utc: toIsoUtc(s.launchUtcMs), slip_days: s.slipDays, stay_days: s.stayDays, hardware: hardwareChosen },
+          context: { site_id: highlighted?.id ?? null, launch_utc: toIsoUtc(s.launchUtcMs), slip_days: s.slipDays, stay_days: s.stayDays, hardware: hardwareChosen, storage_kwh: s.storageKwh },
         },
         c.signal,
       )
