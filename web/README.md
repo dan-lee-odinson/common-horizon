@@ -35,7 +35,7 @@ Press `Ctrl+C` in the terminal to stop the server.
 | `npm run preview` | Serves the built `dist/` folder at `http://localhost:4173/` to check the build. |
 | `npm run typecheck` | Checks the TypeScript types without building. |
 | `npm test` | Runs the unit tests (Vitest). |
-| `npm run test:e2e` | Builds, serves and runs the browser test (Playwright) at a desktop and a phone width. |
+| `npm run test:e2e` | Builds, serves and runs the browser tests (Playwright) at a desktop and a phone width. |
 
 Before the first `npm run test:e2e` on a new computer, install the test browser once:
 
@@ -171,7 +171,7 @@ web/
   src/scene/               3D Moon, 2D fallback, site scene, texture slot
   src/util/                time (LTC), geometry (longitudes), power colours, ranking
   src/styles/theme.css     every colour, as CSS variables (brand colours go here)
-  e2e/path.spec.ts         the browser test
+  e2e/path.spec.ts         the browser tests
   public/textures/         slot for the Moon colour map (see its README)
 ```
 
