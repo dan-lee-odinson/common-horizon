@@ -1,0 +1,57 @@
+{
+  "id": "fission-power-unit",
+  "name": "Fission power unit (radiators shown deployed, illustrative)",
+  "file": "fission-power-unit.glb",
+  "status": "NASA goal",
+  "note": "illustrative shape, built with SI/AI-written code",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 14,
+    "height_y": 6,
+    "depth_z": 4
+  },
+  "dimension_sources": [
+    {
+      "dimension": "height_y",
+      "value_m": 6,
+      "meaning": "stowed height (cylinder)",
+      "source": "Kaldon et al., IAC 2024, NASA Technical Reports Server 20240011694 (link to add)",
+      "status": "NASA goal"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 4,
+      "meaning": "stowed diameter (cylinder)",
+      "source": "Kaldon et al., IAC 2024, NASA Technical Reports Server 20240011694 (link to add)",
+      "status": "NASA goal"
+    },
+    {
+      "dimension": "width_x",
+      "value_m": 14,
+      "meaning": "radiator tip to radiator tip: 4 m stowed diameter plus two deployed radiator wings of 5 m each",
+      "source": "Kaldon et al., IAC 2024, NASA Technical Reports Server 20240011694 (link to add) for the 4 m diameter; the radiator wings are our illustration, not a published figure",
+      "status": "NASA goal (body); our illustration, not a published figure (radiators)"
+    }
+  ],
+  "parts": [
+    {
+      "node": "stowed-body",
+      "dimensions_m": {
+        "width_x": 4,
+        "height_y": 6,
+        "depth_z": 4
+      },
+      "source": "Kaldon et al., IAC 2024, NASA Technical Reports Server 20240011694 (link to add)",
+      "status": "NASA goal"
+    }
+  ],
+  "triangles": 1208,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "The 4 m by 6 m cylinder is the stowed size from the source. The flat radiator panels are shown deployed as an illustration; their number, size (two wings of two 2.4 m x 3.6 m panels) and position are our estimate, not a published figure.",
+    "The body is split into a darker lower band (reactor and shielding) and a lighter upper band (power conversion); this split is our illustration.",
+    "No markings or lettering."
+  ],
+  "built_by": "tools/models/fission-power-unit.mjs"
+}
