@@ -1,0 +1,25 @@
+{
+  "name": "common-horizon-models",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Code-built, true-scale lunar hardware models (GLB) for the Common Horizon site.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node build-all.mjs",
+    "check": "node check-models.mjs",
+    "test": "node --test \"test/*.test.mjs\"",
+    "test:page": "node test-page/page-smoke.mjs",
+    "verify": "npm run build && npm run check && npm test",
+    "preview": "node preview-server.mjs"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "gltf-validator": "2.0.0-dev.3.10"
+  }
+}
