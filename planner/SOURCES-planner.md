@@ -54,7 +54,7 @@ figure; this table groups them by source.
 | NTRS 20220005798 | Keep-alive heat 140 W per lander or payload | NASA study | link to add |
 | arXiv 2508.10855 | Comms relay 200 W | research estimate | link to add |
 | NTRS 20190032521 | ISRU propellant pilot 20 kW | NASA figure | link to add |
-| NTRS 20210026557 (Schunk) | Habitat's own array 10 to 15 kW; heat leak 1,550 W; radiator protection 3,840 W deployed, about 700 W stowed | NASA study (published as a NASA reference design; mapping to confirm) | link to add |
+| NTRS 20210026557 (Schunk) | Habitat's own array 10 to 15 kW; heat leak 1,550 W; radiator protection 3,840 W deployed, about 700 W stowed | NASA study (a conceptual thermal design based on NASA's Surface Habitat reference design; label confirmed by the team, 14 Nov 2026) | link to add |
 | GSFC-STD-1000 Rev I, Table 1.06-1 | 25 percent power margin, Pre-Phase A | NASA figure (inferred, to confirm) | link to add |
 | NASA 2018; NASA 2019; NASA 2023 | Delta-v, Artemis halo orbit to the surface: 2,850; 2,750; 2,700 m/s | NASA figure (inferred, to confirm) | link to add |
 | NASA HLS-R-0071, through a secondary source | Landing tilt for crew landers: 0 to 8 degrees threshold; 0 to 5 degrees goal | NASA figure; NASA goal (inferred, to confirm) | link to add |

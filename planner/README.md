@@ -392,13 +392,15 @@ and asks for a typed value.
    width and fueled mass), every figure in the entry carries that status and
    source. Where the two sources are not split by figure, both are listed.
 2. **"Built, company figure"** is stored as two labels: `["built", "company figure"]`.
-3. **Inferred labels are flagged.** Twelve figures had no label stated with
-   them, or a label outside the eight, and carry an inferred one with
-   `status_inferred: true` and a `status_note` asking the team to confirm:
-   "NASA reference design" (the habitat's own array, heat leak, both radiator
-   figures) is mapped to `NASA study`; the 25 percent line and the NASA-sourced
-   reference values carry `NASA figure`; the tilt goal `NASA goal`; Griffin's
-   slope `company figure`; Apollo's Sun elevations `NASA figure`.
+3. **Inferred labels are flagged.** Eight figures had no label stated with
+   them and carry an inferred one with `status_inferred: true` and a
+   `status_note` asking the team to confirm: the 25 percent line and the
+   NASA-sourced reference values carry `NASA figure`; the tilt goal `NASA goal`;
+   Griffin's slope `company figure`; Apollo's Sun elevations `NASA figure`.
+   The habitat's own array, the heat leak and both radiator figures carry
+   `NASA study` as a confirmed label (team decision, 14 Nov 2026): they come
+   from a NASA conceptual thermal design that is based on NASA's Surface
+   Habitat reference design, and the source text says so.
 4. **No source name invented.** Every unnamed source, including the team's own
    estimates, reads `source to add`. Figures with no label and nothing to infer
    it from (the JAXA pressurized rover's dimensions, the lunar month constant)
