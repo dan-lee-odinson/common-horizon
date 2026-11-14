@@ -1,0 +1,344 @@
+{
+  "schema_version": 1,
+  "about": "Common Horizon planner catalog. Every figure carries a status label and a source. A figure whose source is not yet named says 'source to add'. Values are stored in the unit they were published in.",
+  "status_labels": [
+    "built",
+    "company figure",
+    "NASA figure",
+    "NASA goal",
+    "NASA study",
+    "university study",
+    "research estimate",
+    "our estimate"
+  ],
+  "default_rule": "Where a published figure is a range, the default is the end that makes a check harder to pass: the top for a load, the bottom for a power source or a lander capacity.",
+  "landers": [
+    {
+      "id": "blue_moon_mk1",
+      "name": "Blue Moon Mark 1",
+      "capacity_options": [
+        {
+          "option": "published",
+          "label": "Payload to the surface",
+          "value": 3000,
+          "unit": "kg",
+          "status": ["built", "company figure"],
+          "source": "Blue Origin; Gunter's Space Page"
+        }
+      ],
+      "dimensions": {
+        "height": {"value": 8.05, "unit": "m", "status": ["built", "company figure"], "source": "Blue Origin; Gunter's Space Page"},
+        "width": {"value": 3.08, "unit": "m", "status": ["built", "company figure"], "source": "Blue Origin; Gunter's Space Page"}
+      },
+      "other_figures": {
+        "fueled_mass": {"value": 21350, "unit": "kg", "qualifier": "under", "status": ["built", "company figure"], "source": "Blue Origin; Gunter's Space Page", "note": "Fueled mass under 21,350 kg."}
+      }
+    },
+    {
+      "id": "blue_moon_mk2_cargo",
+      "name": "Blue Moon Mark 2 cargo",
+      "capacity_options": [
+        {
+          "option": "one_way",
+          "label": "Payload to the surface, one-way",
+          "value": 30000,
+          "unit": "kg",
+          "status": ["company figure"],
+          "source": "Blue Origin; Space.com"
+        },
+        {
+          "option": "reusable",
+          "label": "Payload to the surface, reusable",
+          "value": 20000,
+          "unit": "kg",
+          "status": ["company figure"],
+          "source": "Blue Origin; Space.com"
+        }
+      ],
+      "dimensions": {
+        "height": {"value": 16, "unit": "m", "qualifier": "about", "status": ["company figure"], "source": "Blue Origin; Space.com"}
+      },
+      "other_figures": {}
+    },
+    {
+      "id": "starship_hls",
+      "name": "Starship HLS",
+      "capacity_options": [
+        {
+          "option": "company",
+          "label": "Payload to the surface (company figure)",
+          "value": 100000,
+          "unit": "kg",
+          "status": ["company figure"],
+          "source": "SpaceX HLS program manager, 2022"
+        },
+        {
+          "option": "nasa_cargo_variants",
+          "label": "Payload to the surface, cargo variants (NASA figure)",
+          "value": [12000, 15000],
+          "kind": "range",
+          "default": 12000,
+          "unit": "kg",
+          "status": ["NASA figure"],
+          "source": "Creech, IAC 2025, NTRS 20250008728",
+          "note": "Published as a range of 12,000 to 15,000 kg; the bottom is the default because it is the harder end for a fit check. Shown beside the 100,000 kg figure; neither is picked."
+        }
+      ],
+      "dimensions": {
+        "height": {"value": 52, "unit": "m", "status": ["company figure"], "source": "SpaceX HLS program manager, 2022"},
+        "width": {"value": 9, "unit": "m", "status": ["company figure"], "source": "SpaceX HLS program manager, 2022"}
+      },
+      "other_figures": {}
+    },
+    {
+      "id": "griffin",
+      "name": "Griffin",
+      "capacity_options": [
+        {
+          "option": "published",
+          "label": "Payload to the surface",
+          "value": 625,
+          "unit": "kg",
+          "status": ["built", "company figure"],
+          "source": "Astrobotic (now Voyager Lunar Systems)"
+        }
+      ],
+      "dimensions": {
+        "height": {"value": 2, "unit": "m", "qualifier": "about", "status": ["built", "company figure"], "source": "Astrobotic (now Voyager Lunar Systems)"},
+        "width": {"value": 4.5, "unit": "m", "qualifier": "about", "status": ["built", "company figure"], "source": "Astrobotic (now Voyager Lunar Systems)"}
+      },
+      "other_figures": {}
+    }
+  ],
+  "payloads": [
+    {
+      "id": "astrolab_clv1",
+      "name": "Astrolab CLV-1 crew rover",
+      "mass": {"value": 907, "unit": "kg", "qualifier": "about", "status": ["NASA figure"], "source": "source to add"},
+      "dimensions": {
+        "length": {"value": 4, "unit": "m", "qualifier": "about", "status": ["NASA figure"], "source": "source to add"},
+        "width": {"value": 2.3, "unit": "m", "qualifier": "about", "status": ["NASA figure"], "source": "source to add"},
+        "height": {"value": 2.6, "unit": "m", "qualifier": "about", "status": ["NASA figure"], "source": "source to add"}
+      }
+    },
+    {
+      "id": "fsp_40kwe",
+      "name": "Fission Surface Power, 40 kWe",
+      "mass": {"value": 6000, "unit": "kg", "qualifier": "under", "status": ["NASA goal"], "source": "Kaldon et al., IAC 2024, NTRS 20240011694", "note": "Mass goal under 6,000 kg; the top (6,000 kg) is used, the harder end for a fit check."},
+      "dimensions": {
+        "stowed_size": {"value": [4, 6], "kind": "size", "unit": "m", "status": ["NASA goal"], "source": "Kaldon et al., IAC 2024, NTRS 20240011694", "note": "Stowed 4 m by 6 m."}
+      }
+    },
+    {
+      "id": "surface_habitat",
+      "name": "Surface Habitat",
+      "mass": {"value": 12000, "unit": "kg", "status": ["NASA study"], "source": "Burke and Howard, AIAA ASCEND 2022", "note": "Allowable landed mass (a ground rule)."},
+      "dimensions": {}
+    },
+    {
+      "id": "jaxa_pressurized_rover",
+      "name": "JAXA pressurized rover",
+      "mass": {"value": null, "unit": "kg", "status": [], "status_note": "Mass not published.", "source": "not published", "note": "Mass not published; type a value."},
+      "dimensions": {
+        "length": {"value": 6.0, "unit": "m", "status": [], "status_note": "label to add", "source": "source to add"},
+        "width": {"value": 5.2, "unit": "m", "status": [], "status_note": "label to add", "source": "source to add"},
+        "height": {"value": 3.8, "unit": "m", "status": [], "status_note": "label to add", "source": "source to add"}
+      }
+    },
+    {
+      "id": "logistics",
+      "name": "Logistics",
+      "mass": {"value": 8000, "unit": "kg", "qualifier": "up to", "status": ["NASA figure"], "source": "source to add", "note": "Up to 8,000 kg per 28-day mission; the top is used."},
+      "dimensions": {}
+    }
+  ],
+  "power_loads": [
+    {
+      "id": "hab_crewed",
+      "name": "Habitat, crewed",
+      "runs": "always",
+      "runs_text": "day and night",
+      "power": {"value": 20, "unit": "kW", "status": ["NASA figure"], "source": "Csank 2023, NTRS 20230002896"}
+    },
+    {
+      "id": "hab_uncrewed",
+      "name": "Habitat, uncrewed",
+      "runs": "always",
+      "runs_text": "day and night",
+      "power": {"value": 2, "unit": "kW", "status": ["NASA figure"], "source": "Csank 2023, NTRS 20230002896"},
+      "note": "In site_energy the heating model replaces this flat 2 kW during darkness."
+    },
+    {
+      "id": "crew_rover_recharge",
+      "name": "Crew rover recharge",
+      "runs": "light",
+      "runs_text": "while charging",
+      "runs_note": "Charging is placed in sunlight by default; type runs to change it.",
+      "power": {"value": 2, "unit": "kW", "status": ["our estimate"], "source": "Common Horizon team estimate"},
+      "energy_per_drive_day": {"value": 16, "unit": "kWh", "qualifier": "about", "status": ["our estimate"], "source": "Common Horizon team estimate", "note": "About 16 kWh per drive day."}
+    },
+    {
+      "id": "crew_rover_keep_warm",
+      "name": "Crew rover keep-warm",
+      "runs": "dark",
+      "runs_text": "per lunar night",
+      "energy_per_night": {"value": 9.7, "unit": "kWh", "status": ["NASA study"], "source": "NTRS 20240004621", "note": "9.7 kWh per lunar night."}
+    },
+    {
+      "id": "science_rover_recharge",
+      "name": "Science rover recharge",
+      "runs": "light",
+      "runs_text": "while charging",
+      "runs_note": "No time of day is published; treated like the crew rover recharge (charging in sunlight).",
+      "power": {"value": 500, "unit": "W", "status": ["NASA figure"], "source": "NTRS 20220005893"}
+    },
+    {
+      "id": "pressurized_rover_recharge",
+      "name": "Pressurized rover recharge",
+      "runs": "light",
+      "runs_text": "while charging",
+      "runs_note": "No time of day is published; treated like the crew rover recharge (charging in sunlight).",
+      "default_option": "peak",
+      "power_options": {
+        "peak": {"value": 9.5, "unit": "kW", "status": ["university study"], "source": "NTRS 19940021211", "note": "Peak; the default, the harder end for a power check."},
+        "average": {"value": 6.5, "unit": "kW", "status": ["university study"], "source": "NTRS 19940021211", "note": "Average."}
+      }
+    },
+    {
+      "id": "worksite_lighting",
+      "name": "Work-site lighting",
+      "runs": "dark",
+      "runs_text": "in darkness",
+      "power": {"value": 1, "unit": "kW", "status": ["our estimate"], "source": "Common Horizon team estimate"}
+    },
+    {
+      "id": "keep_alive_heat",
+      "name": "Keep-alive heat, per lander or payload",
+      "runs": "dark",
+      "runs_text": "in darkness",
+      "power": {"value": 140, "unit": "W", "status": ["NASA study"], "source": "NTRS 20220005798", "note": "Per lander or payload; set count for more than one."}
+    },
+    {
+      "id": "comms_relay",
+      "name": "Comms relay",
+      "runs": "always",
+      "runs_text": "day and night",
+      "power": {"value": 200, "unit": "W", "status": ["research estimate"], "source": "arXiv 2508.10855"}
+    },
+    {
+      "id": "isru_pilot",
+      "name": "ISRU propellant pilot",
+      "runs": "light",
+      "runs_text": "daylight only",
+      "power": {"value": 20, "unit": "kW", "status": ["NASA figure"], "source": "NTRS 20190032521"}
+    },
+    {
+      "id": "isru_full_plant",
+      "name": "ISRU full plant",
+      "runs": "light",
+      "runs_text": "sunlight only",
+      "power": {"value": 60, "unit": "kW", "status": ["NASA figure"], "source": "source to add"}
+    }
+  ],
+  "power_sources": [
+    {
+      "id": "fission_100kwe",
+      "name": "Fission 100 kWe",
+      "works": "always",
+      "works_text": "day and night",
+      "power": {"value": 100, "unit": "kW", "status": ["NASA goal"], "source": "source to add"}
+    },
+    {
+      "id": "fission_40kwe",
+      "name": "Fission 40 kWe",
+      "works": "always",
+      "works_text": "day and night",
+      "power": {"value": 40, "unit": "kW", "status": ["NASA goal"], "source": "source to add"}
+    },
+    {
+      "id": "vsat",
+      "name": "Solar array mast (VSAT)",
+      "works": "light",
+      "works_text": "in sunlight",
+      "power": {"value": 10, "unit": "kW", "status": ["company figure"], "source": "source to add"}
+    },
+    {
+      "id": "vsat_xl",
+      "name": "Solar array mast (VSAT-XL)",
+      "works": "light",
+      "works_text": "in sunlight",
+      "power": {"value": 50, "unit": "kW", "status": ["company figure"], "source": "source to add"}
+    },
+    {
+      "id": "hab_array",
+      "name": "Habitat's own solar array",
+      "works": "light",
+      "works_text": "in sunlight",
+      "power": {"value": [10, 15], "kind": "range", "default": 10, "unit": "kW", "status": ["NASA study"], "status_note": "Published as a NASA reference design.", "source": "NTRS 20210026557", "note": "Published range 10 to 15 kW; the low end is the default, the harder end for a power source."}
+    },
+    {
+      "id": "regenerative_fuel_cell",
+      "name": "Regenerative fuel cell",
+      "works": "dark",
+      "works_text": "through the night",
+      "power": {"value": 10, "unit": "kW", "status": ["NASA goal"], "source": "source to add", "note": "Delivers through the night; the energy it delivers is refilled in sunlight."}
+    }
+  ],
+  "storage": {
+    "note": "Storage is typed by the user in kWh. There is no default."
+  },
+  "heating": {
+    "about": "Heating penalty for an uncrewed habitat in darkness. It replaces the flat 2 kW uncrewed load. Penalty = (heat leak + radiator protection) x dark hours.",
+    "heat_leak": {"value": 1550, "unit": "W", "status": ["NASA study"], "status_note": "Published as a NASA reference design.", "source": "Schunk, NTRS 20210026557"},
+    "radiator_protection_deployed": {"value": 3840, "unit": "W", "status": ["NASA study"], "status_note": "Published as a NASA reference design.", "source": "Schunk, NTRS 20210026557", "note": "Radiator deployed; the default."},
+    "radiator_protection_stowed": {"value": 700, "unit": "W", "qualifier": "about", "status": ["NASA study"], "status_note": "Published as a NASA reference design.", "source": "Schunk, NTRS 20210026557", "note": "Radiator stowed."}
+  },
+  "margin_rule": {
+    "green_at_percent": {"value": 25, "unit": "%", "status": ["NASA figure"], "source": "GSFC-STD-1000 Rev I, Table 1.06-1", "note": "Pre-Phase A value. Green at 25 or more, yellow when positive under 25, red when negative."}
+  },
+  "constants": {
+    "lunar_month_hours": {"value": 708.73, "unit": "h", "status": [], "status_note": "A physical constant; none of the eight labels applies.", "source": "source to add", "note": "One lunar month."}
+  },
+  "reference": [
+    {
+      "id": "dv_halo_to_surface_2018",
+      "name": "Delta-v, Artemis halo orbit to the surface (2018)",
+      "figure": {"value": 2850, "unit": "m/s", "status": ["NASA figure"], "source": "NASA 2018"}
+    },
+    {
+      "id": "dv_halo_to_surface_2019",
+      "name": "Delta-v, Artemis halo orbit to the surface (2019)",
+      "figure": {"value": 2750, "unit": "m/s", "status": ["NASA figure"], "source": "NASA 2019"}
+    },
+    {
+      "id": "dv_halo_to_surface_2023",
+      "name": "Delta-v, Artemis halo orbit to the surface (2023)",
+      "figure": {"value": 2700, "unit": "m/s", "status": ["NASA figure"], "source": "NASA 2023"}
+    },
+    {
+      "id": "crew_lander_tilt_threshold",
+      "name": "Landing tilt for crew landers, threshold",
+      "figure": {"value": [0, 8], "kind": "range", "unit": "deg", "status": ["NASA figure"], "source": "NASA HLS-R-0071, through a secondary source", "note": "Threshold: 0 to 8 degrees."}
+    },
+    {
+      "id": "crew_lander_tilt_goal",
+      "name": "Landing tilt for crew landers, goal",
+      "figure": {"value": [0, 5], "kind": "range", "unit": "deg", "status": ["NASA goal"], "source": "NASA HLS-R-0071, through a secondary source", "note": "Goal: 0 to 5 degrees."}
+    },
+    {
+      "id": "griffin_slope",
+      "name": "Griffin slope tolerance",
+      "figure": {"value": 10, "unit": "deg", "status": ["company figure"], "source": "Voyager", "note": "Griffin handles a 10 degree slope."}
+    },
+    {
+      "id": "apollo_sun_elevation",
+      "name": "Apollo landing Sun elevation",
+      "figure": {"value": [5, 25], "kind": "range", "unit": "deg", "status": ["NASA figure"], "source": "Apollo landings; source to add", "note": "Reference only: Apollo landed at Sun elevations of 5 to 25 degrees."}
+    },
+    {
+      "id": "crew_rover_battery",
+      "name": "Crew rover battery",
+      "figure": {"value": 23.22, "unit": "kWh", "status": ["NASA study"], "source": "Venturi, NASA Aerospace Battery Workshop, Jan 2026"}
+    }
+  ]
+}
