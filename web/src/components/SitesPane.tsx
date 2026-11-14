@@ -207,7 +207,9 @@ function RankedList({ rows, siteById, highlightedId, savedIds }: { rows: RankedR
   const listRef = useRef<HTMLOListElement>(null);
   const lastTops = useRef(new Map<string, number>());
 
-  // FLIP: when the order changes, slide each row from where it was to where it is now (GSAP).
+  // FLIP: when the order changes, slide each row from where it is on screen to its new place
+  // (GSAP). Starting from the current on-screen offset keeps it smooth if the slip changes again
+  // while rows are still moving. power3.inOut = cubic-bezier(0.77, 0, 0.175, 1).
   useLayoutEffect(() => {
     const list = listRef.current;
     if (!list) return;
@@ -218,8 +220,11 @@ function RankedList({ rows, siteById, highlightedId, savedIds }: { rows: RankedR
       const top = el.offsetTop;
       nextTops.set(id, top);
       const prev = lastTops.current.get(id);
-      if (!reduce && prev !== undefined && prev !== top) {
-        gsap.fromTo(el, { y: prev - top }, { y: 0, duration: 0.5, ease: 'power3.out', overwrite: true });
+      if (reduce || prev === undefined) return;
+      const shown = Number(gsap.getProperty(el, 'y')) || 0;
+      const from = prev + shown - top;
+      if (Math.abs(from) > 0.5) {
+        gsap.fromTo(el, { y: from }, { y: 0, duration: 0.4, ease: 'power3.inOut', overwrite: true });
       }
     });
     lastTops.current = nextTops;
@@ -350,7 +355,7 @@ export function FloatingSitesPane() {
     <section
       ref={paneRef}
       aria-labelledby={headingId}
-      className="glass absolute z-20 flex max-h-[calc(100%-24px)] w-[min(400px,calc(100%-24px))] flex-col overflow-hidden rounded-xl"
+      className="glass enter absolute z-20 flex max-h-[calc(100%-24px)] w-[min(400px,calc(100%-24px))] flex-col overflow-hidden rounded-xl"
       style={{ left: pos.x, top: pos.y }}
       data-testid="sites-pane"
     >

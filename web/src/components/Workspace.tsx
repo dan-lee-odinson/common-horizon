@@ -48,7 +48,10 @@ export function Workspace() {
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden bg-space">
-      {view === 'scene' ? <SiteView webgl={webgl} isPhone={isPhone} /> : <MoonView webgl={webgl} isPhone={isPhone} />}
+      {/* Keyed wrapper: switching between the Moon and a site scene fades in instead of cutting. */}
+      <div key={view === 'scene' ? 'scene' : 'moon'} className="enter-fade absolute inset-0">
+        {view === 'scene' ? <SiteView webgl={webgl} isPhone={isPhone} /> : <MoonView webgl={webgl} isPhone={isPhone} />}
+      </div>
 
       {isPhone && view !== 'globe' ? (
         <Drawer open={drawer === 'sites'} side="bottom" label="Sites" onClose={() => actions.setDrawer('none')} testId="sites-drawer">
@@ -208,7 +211,7 @@ function SiteView({ webgl, isPhone }: { webgl: boolean; isPhone: boolean }) {
           </div>
         </Drawer>
       ) : horizonOpen ? (
-        <section aria-label="Horizon plot" className="glass absolute bottom-3 left-3 z-10 w-[min(640px,calc(100%-5.5rem))] rounded-xl p-3" data-testid="horizon-panel">
+        <section aria-label="Horizon plot" className="glass enter absolute bottom-3 left-3 z-10 w-[min(640px,calc(100%-5.5rem))] rounded-xl p-3" data-testid="horizon-panel">
           <div className="mb-1 flex items-center justify-between">
             <h2 className="m-0 text-[13px] font-semibold">Horizon plot</h2>
             <button type="button" className="btn btn-icon size-7 min-h-7" aria-label="Hide the horizon plot" onClick={() => actions.setHorizonOpen(false)}>

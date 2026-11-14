@@ -70,16 +70,18 @@ function earthBoxCenter(h: HorizonResponse | null): { az: number; el: number } |
 function ZoomBridge({ zoomRef }: { zoomRef: { current: (factor: number) => void } }) {
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
+  const tween = useRef<gsap.core.Tween | null>(null);
   zoomRef.current = (factor: number) => {
     if (!controls) return;
+    tween.current?.kill(); // rapid clicks retarget from where the camera is now
     const offset = camera.position.clone().sub(controls.target);
     const target = Math.min(controls.maxDistance, Math.max(controls.minDistance, offset.length() * factor));
     const proxy = { d: offset.length() };
     const dir = offset.normalize();
-    gsap.to(proxy, {
+    tween.current = gsap.to(proxy, {
       d: target,
-      duration: prefersReducedMotion() ? 0 : 0.35,
-      ease: 'power2.out',
+      duration: prefersReducedMotion() ? 0 : 0.3,
+      ease: 'power4.out',
       onUpdate: () => {
         camera.position.copy(controls.target).addScaledVector(dir, proxy.d);
         controls.update();

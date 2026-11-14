@@ -18,7 +18,7 @@ export function ComparePanel() {
   return (
     <section
       aria-labelledby={headingId}
-      className="glass absolute inset-2 z-40 flex flex-col overflow-hidden rounded-xl md:inset-4"
+      className="glass enter absolute inset-2 z-40 flex flex-col overflow-hidden rounded-xl md:inset-4"
       data-testid="compare-panel"
     >
       <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">

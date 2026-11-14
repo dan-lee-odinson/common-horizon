@@ -39,12 +39,12 @@ export function Drawer({ open, side, label, onClose, children, testId }: { open:
         tabIndex={-1}
         data-testid={testId}
         data-open={open}
+        data-motion="slide"
         className={`absolute z-40 flex flex-col border-line bg-surface shadow-2xl outline-none ${placement}`}
         style={{
           transform: open ? 'none' : closedTransform,
-          transition: 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+          transition: 'transform 300ms var(--ease-drawer), visibility 300ms',
           visibility: open ? 'visible' : 'hidden',
-          transitionProperty: 'transform, visibility',
         }}
       >
         {children}

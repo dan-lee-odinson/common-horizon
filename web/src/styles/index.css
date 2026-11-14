@@ -4,7 +4,11 @@
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
-  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Motion tokens: strong ease-out for things entering or responding, ease-in-out for things
+     moving on screen, and an iOS-like curve for drawers. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --breakpoint-md: 48rem;
 }
 
@@ -79,10 +83,18 @@
     background: var(--ch-surface-2);
     color: var(--ch-ink);
     font-size: 13px;
-    transition: background-color 150ms ease, border-color 150ms ease, transform 100ms ease;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      transform 160ms var(--ease-out);
   }
-  .btn:hover:not(:disabled) {
-    background: var(--ch-surface-3);
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled) {
+      background: var(--ch-surface-3);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--ch-focus);
+    }
   }
   .btn:active:not(:disabled) {
     transform: scale(0.97);
@@ -92,9 +104,6 @@
     border-color: var(--ch-accent);
     color: var(--ch-accent-ink);
     font-weight: 600;
-  }
-  .btn-primary:hover:not(:disabled) {
-    background: var(--ch-focus);
   }
   .btn-icon {
     width: 2rem;
@@ -113,10 +122,17 @@
     text-transform: uppercase;
     color: var(--ch-muted);
   }
+  /* Panels and scenes that appear: a short fade with a small lift. */
+  .enter {
+    animation: ch-enter 220ms var(--ease-out) both;
+  }
+  .enter-fade {
+    animation: ch-fade 240ms var(--ease-out) both;
+  }
   .skeleton {
     background: linear-gradient(90deg, var(--ch-surface-2), var(--ch-surface-3), var(--ch-surface-2));
     background-size: 200% 100%;
-    animation: ch-shimmer 1.4s ease-in-out infinite;
+    animation: ch-shimmer 1.4s linear infinite;
     border-radius: 0.375rem;
   }
 }
@@ -130,12 +146,31 @@
   }
 }
 
+@keyframes ch-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes ch-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: drop movement, keep gentle fades and colour changes. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .skeleton {
+    animation: none;
+  }
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+  .enter {
+    animation-name: ch-fade;
+  }
+  [data-motion='slide'] {
+    transition-property: visibility !important;
   }
 }

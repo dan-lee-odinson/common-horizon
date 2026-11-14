@@ -243,7 +243,7 @@ function CameraRig({ view, sites, highlightedId, shiftPx }: { view: MoonScenePro
     };
     const tween = gsap.to(proxy, {
       t: 1,
-      duration: prefersReducedMotion() ? 0 : 1.2,
+      duration: prefersReducedMotion() ? 0 : 0.9,
       ease: 'power2.inOut',
       onUpdate: apply,
       onComplete: () => {
