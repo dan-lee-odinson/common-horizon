@@ -1,0 +1,11 @@
+{
+  "_note": "Example hardware for mock mode. Every number here is an illustrative placeholder, not a sourced specification. The backend will supply the real catalog.",
+  "items": [
+    { "id": "starship", "name": "Starship lander", "kind": "lander", "countable": false, "default_count": 1, "max_count": 1, "mass_kg": 0, "capacity_kg": 100000, "max_slope_deg": 8, "load_day_kw": 4, "load_night_kw": 3, "gen_kw": 6, "gen_needs_sun": true, "picture": null, "note": "Carries the cargo below" },
+    { "id": "hab", "name": "Hab unit", "kind": "cargo", "countable": false, "default_count": 1, "max_count": 1, "mass_kg": 25000, "load_day_kw": 10, "load_night_kw": 8, "gen_kw": 0, "gen_needs_sun": false, "picture": null, "note": null },
+    { "id": "rover", "name": "Rover 1", "kind": "cargo", "countable": true, "default_count": 1, "max_count": 4, "mass_kg": 3000, "load_day_kw": 1, "load_night_kw": 0.3, "gen_kw": 0, "gen_needs_sun": false, "picture": null, "note": null },
+    { "id": "nuclear", "name": "Nuclear generator", "kind": "power", "countable": false, "default_count": 1, "max_count": 1, "mass_kg": 6000, "load_day_kw": 0, "load_night_kw": 0, "gen_kw": 40, "gen_needs_sun": false, "picture": null, "note": "Works day and night" },
+    { "id": "solar", "name": "Solar panels", "kind": "power", "countable": true, "default_count": 2, "max_count": 10, "mass_kg": 1500, "load_day_kw": 0, "load_night_kw": 0, "gen_kw": 10, "gen_needs_sun": true, "picture": null, "note": "Per array, in sunlight" },
+    { "id": "griffin", "name": "Griffin lander", "kind": "lander", "countable": false, "default_count": 1, "max_count": 1, "mass_kg": 0, "capacity_kg": 500, "max_slope_deg": 12, "load_day_kw": 0.4, "load_night_kw": 0.2, "gen_kw": 0.6, "gen_needs_sun": true, "picture": null, "note": null }
+  ]
+}

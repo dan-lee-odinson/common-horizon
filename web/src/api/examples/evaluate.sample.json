@@ -1,0 +1,59 @@
+{
+  "launch_utc": "2027-02-10T15:00:00Z",
+  "landing_utc": "2027-02-22T15:00:00Z",
+  "slip_days": 7,
+  "stay_days": 14,
+  "geometry": {
+    "subsolar_lat": -0.8015,
+    "subsolar_lon_east": 343.51,
+    "subearth_lat": 4.9751,
+    "subearth_lon_east": 353.9905
+  },
+  "results": [
+    {
+      "site_id": "shackleton-ridge",
+      "score": 62,
+      "sunlight_hours": 335,
+      "sunlight_percent": 99.7,
+      "clear_sky_percent": 98.5,
+      "earth_link": "intermittent",
+      "hardware_fits": true,
+      "energy_added_kwh": 7367,
+      "power_margin_percent": 548.6,
+      "verdict": {
+        "result": "fail",
+        "requirement": "night power"
+      }
+    },
+    {
+      "site_id": "apollo-11",
+      "score": 51,
+      "sunlight_hours": 96.7,
+      "sunlight_percent": 28.8,
+      "clear_sky_percent": 97.7,
+      "earth_link": "clear",
+      "hardware_fits": true,
+      "energy_added_kwh": 1410,
+      "power_margin_percent": 127.6,
+      "verdict": {
+        "result": "fail",
+        "requirement": "night power"
+      }
+    },
+    {
+      "site_id": "nobile",
+      "score": 22,
+      "sunlight_hours": 65.8,
+      "sunlight_percent": 19.6,
+      "clear_sky_percent": 90.9,
+      "earth_link": "intermittent",
+      "hardware_fits": false,
+      "energy_added_kwh": 637,
+      "power_margin_percent": 59.3,
+      "verdict": {
+        "result": "fail",
+        "requirement": "hardware fit"
+      }
+    }
+  ]
+}

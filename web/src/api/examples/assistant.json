@@ -1,0 +1,11 @@
+{
+  "_note": "Canned example answers for mock mode. The real assistant runs in the backend and answers in text only.",
+  "answers": [
+    { "keywords": ["slip", "delay", "late"], "answer": "A launch slip moves the landing to a different point in the lunar day. Near the equator the Sun rises and sets once every 29.5 days, so a slip of about two weeks can turn a sunlit stay into a dark one. Polar sites change much less, because the Sun stays close to the horizon there. Watch the arrows in the ranked list: they show how far each site moved." },
+    { "keywords": ["earth", "contact", "link", "comm"], "answer": "Earth link depends on where Earth sits in the site's sky. From the near side Earth hangs high and almost still. Near the south pole it sits on the horizon and wobbles a few degrees, so ridges and crater rims can hide it: that is why some polar sites show \"intermittent\". Far-side sites never see Earth." },
+    { "keywords": ["power", "energy", "solar", "nuclear", "battery", "night"], "answer": "The power number is the lower of two checks: daytime generation against daytime load, and night-time generation against night-time load. Solar panels only help in daylight, so a stay that includes a lunar night needs another source, such as the nuclear generator, or the night check turns red." },
+    { "keywords": ["sun", "light", "dark", "shadow"], "answer": "Sunlight hours count the time the Sun's centre is above the terrain skyline during the stay. On the horizon plot the Sun's path is solid where it is above the skyline and dashed where terrain hides it." },
+    { "keywords": ["ltc", "time", "clock", "utc"], "answer": "LTC here is a model value: UTC plus 56.02 microseconds for every day since landing, because clocks on the Moon run slightly fast. The official lunar time standard is still being defined." }
+  ],
+  "fallback": "This is an example answer from mock mode. Once the backend is connected, the assistant will answer questions about the ranked sites, the slip, power and Earth contact, in text only."
+}
