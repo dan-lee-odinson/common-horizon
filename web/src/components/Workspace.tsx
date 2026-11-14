@@ -43,11 +43,12 @@ function SceneLoading() {
 export function Workspace() {
   const view = useStore(appStore, (s) => s.view);
   const drawer = useStore(appStore, (s) => s.drawer);
+  const flight = useStore(appStore, (s) => s.flight);
   const isPhone = useIsPhone();
   const webgl = useMemo(() => hasWebGL(), []);
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden bg-space">
+    <div className="relative h-full min-h-0 overflow-hidden bg-space" data-testid="workspace" data-flight={flight ?? ''}>
       {/* Keyed wrapper: switching between the Moon and a site scene fades in instead of cutting. */}
       <div key={view === 'scene' ? 'scene' : 'moon'} className="enter-fade absolute inset-0">
         {view === 'scene' ? <SiteView webgl={webgl} isPhone={isPhone} /> : <MoonView webgl={webgl} isPhone={isPhone} />}
@@ -168,7 +169,7 @@ function SiteView({ webgl, isPhone }: { webgl: boolean; isPhone: boolean }) {
       )}
 
       <div className="absolute left-3 top-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 md:max-w-[calc(100%-12rem)]">
-        <button type="button" className="btn btn-primary" onClick={() => actions.setView('sites')} data-testid="back-to-moon">
+        <button type="button" className="btn btn-primary" onClick={actions.backToMoon} data-testid="back-to-moon">
           <Icon name="back" size={14} /> Back to Moon
         </button>
         <span className="glass min-w-0 truncate rounded-lg px-2.5 py-1 text-[13px] font-medium" data-testid="scene-title">

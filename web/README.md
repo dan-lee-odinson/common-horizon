@@ -135,8 +135,12 @@ can pass these straight through:
 * **Assistant** (bottom, always).
 * **View 1**: the Moon with Sun and Earth markers ("not to scale"). Click the Moon (or "Show landing sites").
 * **View 2**: site markers and the floating, movable Sites pane (coordinates, presets, ranked list,
-  compact horizon plot). Click a site once to highlight it, again to open it.
-* **View 3**: the site scene (placeholder ground), "Back to Moon", zoom buttons and the horizon plot.
+  and the selected-site card with a compact horizon plot). Click a site once to highlight it. Its
+  card, and its label on the Moon, carry **Zoom in to this site**: the camera flies down to the site
+  (GSAP) and then the site scene opens. Clicking the highlighted site again does the same. Visitors
+  who prefer reduced motion get an instant switch.
+* **View 3**: the site scene (placeholder ground), "Back to Moon" (the camera starts over the site and
+  flies back out), zoom buttons and the horizon plot.
 
 **Time.** LTC (model value) = UTC + 56.02 microseconds for every day counted from the landing time.
 The lunar time standard is still being defined, so it is labelled as a model value.

@@ -4,9 +4,16 @@ import type { CatalogItem, HardwareChoice, Site, SiteRef } from '../api/types';
 import type { TimeScale } from '../util/time';
 import { formatLatLon, normalizeLon360 } from '../util/geo';
 import { createStore } from './store';
+import { prefersReducedMotion } from './useMedia';
 
 export type View = 'globe' | 'sites' | 'scene';
 export type Drawer = 'none' | 'planner' | 'sites' | 'horizon';
+/**
+ * Camera flight between the Moon and a site scene. "in": the Moon camera flies down to the
+ * highlighted site, then the site scene opens. "out": back from the site scene, the Moon camera
+ * starts over the site and flies out. null: no flight.
+ */
+export type Flight = 'in' | 'out' | null;
 
 export interface HardwarePick {
   selected: boolean;
@@ -33,6 +40,7 @@ export interface AppState {
   /** Phone widths: which drawer is open. */
   drawer: Drawer;
   playing: boolean;
+  flight: Flight;
 }
 
 /** Example default launch: picked because the mock ranking changes clearly with the slip. */
@@ -83,6 +91,7 @@ export const appStore = createStore<AppState>({
   horizonOpen: true,
   drawer: 'none',
   playing: false,
+  flight: null,
 });
 
 /** Simulated "now" in the site scene (moves when Play runs). null = at the landing time. */
@@ -94,10 +103,50 @@ export function clamp(x: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, x));
 }
 
+/** A flight that no view finishes (for example while the 3D code is still loading) ends after this. */
+export const FLIGHT_TIMEOUT_MS = 3000;
+let flightSeq = 0;
+
+function startFlight(flight: 'in' | 'out', finish: () => void) {
+  const seq = ++flightSeq;
+  setTimeout(() => {
+    if (seq === flightSeq && appStore.get().flight === flight) finish();
+  }, FLIGHT_TIMEOUT_MS);
+}
+
 export const actions = {
   setView(view: View) {
-    appStore.set({ view, drawer: 'none', playing: view === 'scene' ? appStore.get().playing : false });
+    appStore.set({ view, drawer: 'none', flight: null, playing: view === 'scene' ? appStore.get().playing : false });
     if (view !== 'scene') simClock.set({ nowMs: null });
+  },
+  /**
+   * "Zoom in to this site": the Moon camera flies to the highlighted site, then the site scene
+   * opens. Visitors who prefer reduced motion (and every view but the site markers) switch at once.
+   */
+  zoomToSite() {
+    const s = appStore.get();
+    if (!s.highlightedId || s.flight === 'in') return;
+    if (s.view !== 'sites' || prefersReducedMotion()) {
+      actions.setView('scene');
+      return;
+    }
+    appStore.set({ flight: 'in', drawer: 'none' });
+    startFlight('in', actions.finishFlightIn);
+  },
+  /** Called by the Moon view when the camera reaches the site. */
+  finishFlightIn() {
+    if (appStore.get().flight === 'in') actions.setView('scene');
+  },
+  /** "Back to Moon" from the site scene: the reverse of "Zoom in to this site". */
+  backToMoon() {
+    const out = !prefersReducedMotion() && appStore.get().highlightedId !== null;
+    appStore.set({ view: 'sites', drawer: 'none', playing: false, flight: out ? 'out' : null });
+    simClock.set({ nowMs: null });
+    if (out) startFlight('out', actions.finishFlightOut);
+  },
+  /** Called by the Moon view when the camera is back at its usual distance. */
+  finishFlightOut() {
+    if (appStore.get().flight === 'out') appStore.set({ flight: null });
   },
   setLaunch(ms: number) {
     if (Number.isFinite(ms)) appStore.set({ launchUtcMs: ms });

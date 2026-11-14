@@ -2,8 +2,9 @@
 //   View 1 ("globe"): the whole Moon with Sun and Earth markers in the directions the data gives
 //                     (not to scale). Click the Moon to go to view 2.
 //   View 2 ("sites"): site markers; the Moon turns and zooms. Click a marker to highlight it,
-//                     click it again to open the site scene. Click elsewhere on the Moon to pick
-//                     that latitude and longitude.
+//                     click it again (or "Zoom in to this site" beside its label) and the camera
+//                     flies down to the site before the site scene opens. Click elsewhere on the
+//                     Moon to pick that latitude and longitude.
 
 import { Suspense, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
@@ -14,7 +15,9 @@ import type { Geometry } from '../api/types';
 import type { KnownSite } from '../state/data';
 import type { View } from '../state/app';
 import { prefersReducedMotion } from '../state/useMedia';
-import { clamp } from '../state/app';
+import { actions, appStore, clamp } from '../state/app';
+import { useStore } from '../state/store';
+import { ZoomToSiteButton } from '../components/ZoomToSiteButton';
 import { latLonToVec3, vec3ToLatLon } from '../util/geo';
 import { cssColor } from './colors';
 import { MOON_TEXTURE } from './textures';
@@ -37,6 +40,7 @@ export interface MoonSceneProps {
 interface ControlsLike {
   enabled: boolean;
   target: THREE.Vector3;
+  minDistance: number;
   update: () => void;
 }
 
@@ -44,6 +48,10 @@ const SUN_DISTANCE = 3.3;
 const EARTH_DISTANCE = 2.4;
 const GLOBE_RADIUS = 6.8;
 const SITES_RADIUS = 3.7;
+/** Closest the visitor can zoom with the wheel or a pinch (Moon radii from the centre). */
+const MIN_DISTANCE = 1.35;
+/** End of the "Zoom in to this site" flight: this far above the site, looking down at it. */
+const FLIGHT_HEIGHT = 0.3;
 /** Wide screens: shift the Moon right by this many pixels so the floating Sites pane does not cover it. */
 const PANE_SHIFT_PX = 210;
 
@@ -74,7 +82,7 @@ export function MoonScene(props: MoonSceneProps) {
         <SunAndEarth geometry={geometry} />
         <Suspense fallback={<MoonMesh {...props} texture={null} />}>{MOON_TEXTURE.enabled ? <TexturedMoon {...props} /> : <MoonMesh {...props} texture={null} />}</Suspense>
         {props.view === 'sites' ? <SiteMarkers {...props} /> : null}
-        <OrbitControls makeDefault enablePan={false} minDistance={1.35} maxDistance={12} rotateSpeed={0.6} zoomSpeed={0.8} enableDamping dampingFactor={0.08} />
+        <OrbitControls makeDefault enablePan={false} minDistance={MIN_DISTANCE} maxDistance={12} rotateSpeed={0.6} zoomSpeed={0.8} enableDamping dampingFactor={0.08} />
         <CameraRig view={props.view} sites={props.sites} highlightedId={props.highlightedId} shiftPx={props.view === 'sites' && !props.isPhone ? PANE_SHIFT_PX : 0} />
         <EdgeTracker geometry={geometry} sunArrow={sunArrow} earthArrow={earthArrow} leftInset={props.leftInset ?? 0} />
       </Canvas>
@@ -166,7 +174,7 @@ function SiteMarkers({ sites, highlightedId, savedIds, onSiteClick }: MoonSceneP
               <meshBasicMaterial color={active ? colors.active : savedIds.has(site.id) ? colors.saved : colors.base} toneMapped={false} />
             </mesh>
             {active ? <Ring color={colors.active} normal={pos} /> : null}
-            {active || hoveredId === site.id ? <MarkerLabel name={site.name} normal={pos} /> : null}
+            {active || hoveredId === site.id ? <MarkerLabel name={site.name} normal={pos} withZoom={active} /> : null}
           </group>
         );
       })}
@@ -174,21 +182,38 @@ function SiteMarkers({ sites, highlightedId, savedIds, onSiteClick }: MoonSceneP
   );
 }
 
-/** Name tag next to a marker; hidden while the marker is on the far side of the Moon. */
-function MarkerLabel({ name, normal }: { name: string; normal: THREE.Vector3 }) {
-  const ref = useRef<HTMLSpanElement>(null);
+/**
+ * Name tag next to a marker; hidden while the marker is on the far side of the Moon. The highlighted
+ * site's tag also carries "Zoom in to this site" (hidden during a flight).
+ */
+function MarkerLabel({ name, normal, withZoom }: { name: string; normal: THREE.Vector3; withZoom: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
   const dir = useMemo(() => normal.clone().normalize(), [normal]);
   const cam = useMemo(() => new THREE.Vector3(), []);
+  const flight = useStore(appStore, (s) => s.flight);
+  // drei's Html attaches to the element R3F listens on. On a fresh canvas that element is connected a
+  // moment after the first render; mounting earlier makes Html move roots and lose its content.
+  const connected = useThree((s) => Boolean(s.events.connected));
   useFrame(({ camera }) => {
     if (!ref.current) return;
     cam.copy(camera.position).normalize();
-    ref.current.style.opacity = cam.dot(dir) > 0.12 ? '1' : '0';
+    const facing = cam.dot(dir) > 0.12;
+    ref.current.style.opacity = facing ? '1' : '0';
+    // A hidden tag must not catch clicks meant for the Moon.
+    ref.current.style.visibility = facing ? 'visible' : 'hidden';
   });
+  const showZoom = withZoom && flight === null;
+  if (!connected) return null;
   return (
     <Html position={[0, 0, 0]} zIndexRange={[15, 10]} style={{ pointerEvents: 'none' }}>
-      <span ref={ref} className="ml-3 -mt-2.5 block whitespace-nowrap rounded-md border border-line bg-glass px-1.5 py-0.5 text-[12px] text-ink" style={{ transition: 'opacity 150ms ease' }}>
-        {name}
-      </span>
+      <div ref={ref} className="ml-3 -mt-2.5 flex flex-col items-start gap-1" style={{ transition: 'opacity 150ms ease' }} data-testid={withZoom ? 'active-site-label' : undefined}>
+        <span className="block whitespace-nowrap rounded-md border border-line bg-glass px-1.5 py-0.5 text-[12px] text-ink">{name}</span>
+        {showZoom ? (
+          <span className="pointer-events-auto block">
+            <ZoomToSiteButton siteName={name} compact testId="zoom-to-site-label" />
+          </span>
+        ) : null}
+      </div>
     </Html>
   );
 }
@@ -228,62 +253,165 @@ function Stars() {
   );
 }
 
-/** Turns and zooms the camera with GSAP whenever the view or the highlighted site changes. */
+interface Flight {
+  /** Where the camera ends up. */
+  position: THREE.Vector3;
+  /** The point it looks at when it gets there. */
+  target: THREE.Vector3;
+  filmOffset: number;
+  duration: number;
+  ease: string;
+  onComplete?: () => void;
+}
+
+/**
+ * Moves the camera with GSAP from where it is to a new place. The direction from the Moon's centre
+ * turns along a great circle, so the path never passes through the Moon. The height above the
+ * surface changes on a log scale, so the ground grows (or shrinks) at a steady rate on screen, and
+ * the point the camera looks at slides from its old place to the new one.
+ */
+function flyTo(camera: THREE.PerspectiveCamera, controls: ControlsLike | null, lookAt: THREE.Vector3, f: Flight): gsap.core.Tween {
+  const startPos = camera.position.clone();
+  const startH = Math.max(1e-3, startPos.length() - 1);
+  const startDir = startPos.clone().normalize();
+  const endH = Math.max(1e-3, f.position.length() - 1);
+  const endDir = f.position.clone().normalize();
+  const startTarget = lookAt.clone();
+  const startFilm = camera.filmOffset;
+  const turn = new THREE.Quaternion().setFromUnitVectors(startDir, endDir);
+  const step = new THREE.Quaternion();
+  const identity = new THREE.Quaternion();
+  const target = new THREE.Vector3();
+  const proxy = { t: 0 };
+  if (controls) {
+    controls.enabled = false;
+    // The controls keep the camera this far from what it looks at; a flight goes closer.
+    controls.minDistance = Math.min(MIN_DISTANCE, FLIGHT_HEIGHT * 0.5);
+  }
+  const apply = () => {
+    step.copy(identity).slerp(turn, proxy.t);
+    camera.position.copy(startDir).applyQuaternion(step).multiplyScalar(1 + startH * (endH / startH) ** proxy.t);
+    target.lerpVectors(startTarget, f.target, proxy.t);
+    lookAt.copy(target);
+    camera.filmOffset = startFilm + (f.filmOffset - startFilm) * proxy.t;
+    camera.updateProjectionMatrix();
+    camera.lookAt(target);
+    if (controls) {
+      controls.target.copy(target);
+      controls.update();
+    }
+  };
+  return gsap.to(proxy, {
+    t: 1,
+    duration: prefersReducedMotion() ? 0 : f.duration,
+    ease: f.ease,
+    onUpdate: apply,
+    onComplete: () => {
+      apply();
+      f.onComplete?.();
+    },
+  });
+}
+
+/** Where the "Zoom in to this site" flight ends: above the site, on the side the camera looks from. */
+function flightEnd(lat: number, lon: number): { position: THREE.Vector3; target: THREE.Vector3 } {
+  const target = toVector(lat, lon);
+  // Look from a latitude no closer than 28 degrees to a pole, so the view never points straight
+  // along the Moon's axis (the camera's "up").
+  const from = toVector(clamp(lat, -62, 62), lon);
+  return { position: target.clone().addScaledVector(from, FLIGHT_HEIGHT), target };
+}
+
+/**
+ * Turns and zooms the camera with GSAP whenever the view or the highlighted site changes, and flies
+ * it down to the highlighted site for "Zoom in to this site" (and back out after "Back to Moon").
+ */
 function CameraRig({ view, sites, highlightedId, shiftPx }: { view: MoonSceneProps['view']; sites: KnownSite[]; highlightedId: string | null; shiftPx: number }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const width = useThree((s) => s.size.width);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
+  const flight = useStore(appStore, (s) => s.flight);
   const focus = sites.find((s) => s.id === highlightedId) ?? null;
   const focusLat = focus?.lat ?? null;
   const focusLon = focus?.lon_east ?? null;
+  const tween = useRef<gsap.core.Tween | null>(null);
+  /** The point the camera looks at: the Moon's centre, or the site during a flight. */
+  const lookAt = useRef(new THREE.Vector3());
+  // Back from a site scene: the first move starts low over the site (the reverse of the flight in).
+  const startOverSite = useRef(appStore.get().flight === 'out');
 
+  const filmFor = (px: number) => (width > 0 ? -(px / width) * 2 * Math.tan((camera.fov * Math.PI) / 360) * camera.aspect * camera.getFilmWidth() : 0);
+
+  const release = () => {
+    if (!controls) return;
+    controls.enabled = true;
+    controls.minDistance = MIN_DISTANCE;
+  };
+
+  // The usual moves: view 1 <-> view 2, and turning to a newly highlighted site.
   useEffect(() => {
-    const startPos = camera.position.clone();
-    const startR = startPos.length();
-    const startDir = startPos.clone().normalize();
+    if (appStore.get().flight === 'in') return;
+    if (startOverSite.current && focusLat !== null && focusLon !== null) {
+      startOverSite.current = false;
+      const end = flightEnd(focusLat, focusLon);
+      camera.position.copy(end.position);
+      camera.filmOffset = filmFor(shiftPx);
+      camera.lookAt(end.target);
+      lookAt.current.copy(end.target);
+    }
+    const startDir = camera.position.clone().normalize();
     let endDir: THREE.Vector3;
     if (view === 'sites') {
       // Look at the highlighted site; otherwise at the southern near side, where most presets are.
       // Latitude is limited so the camera never sits exactly over a pole.
       endDir = focusLat !== null && focusLon !== null ? toVector(clamp(focusLat, -62, 62), focusLon) : toVector(-48, 20);
     } else {
-      endDir = startPos.lengthSq() > 0 ? toVector(18, 55) : startDir;
+      endDir = camera.position.lengthSq() > 0 ? toVector(18, 55) : startDir;
     }
-    const endR = view === 'globe' ? GLOBE_RADIUS : focus ? SITES_RADIUS * 0.88 : SITES_RADIUS;
-    // Film offset moves the picture sideways without moving the camera (orbiting still centres on the Moon).
-    const startFilm = camera.filmOffset;
-    const endFilm = width > 0 ? -(shiftPx / width) * 2 * Math.tan((camera.fov * Math.PI) / 360) * camera.aspect * camera.getFilmWidth() : 0;
-    const turn = new THREE.Quaternion().setFromUnitVectors(startDir, endDir.normalize());
-    const proxy = { t: 0 };
-    const step = new THREE.Quaternion();
-    const identity = new THREE.Quaternion();
-    if (controls) controls.enabled = false;
-    const apply = () => {
-      step.copy(identity).slerp(turn, proxy.t);
-      const dir = startDir.clone().applyQuaternion(step);
-      camera.position.copy(dir.multiplyScalar(startR + (endR - startR) * proxy.t));
-      camera.filmOffset = startFilm + (endFilm - startFilm) * proxy.t;
-      camera.updateProjectionMatrix();
-      camera.lookAt(0, 0, 0);
-      controls?.target.set(0, 0, 0);
-      controls?.update();
-    };
-    const tween = gsap.to(proxy, {
-      t: 1,
-      duration: prefersReducedMotion() ? 0 : 0.9,
-      ease: 'power2.inOut',
-      onUpdate: apply,
+    const endR = view === 'globe' ? GLOBE_RADIUS : focusLat !== null ? SITES_RADIUS * 0.88 : SITES_RADIUS;
+    const flyingOut = appStore.get().flight === 'out';
+    tween.current?.kill();
+    tween.current = flyTo(camera, controls, lookAt.current, {
+      position: endDir.multiplyScalar(endR),
+      target: new THREE.Vector3(),
+      // Film offset moves the picture sideways without moving the camera (orbiting still centres on the Moon).
+      filmOffset: filmFor(shiftPx),
+      duration: flyingOut ? 1.2 : 0.9,
+      ease: flyingOut ? 'power1.inOut' : 'power2.inOut',
       onComplete: () => {
-        apply();
-        if (controls) controls.enabled = true;
+        release();
+        if (flyingOut) actions.finishFlightOut();
       },
     });
     return () => {
-      tween.kill();
-      if (controls) controls.enabled = true;
+      tween.current?.kill();
+      release();
     };
     // Only re-run when the destination changes, not on every camera move.
   }, [view, focusLat, focusLon, controls, shiftPx, width]);
+
+  // "Zoom in to this site": fly down to the site, then open the site scene.
+  useEffect(() => {
+    if (flight !== 'in') return;
+    if (focusLat === null || focusLon === null) {
+      actions.finishFlightIn();
+      return;
+    }
+    const end = flightEnd(focusLat, focusLon);
+    tween.current?.kill();
+    tween.current = flyTo(camera, controls, lookAt.current, {
+      position: end.position,
+      target: end.target,
+      filmOffset: camera.filmOffset,
+      duration: 1.2,
+      ease: 'power1.inOut',
+      onComplete: actions.finishFlightIn,
+    });
+    return () => {
+      tween.current?.kill();
+      release();
+    };
+  }, [flight, focusLat, focusLon, controls]);
   return null;
 }
 

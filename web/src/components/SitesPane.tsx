@@ -13,6 +13,7 @@ import { movedText, type RankedRow } from '../util/ranking';
 import { AsyncView, SkeletonLines } from './AsyncView';
 import { EARTH_LINK_COLOR, EARTH_LINK_WORD, HorizonPlot } from './HorizonPlot';
 import { Icon } from './Icon';
+import { ZoomToSiteButton } from './ZoomToSiteButton';
 
 /** Suggested next step when every ranked site fails the same requirement. */
 const FIX_HINT: Record<string, string> = {
@@ -30,11 +31,11 @@ function sharedFailure(rows: RankedRow[]): string | null {
   return rows.every((r) => r.evaluation.verdict.result === 'fail' && r.evaluation.verdict.requirement === req) ? req : null;
 }
 
-/** Click once to highlight a site; click the highlighted site again to open its scene. */
+/** Click once to highlight a site; click the highlighted site again to zoom in to its scene. */
 export function selectSite(site: KnownSite) {
   const { highlightedId } = appStore.get();
   if (highlightedId === site.id) {
-    actions.setView('scene');
+    actions.zoomToSite();
   } else {
     actions.highlight(site.id, site);
   }
@@ -88,7 +89,7 @@ export function SitesContent({ onClose, layout = 'pane' }: { onClose?: () => voi
         </h3>
         {evaluation.refreshing ? <span className="text-[12px] text-muted">updating…</span> : null}
       </div>
-      <p className="m-0 px-3 pb-1.5 text-[12px] text-muted">Score 0–100, higher is better. Select a site once to highlight it, again to open it.</p>
+      <p className="m-0 px-3 pb-1.5 text-[12px] text-muted">Score 0–100, higher is better. Select a site once to highlight it, again to zoom in to it.</p>
       <p className="sr-only" aria-live="polite" data-testid="rank-announcement">
         {announcement}
       </p>
@@ -126,14 +127,15 @@ export function SitesContent({ onClose, layout = 'pane' }: { onClose?: () => voi
         )}
       </div>
 
-      {/* Compact horizon plot for the highlighted site (the site scene shows the full plot instead). */}
+      {/* Selected-site card: its main action, then a compact horizon plot (the site scene shows the full plot). */}
       {highlighted && view !== 'scene' ? (
-        <div className="border-t border-line px-3 py-2">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <p className="m-0 truncate text-[12px] font-medium">{highlighted.name}</p>
-            <button type="button" className="btn h-7 min-h-7 shrink-0 px-2 text-[12px]" onClick={() => actions.setView('scene')}>
-              Open site
-            </button>
+        <div className="border-t border-line px-3 py-2.5" data-testid="selected-site">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="label m-0">Selected site</p>
+              <p className="m-0 truncate text-[13px] font-medium">{highlighted.name}</p>
+            </div>
+            <ZoomToSiteButton siteName={highlighted.name} />
           </div>
           <AsyncView result={horizon} what="the horizon" waiting={<div className="skeleton h-24 w-full" />} empty="No horizon data for this point.">
             {(h) =>
@@ -331,7 +333,7 @@ function SiteRow({ row, site, highlighted, saved, quietVerdict }: { row: RankedR
         onClick={() => selectSite(site)}
         aria-pressed={highlighted}
       >
-        <span className="sr-only">{highlighted ? 'Highlighted. Press again to open the site scene. ' : ''}</span>
+        <span className="sr-only">{highlighted ? 'Highlighted. Press again to zoom in to the site scene. ' : ''}</span>
         <span className="flex items-baseline gap-2">
           <span className="num w-5 shrink-0 text-right text-[12px] text-muted">
             {row.rank}
