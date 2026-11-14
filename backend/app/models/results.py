@@ -10,9 +10,10 @@ from enum import StrEnum
 from itertools import pairwise
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.mission import MissionInput
+from app.models.types import UtcDatetime
 
 Vector3 = Annotated[list[float], Field(min_length=3, max_length=3)]
 AzimuthDeg = Annotated[float, Field(ge=0, lt=360)]
@@ -20,6 +21,12 @@ ElevationDeg = Annotated[float, Field(ge=-90, le=90)]
 Fraction = Annotated[float, Field(ge=0, le=1)]
 
 _UNIT_VECTOR_TOLERANCE = 1e-3
+
+
+class _OutputModel(BaseModel):
+    # NaN/Infinity are never valid physics output: they would serialise as JSON null where the
+    # schema promises a number. Rejecting them turns bad engine data into a 502 (see evaluation.py).
+    model_config = ConfigDict(allow_inf_nan=False)
 
 
 class DataSource(StrEnum):
@@ -36,7 +43,7 @@ class ObstructionState(StrEnum):
     BELOW_HORIZON = "below_horizon"  # below the local horizontal plane
 
 
-class DataProvenance(BaseModel):
+class DataProvenance(_OutputModel):
     source: DataSource
     is_synthetic: bool = Field(description="True when the numbers are placeholder fixtures, not physics results.")
     engine_name: str
@@ -44,7 +51,7 @@ class DataProvenance(BaseModel):
     notice: str = Field(description="Human-readable statement of where the numbers come from.")
 
 
-class BodyTimeseries(BaseModel):
+class BodyTimeseries(_OutputModel):
     """Sun or Earth as seen from the observer, one entry per timestamp."""
 
     position_km: list[Vector3] = Field(description="Body position, km, MOON_ME frame, origin at the Moon's centre.")
@@ -72,9 +79,9 @@ class BodyTimeseries(BaseModel):
         return self
 
 
-class Timeseries(BaseModel):
+class Timeseries(_OutputModel):
     frame: Literal["MOON_ME"] = "MOON_ME"
-    timestamps_utc: list[AwareDatetime] = Field(min_length=2)
+    timestamps_utc: list[UtcDatetime] = Field(min_length=2)
     sun: BodyTimeseries
     earth: BodyTimeseries
 
@@ -88,9 +95,9 @@ class Timeseries(BaseModel):
         return self
 
 
-class TimeWindow(BaseModel):
-    start_utc: AwareDatetime
-    end_utc: AwareDatetime
+class TimeWindow(_OutputModel):
+    start_utc: UtcDatetime
+    end_utc: UtcDatetime
     duration_hours: float = Field(ge=0)
 
     @model_validator(mode="after")
@@ -100,7 +107,7 @@ class TimeWindow(BaseModel):
         return self
 
 
-class SiteInfo(BaseModel):
+class SiteInfo(_OutputModel):
     latitude_deg: float
     longitude_deg: float
     elevation_m: float = Field(description="Site elevation relative to the 1737.4 km reference sphere, metres.")
@@ -108,7 +115,7 @@ class SiteInfo(BaseModel):
     slope_deg: float | None = Field(default=None, ge=0, le=90, description="Local terrain slope, degrees.")
 
 
-class TerrainSkyline(BaseModel):
+class TerrainSkyline(_OutputModel):
     """Terrain horizon profile around the site (angular elevation per azimuth)."""
 
     azimuth_deg: list[AzimuthDeg]
@@ -121,7 +128,7 @@ class TerrainSkyline(BaseModel):
         return self
 
 
-class MissionMetrics(BaseModel):
+class MissionMetrics(_OutputModel):
     sunlight_hours: float = Field(ge=0)
     sunlight_percentage: float = Field(ge=0, le=100)
     longest_sunlight_hours: float = Field(ge=0)
@@ -134,14 +141,14 @@ class MissionMetrics(BaseModel):
     time_to_sunset_hours: float | None = Field(
         default=None, ge=0, description="Hours from mission start to the first sunset; null if none occurs."
     )
-    sunset_utc: AwareDatetime | None = None
+    sunset_utc: UtcDatetime | None = None
     time_to_earthset_hours: float | None = Field(
         default=None, ge=0, description="Hours from mission start to the first Earthset; null if none occurs."
     )
-    earthset_utc: AwareDatetime | None = None
+    earthset_utc: UtcDatetime | None = None
 
 
-class RequirementResult(BaseModel):
+class RequirementResult(_OutputModel):
     requirement: str = Field(description="Name of the field in hardware_requirements.")
     metric: str = Field(description="Metric the threshold is compared against.")
     comparison: Literal[">=", "<="]
@@ -151,14 +158,14 @@ class RequirementResult(BaseModel):
     passed: bool | None = Field(description="Null when the engine did not provide the metric.")
 
 
-class LaunchDelayCase(BaseModel):
+class LaunchDelayCase(_OutputModel):
     launch_delay_days: int = Field(ge=0)
-    mission_start_utc: AwareDatetime
+    mission_start_utc: UtcDatetime
     metrics: MissionMetrics
     requirements_passed: bool | None
 
 
-class MissionEvaluation(BaseModel):
+class MissionEvaluation(_OutputModel):
     """Full response of ``POST /api/v1/missions/evaluate``."""
 
     contract_version: str
@@ -177,5 +184,5 @@ class MissionEvaluation(BaseModel):
     warnings: list[str]
 
 
-class ErrorResponse(BaseModel):
+class ErrorResponse(_OutputModel):
     detail: str

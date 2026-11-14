@@ -4,12 +4,13 @@ Field names carry their unit as a suffix (``_deg``, ``_m``, ``_s``, ``_days``,
 ``_utc``) so the contract is unambiguous in JSON and in generated TypeScript.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models import limits
+from app.models.types import UtcDatetime
 from app.timegrid import SECONDS_PER_DAY, count_samples
 
 
@@ -98,7 +99,7 @@ class MissionInput(_InputModel):
         le=limits.OBSERVER_HEIGHT_MAX_M,
         description="Height of the observer (camera, antenna, panel) above the local surface, metres.",
     )
-    mission_start_utc: AwareDatetime = Field(
+    mission_start_utc: UtcDatetime = Field(
         description=(
             "Mission start as an ISO 8601 string with an explicit timezone, e.g. 2027-01-15T00:00:00Z. "
             "Normalised to UTC."
@@ -151,8 +152,15 @@ class MissionInput(_InputModel):
 
     @field_validator("mission_start_utc")
     @classmethod
-    def _normalise_to_utc(cls, value: datetime) -> datetime:
-        return value.astimezone(UTC)
+    def _check_supported_window(cls, value: datetime) -> datetime:
+        # Runs after UtcDatetime has normalised the value to UTC (or rejected it if that overflows).
+        # Bounding the start here also keeps the end-of-mission arithmetic below from overflowing.
+        if not limits.MISSION_WINDOW_START_UTC <= value < limits.MISSION_WINDOW_END_UTC:
+            raise ValueError(
+                f"mission_start_utc must be on or after {limits.MISSION_WINDOW_START_UTC.isoformat()} "
+                f"and before {limits.MISSION_WINDOW_END_UTC.isoformat()}"
+            )
+        return value
 
     @model_validator(mode="after")
     def _check_mission_window(self) -> "MissionInput":
@@ -170,10 +178,7 @@ class MissionInput(_InputModel):
         if self.launch_delay_days > 0 and self.launch_delay_step_days > self.launch_delay_days:
             raise ValueError("launch_delay_step_days must not exceed launch_delay_days")
 
-        if self.mission_start_utc < limits.MISSION_WINDOW_START_UTC:
-            raise ValueError(
-                f"mission_start_utc must be on or after {limits.MISSION_WINDOW_START_UTC.isoformat()}"
-            )
+        # Cannot overflow: the start is bounded by the field validator and delay/stay are capped in limits.
         latest_end = self.mission_start_utc + timedelta(days=self.launch_delay_days + self.stay_duration_days)
         if latest_end > limits.MISSION_WINDOW_END_UTC:
             raise ValueError(

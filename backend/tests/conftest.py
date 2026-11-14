@@ -26,5 +26,12 @@ def client(app):
 
 
 @pytest.fixture
+def server_client(app):
+    """Client that reports unhandled server errors as HTTP 500 (as in production) instead of raising."""
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        yield test_client
+
+
+@pytest.fixture
 def mission_payload() -> dict:
     return copy.deepcopy(VALID_MISSION)

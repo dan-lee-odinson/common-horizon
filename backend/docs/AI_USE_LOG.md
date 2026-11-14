@@ -24,6 +24,7 @@ clock reading.
 | pytest / httpx / openapi-spec-validator | 9.2.0 / 0.28.1 / 0.9.0 | Tests and OpenAPI validation |
 | ruff | latest at install time (local lint only, not a project dependency) | Lint |
 | Docker / AWS Lambda Web Adapter | 29.5.2 / 0.9.1 | Container build and Lambda compatibility |
+| OpenAI Codex | not stated in the review | Independent review of `c34f59e`, posted on PR #4; no code changes |
 
 ## Phase 1: backend contract and minimal FastAPI implementation (2026-11-14)
 
@@ -54,3 +55,28 @@ clock reading.
 - [ ] Backend owner reviewed every changed file
 - [ ] Physics owner confirmed or corrected the open questions in `API_CONTRACT.md`
 - [ ] Independent teammate review before merge
+
+## Phase 1 review fixes: Codex review of `c34f59e` on PR #4 (2026-11-14)
+
+Fixes drafted by Claude Code (Claude Opus 5.5); findings from the independent OpenAI Codex review.
+Times after 15:03 are not split per step: a `git stash` round-trip used to compare performance reset
+the source files' modification times.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 14:52:27 | 16:52:27 | Codex review posted on PR #4 (GitHub timestamp) | 3 blocking findings, 1 nonblocking settings issue |
+| by 15:01:07 | by 17:01:07 | Read the review, inspected the cited files, reproduced every finding with in-memory probes | All reproduced: NaN/Infinity output gave 200 with `null`; extreme dates and `1e999` gave 500; `+02:00` output timestamps; supplied `Settings` ignored |
+| ~15:02:16 | ~17:02:16 | Wrote 40 regression tests and ran them before any fix | 40 failed for the reported reasons |
+| ~15:03:47 onward | ~17:03:47 onward | Fixes: UTC timestamp type, finite-only output models, engine-boundary re-validation, JSON-safe 422 handler, engine bound to the app's own settings | 143 passed |
+| by 15:08:06 | by 17:08:06 | ruff, OpenAPI drift, `pip check`, Docker build and read-only smoke test | All passed; regenerated contract artefacts byte-identical (no contract change) |
+
+### Not addressed here (nonblocking review items)
+
+- Docker build tooling: bundled `pip` advisories, unpinned transitive dependencies and image digest.
+  Left for an infrastructure change agreed with Dan.
+- Physics conventions (coordinates, elevation, metric definitions, launch-delay semantics) still
+  need Isabella's confirmation.
+- The Starlette/httpx test warning filter stays until the move to `httpx2` (accepted as temporary).
+- A request containing an integer literal of more than 4 300 digits gets FastAPI's own 400
+  ("There was an error parsing the body"), not 422: Python's integer-size limit fails while parsing the JSON.
+  The response is structured, never 500.

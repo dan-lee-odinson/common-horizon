@@ -7,7 +7,11 @@ Machine-readable version: [`../contract/openapi.json`](../contract/openapi.json)
 Conventions:
 
 - Units are part of every field name: `_deg`, `_m`, `_km`, `_s`, `_hours`, `_days`, `_utc`.
-- Timestamps are ISO 8601 strings. Responses always use UTC with a `Z` suffix.
+- Timestamps are ISO 8601 strings. Responses always use UTC with a `Z` suffix: every output
+  timestamp (time series, metrics, communication windows, launch-delay cases) is normalised to
+  UTC, whatever offset the engine used.
+- Numbers are always finite. `NaN` and `Infinity` are rejected in requests (HTTP 422) and in
+  engine output (HTTP 502); they never appear as `null` in a 200 response.
 - Vectors are `[x, y, z]` in the `MOON_ME` frame.
 - Time series are column-oriented: one array per quantity, all aligned with `timestamps_utc`.
 - Unknown request fields are rejected (HTTP 422), so typos fail loudly.
@@ -22,6 +26,9 @@ Conventions:
 | POST | `/api/v1/missions/evaluate` | 200 `MissionEvaluation` | 422 invalid input, 502 engine output broke the contract, 503 engine unavailable |
 
 422 bodies use FastAPI's standard shape: `{"detail": [{"loc": [...], "msg": "...", "type": "..."}]}`.
+A rejected non-finite number (e.g. `1e999`, which overflows, or the non-standard `NaN` / `Infinity`
+tokens) is echoed in `input` as the string `"NaN"`, `"Infinity"` or `"-Infinity"`, so the body is
+always strict JSON.
 502/503 bodies are `{"detail": "..."}`.
 
 ## Inputs: website → engine (`MissionInput`)
@@ -32,7 +39,7 @@ Conventions:
 | Landing longitude | `landing_site.longitude_deg` | deg, east + | yes | -180 … 180 |
 | Landing altitude | `landing_site.altitude_m` | m vs 1737.4 km sphere | no (null → from terrain) | -10 000 … 11 000 |
 | Observer height | `observer_height_m` | m above surface | no (0) | 0 … 1 000 |
-| Mission start | `mission_start_utc` | ISO 8601 with timezone | yes | 2000-01-01 ≤ start; end incl. max delay ≤ 2100-01-01; naive times, date-only strings and Unix numbers rejected; offsets normalised to UTC |
+| Mission start | `mission_start_utc` | ISO 8601 with timezone | yes | 2000-01-01 ≤ start < 2100-01-01 (error on `mission_start_utc`); end incl. max delay ≤ 2100-01-01; naive times, date-only strings, Unix numbers and offsets with no UTC equivalent (e.g. `0001-01-01T00:00:00+01:00`) rejected; offsets normalised to UTC |
 | Stay duration | `stay_duration_days` | days | yes | > 0 … 365 |
 | Time step | `time_step_s` | s (integer) | yes | 60 … 86 400, ≤ stay duration |
 | Launch delay | `launch_delay_days` | whole days | no (0 = off) | 0 … 30 |
@@ -88,8 +95,10 @@ class PhysicsEngine(Protocol):
 - `SimulationRequest`: one site, one start time (lat/lon/alt, observer height, `start_utc`,
   `duration_s`, `time_step_s`, `include_timeseries`).
 - `SimulationResult` (Pydantic): `site`, `timeseries`, `metrics`, `communication_windows`,
-  `terrain_skyline`, `warnings`. Building it validates array alignment, angle ranges, unit vectors
-  and metric ranges, so bad engine output becomes a 502 instead of reaching the website.
+  `terrain_skyline`, `warnings`. Building it validates array alignment, angle ranges, unit vectors,
+  metric ranges and finiteness, and normalises timestamps to UTC. The backend validates every
+  returned result again (results built with `model_copy(update=...)` skip validation), so bad
+  engine output becomes a 502 instead of reaching the website.
 - The backend currently runs the launch-delay sweep (one `simulate` call per delay) and the
   requirement comparisons (threshold vs engine metric; no physics).
 

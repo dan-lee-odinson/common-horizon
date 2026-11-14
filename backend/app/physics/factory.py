@@ -2,7 +2,8 @@
 
 from functools import lru_cache
 
-from app.config import get_settings
+from fastapi import Request
+
 from app.physics.engine_adapter import PhysicsEngineAdapter
 from app.physics.interface import PhysicsEngine
 from app.physics.synthetic import SyntheticPhysicsEngine
@@ -21,6 +22,9 @@ def build_engine(name: str) -> PhysicsEngine:
         raise ValueError(f"Unknown CH_PHYSICS_ENGINE {name!r}; expected one of {sorted(_ENGINES)}") from None
 
 
-def get_physics_engine() -> PhysicsEngine:
-    """FastAPI dependency. Tests override it with ``app.dependency_overrides``."""
-    return build_engine(get_settings().physics_engine)
+def get_physics_engine(request: Request) -> PhysicsEngine:
+    """FastAPI dependency: the engine chosen by the ``Settings`` given to ``create_app``.
+
+    Tests override it with ``app.dependency_overrides``.
+    """
+    return request.app.state.physics_engine

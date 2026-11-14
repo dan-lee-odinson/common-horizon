@@ -26,7 +26,14 @@ def _run(engine: PhysicsEngine, mission: MissionInput, delay_days: int, include_
         include_timeseries=include_timeseries,
     )
     try:
-        return engine.simulate(request)
+        result = engine.simulate(request)
+        if not isinstance(result, SimulationResult):
+            raise EngineContractError(
+                f"Physics engine '{engine.info.name}' returned {type(result).__name__}, expected SimulationResult."
+            )
+        # Validate again at the boundary: results built with model_copy(update=...) or
+        # model_construct() skip validation, and nothing unchecked may reach the website.
+        return SimulationResult.model_validate(result.model_dump(warnings=False))
     except ValidationError as exc:
         raise EngineContractError(
             f"Physics engine '{engine.info.name}' returned data that violates the API contract "

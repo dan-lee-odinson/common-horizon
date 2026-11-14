@@ -1,9 +1,11 @@
 """FastAPI application entry point (``uvicorn app.main:app``)."""
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import health, missions
+from app.api.errors import request_validation_error_handler
 from app.config import SERVICE_VERSION, Settings, get_settings
 from app.physics.factory import build_engine
 
@@ -22,7 +24,7 @@ Units are part of every field name: `_deg` degrees, `_m` metres, `_km` kilometre
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
-    build_engine(settings.physics_engine)  # fail fast on a misconfigured engine name
+    engine = build_engine(settings.physics_engine)  # fails fast on a misconfigured engine name
 
     app = FastAPI(
         title="Common Horizon API",
@@ -30,6 +32,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         summary="Lunar landing-site Sun/Earth visibility evaluation",
         description=DESCRIPTION,
     )
+    # get_physics_engine reads this, so an app serves the engine its own settings chose, not the environment's.
+    app.state.physics_engine = engine
+    app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),

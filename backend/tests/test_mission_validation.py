@@ -1,6 +1,7 @@
 """Input validation: coordinates, dates, units, mission duration and launch delay."""
 
 import copy
+import json
 from datetime import UTC, datetime
 
 import pytest
@@ -181,3 +182,83 @@ def test_api_rejects_missing_required_fields(client):
         ("body", "stay_duration_days"),
         ("body", "time_step_s"),
     } <= missing
+
+
+# --- Regression tests for the independent Codex review of c34f59e (PR #4) ---------------------
+
+EXTREME_STARTS = [
+    "9999-12-31T00:00:00Z",  # start + stay overflows datetime.max
+    "9999-12-31T23:59:59-01:00",  # UTC normalisation overflows into year 10000
+    "0001-01-01T00:00:00+01:00",  # UTC normalisation underflows into year 0
+    "0001-01-01T00:00:00Z",
+    "2100-01-01T00:00:00Z",  # first instant after the supported window
+]
+
+
+@pytest.mark.parametrize("value", EXTREME_STARTS)
+def test_extreme_mission_start_raises_validation_error_not_overflow(value):
+    with pytest.raises(ValidationError) as excinfo:
+        MissionInput.model_validate(_with("mission_start_utc", value))
+
+    assert [error["loc"] for error in excinfo.value.errors()] == [("mission_start_utc",)]
+
+
+@pytest.mark.parametrize("value", EXTREME_STARTS)
+def test_api_returns_422_for_extreme_mission_start(server_client, mission_payload, value):
+    mission_payload["mission_start_utc"] = value
+
+    response = server_client.post("/api/v1/missions/evaluate", json=mission_payload)
+
+    assert response.status_code == 422
+    assert ["body", "mission_start_utc"] in [error["loc"] for error in response.json()["detail"]]
+
+
+def _reject_non_standard_json(token: str):
+    raise AssertionError(f"response is not strict JSON: contains {token}")
+
+
+def _raw_body(path: str, raw_token: str) -> str:
+    """VALID_MISSION as JSON with ``path`` set to a raw (possibly non-standard) JSON number token."""
+    return json.dumps(_with(path, "__RAW__")).replace('"__RAW__"', raw_token)
+
+
+@pytest.mark.parametrize(
+    "path, raw_token, encoded_input",
+    [
+        ("landing_site.latitude_deg", "1e999", "Infinity"),  # valid JSON syntax, overflows to inf
+        ("landing_site.longitude_deg", "-1e999", "-Infinity"),
+        ("landing_site.latitude_deg", "NaN", "NaN"),  # non-standard tokens Python's parser accepts
+        ("landing_site.altitude_m", "Infinity", "Infinity"),
+        ("observer_height_m", "-Infinity", "-Infinity"),
+        ("stay_duration_days", "1e999", "Infinity"),
+        ("time_step_s", "1e999", "Infinity"),
+        ("hardware_requirements.max_darkness_hours", "1e999", "Infinity"),
+    ],
+)
+def test_api_returns_strict_json_422_for_non_finite_numbers(server_client, path, raw_token, encoded_input):
+    response = server_client.post(
+        "/api/v1/missions/evaluate",
+        content=_raw_body(path, raw_token),
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    errors = json.loads(response.text, parse_constant=_reject_non_standard_json)["detail"]
+    by_loc = {tuple(error["loc"]): error for error in errors}
+    error = by_loc[("body", *path.split("."))]
+    assert error["input"] == encoded_input
+    assert error["msg"]
+
+
+def test_non_finite_numbers_nested_in_error_input_are_encoded(server_client):
+    """Errors echo the rejected value as ``input``; non-finite numbers nested inside it must be encoded too."""
+    response = server_client.post(
+        "/api/v1/missions/evaluate",
+        content=_raw_body("landing_site", '[1e999, NaN, {"x": -1e999}]'),
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    errors = json.loads(response.text, parse_constant=_reject_non_standard_json)["detail"]
+    by_loc = {tuple(error["loc"]): error for error in errors}
+    assert by_loc[("body", "landing_site")]["input"] == ["Infinity", "NaN", {"x": "-Infinity"}]
