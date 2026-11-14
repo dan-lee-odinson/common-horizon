@@ -193,8 +193,12 @@ export function AssistantBar() {
           </div>
           <div
             ref={logRef}
-            className="chat-log relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2 text-[13px] outline-none md:px-4"
-            tabIndex={-1}
+            className="chat-log relative flex-1 overflow-y-auto overscroll-contain px-3 py-2 text-[13px] md:px-4"
+            // In the Tab order so keyboard users can scroll the history. New answers are announced by the
+            // live region below, so the log itself stays quiet.
+            tabIndex={0}
+            role="log"
+            aria-live="off"
             aria-label="Conversation with the assistant"
             data-testid="chat-log"
           >

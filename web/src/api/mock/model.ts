@@ -289,7 +289,8 @@ function nightCheckOf(r: PowerResult): NightCheck {
     per_night_kwh: round(n.per_night_kwh, 2),
     longest_darkness_h: n.longest_darkness_h === null ? null : round(n.longest_darkness_h, 1),
     storage_kwh: n.storage_kwh,
-    storage_needed_kwh: nullableRound(n.storage_needed_kwh, 1),
+    // Rounded up, never down: typing the suggested figure must pass the night check.
+    storage_needed_kwh: n.storage_needed_kwh === null ? null : Math.ceil(n.storage_needed_kwh * 10 - 1e-9) / 10,
     available_kwh: nullableRound(n.available_kwh, 1),
     load_kwh: nullableRound(n.load_kwh, 1),
     margin_percent: nullableRound(n.margin_percent, 2),

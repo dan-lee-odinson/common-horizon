@@ -6,6 +6,7 @@ import sitesJson from '../examples/sites.json';
 import type { HardwareChoice, SiteRef } from '../types';
 import { landingMsFor } from './index';
 import { evaluateSite, genericCheck, longestDarknessHours } from './model';
+import { storageToCover } from '../../util/power';
 
 const SITES = sitesJson.sites as SiteRef[];
 const site = (id: string) => SITES.find((s) => s.id === id)!;
@@ -82,6 +83,23 @@ describe('storage in the mock model', () => {
     const { day } = evaluateSite(LONG_DARK, LANDING, STAY, SOLAR, needed).check;
     expect(day.refill_kwh).toBeCloseTo(needed, 0);
     expect(day.refill_kw).toBeGreaterThan(0);
+  });
+
+  it('passes the night check when the suggested "about N kWh" is typed, for every site, stay and plan', () => {
+    const plans: HardwareChoice[][] = [SOLAR, [{ id: 'griffin', count: 1 }], [{ id: 'starship', count: 1 }, { id: 'hab', count: 1 }, { id: 'rover', count: 2 }]];
+    let checked = 0;
+    for (const s of SITES) {
+      for (const stay of [1, 2, 3.5, 14, 30]) {
+        for (const plan of plans) {
+          const needed = evaluateSite(s, LANDING, stay, plan, 0).check.night.storage_needed_kwh;
+          if (!needed) continue;
+          checked++;
+          const typed = storageToCover(needed);
+          expect(evaluateSite(s, LANDING, stay, plan, typed).check.night.passes, `${s.id}, ${stay} d, ${typed} kWh`).toBe(true);
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
   });
 
   it('does not count storage before a site is picked (no darkness length yet)', () => {

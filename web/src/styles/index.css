@@ -143,6 +143,8 @@
     backdrop-filter: blur(12px) saturate(1.1);
     box-shadow: 0 -12px 32px var(--ch-shadow);
   }
+  /* The log is a flex item: this explicit minimum (no min-h-0 utility on it, which would win over a
+     component rule) lets it shrink to six lines and scroll beyond that. */
   .chat-log {
     line-height: 1.45;
     min-height: calc(6 * 1.45em + 1rem);

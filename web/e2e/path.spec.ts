@@ -157,6 +157,15 @@ test('chat: opening the conversation does not move or resize the scene behind it
     await box.press('Enter');
     await expect(page.getByTestId('chat-log').locator('[data-state="answer"]')).toHaveCount(i + 1);
     expect(await sceneBox(page)).toEqual(before);
+    if (i === 0) {
+      // With a single exchange the history is still at least six lines tall.
+      const one = await page.getByTestId('chat-log').evaluate((e) => {
+        const css = getComputedStyle(e);
+        return { height: e.clientHeight, min: parseFloat(css.minHeight) || 0, line: parseFloat(css.lineHeight) };
+      });
+      expect(one.min).toBeGreaterThanOrEqual(6 * one.line);
+      expect(one.height).toBeGreaterThanOrEqual(6 * one.line);
+    }
   }
 
   // The panel sits on top of the question bar, shows several rows and stays within 40 % of the window.

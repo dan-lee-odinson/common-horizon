@@ -118,6 +118,12 @@ can pass these straight through:
   (a load with nothing at all to power it); the website then shows "no supply".
 * With no site picked there is no darkness length, so, as in the planner module, the night check
   compares power only and storage is not counted. The planner says so in words.
+* `day.needed` and `night.needed` have no planner key: they are `status != "none"`.
+* `storage_needed_kwh` is shown rounded **up** to a whole kWh ("about N kWh"), so send it unrounded
+  or rounded up, never down.
+* When storage must be refilled but no sunlit hours are left (longest darkness of a lunar month or
+  more), the planner raises `PlannerInputError`; the mock shows a red day check instead. The backend
+  should pass `refill_hours` from the physics engine, or turn that error into a red day check.
 * The mock copies the planner's arithmetic in `src/api/mock/power.ts` (tests in
   `src/api/mock/power.test.ts` use the planner README's figures). The mock catalog's
   optional `energy_per_night_kwh` stands for per-night items such as rover keep-warm.
