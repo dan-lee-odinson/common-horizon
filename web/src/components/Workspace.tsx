@@ -10,6 +10,7 @@ import { useIsPhone } from '../state/useMedia';
 import { hasWebGL } from '../scene/webgl';
 import { MoonFallback } from '../scene/MoonFallback';
 import { MOON_TEXTURE } from '../scene/textures';
+import type { MoonSceneHandle } from '../scene/MoonScene';
 import type { SiteSceneHandle } from '../scene/SiteScene';
 import { DAY_MS } from '../util/time';
 import { AsyncView } from './AsyncView';
@@ -76,6 +77,7 @@ function MoonView({ webgl, isPhone }: { webgl: boolean; isPhone: boolean }) {
   const { allSites, evaluation } = useData();
   const savedIds = useMemo(() => new Set(saved.map((s) => s.id)), [saved]);
   const geometry = evaluation.data?.current.geometry ?? null;
+  const moonRef = useRef<MoonSceneHandle>(null);
 
   const common = {
     view,
@@ -96,15 +98,28 @@ function MoonView({ webgl, isPhone }: { webgl: boolean; isPhone: boolean }) {
       {webgl ? (
         <SceneBoundary fallback={fallback}>
           <Suspense fallback={<SceneLoading />}>
-            <MoonScene {...common} isPhone={isPhone} leftInset={leftInset} />
+            <MoonScene ref={moonRef} {...common} isPhone={isPhone} leftInset={leftInset} />
           </Suspense>
         </SceneBoundary>
       ) : (
         fallback
       )}
 
-      <p className="pointer-events-none absolute bottom-2 right-3 m-0 rounded-full border border-line bg-glass px-2.5 py-0.5 text-[12px] text-ink-2" data-testid="not-to-scale">
-        Sun and Earth markers: not to scale
+      {webgl ? (
+        <div className="absolute bottom-3 right-3 flex flex-col gap-1" role="group" aria-label="Zoom the Moon view">
+          <button type="button" className="btn btn-icon" aria-label="Zoom in" onClick={() => moonRef.current?.zoom(0.6)} data-testid="moon-zoom-in">
+            <Icon name="plus" />
+          </button>
+          <button type="button" className="btn btn-icon" aria-label="Zoom out" onClick={() => moonRef.current?.zoom(1.66)} data-testid="moon-zoom-out">
+            <Icon name="minus" />
+          </button>
+        </div>
+      ) : null}
+      <p
+        className={`pointer-events-none absolute bottom-3 m-0 max-w-[calc(100%-5rem)] rounded-full border border-line bg-glass px-2.5 py-0.5 text-[12px] text-ink-2 ${webgl ? 'right-14' : 'right-3'}`}
+        data-testid="not-to-scale"
+      >
+        Earth and Sun: sizes and distances not to scale{webgl ? <span className="hidden sm:inline"> · scroll or pinch to zoom out</span> : null}
       </p>
       {MOON_TEXTURE.enabled ? <p className="pointer-events-none absolute bottom-2 left-3 m-0 text-[10px] text-muted">{MOON_TEXTURE.credit}</p> : null}
 

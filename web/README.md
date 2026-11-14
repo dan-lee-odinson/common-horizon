@@ -133,7 +133,12 @@ can pass these straight through:
   storage would cover the picked site's darkness. Try the nuclear generator, then solar panels with
   batteries, at a site with long darkness and at one with short darkness.
 * **Assistant** (bottom, always).
-* **View 1**: the Moon with Sun and Earth markers ("not to scale"). Click the Moon (or "Show landing sites").
+* **View 1**: the Moon with Earth and the Sun in the directions the data gives. Earth is drawn at its
+  true size beside the Moon (3.67 times the Moon's diameter) and the Sun larger than Earth, both much
+  farther out than before; sizes and distances are still **not to scale**, and a note on screen says
+  so. Scroll the mouse wheel (or pinch, or use the + / − buttons) to zoom out until Earth and the Sun
+  are in view, and back in to the Moon. Edge arrows point to whichever is out of view. Sunlight on the
+  Moon (and on Earth) comes from the Sun's direction. Click the Moon (or "Show landing sites").
 * **View 2**: site markers and the floating, movable Sites pane (coordinates, presets, ranked list,
   and the selected-site card with a compact horizon plot). Click a site once to highlight it. Its
   card, and its label on the Moon, carry **Zoom in to this site**: the camera flies down to the site

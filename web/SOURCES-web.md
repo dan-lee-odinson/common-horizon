@@ -69,6 +69,8 @@ No logos, insignia, flags or agency or company lettering are used anywhere. Name
 | Power colour thresholds: green at 25 % margin or more, yellow from 0 % to under 25 %, red below 0 % | Planner and ranked list | Team brief; the same line as the planner module (GSFC-STD-1000 Rev I, Table 1.06-1, as cited in `planner/README.md`) | — |
 | Power check rules: margin = (available − load) / available × 100; night storage over the longest darkness; day refill | Mock power checks (`src/api/mock/power.ts`) | Planner module, `planner/README.md` ("power_check"), read only | — |
 | One lunar month 708.73 h | Default refill window in the mock power checks | Planner module catalog constant (`planner/README.md`) | — |
+| Earth's diameter about 3.67 times the Moon's (mean diameters about 12,742 km and 3,474.8 km) | Earth's size in the Moon view (Moon radius 1, Earth radius 3.67) | Standard astronomical values | link to add |
+| Moon view distances (Earth 30, Sun 90 Moon radii) and the Sun's radius (8 Moon radii) | Placing Earth and the Sun in the Moon view | Chosen for this website so both fit on screen; not to scale (really about 221 and 86,000 Moon radii, and the Sun about 400 Moon diameters wide) | — |
 
 ## SI/AI use
 
