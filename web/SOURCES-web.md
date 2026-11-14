@@ -17,7 +17,7 @@ as installed by npm from the public npm registry.
 
 Only these five packages (and what they import) end up in the built site. drei pulls in further
 packages (for example three-stdlib, camera-controls, troika-three-text, maath, zustand); the website
-imports only `OrbitControls` and `useTexture` from drei.
+imports only `OrbitControls`, `Html` (marker labels) and `useTexture` from drei.
 
 ## Tools — used to build and test, not shipped
 
