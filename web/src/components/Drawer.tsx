@@ -6,12 +6,17 @@ export function Drawer({ open, side, label, onClose, children, testId }: { open:
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
+    // Remember what opened the drawer and give focus back to it when the drawer closes.
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     ref.current?.focus();
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
   }, [open, onClose]);
 
   const closedTransform = side === 'right' ? 'translateX(100%)' : side === 'left' ? 'translateX(-100%)' : 'translateY(100%)';

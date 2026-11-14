@@ -17,7 +17,10 @@ export type IconName =
   | 'sites'
   | 'planner'
   | 'horizon'
-  | 'compare';
+  | 'compare'
+  | 'sun'
+  | 'left'
+  | 'right';
 
 const PATHS: Record<IconName, string> = {
   play: 'M7 5.5v13l11-6.5z',
@@ -37,6 +40,9 @@ const PATHS: Record<IconName, string> = {
   planner: 'M5 6h14M5 12h14M5 18h9',
   horizon: 'M3 17l5-5 4 3 4-6 5 8M3 20h18',
   compare: 'M4 5h7v14H4zM13 5h7v14h-7z',
+  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4',
+  left: 'M19 12H5M11 6l-6 6 6 6',
+  right: 'M5 12h14M13 6l6 6-6 6',
 };
 
 const FILLED = new Set<IconName>(['play', 'star-filled']);

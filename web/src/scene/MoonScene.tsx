@@ -5,9 +5,9 @@
 //                     click it again to open the site scene. Click elsewhere on the Moon to pick
 //                     that latitude and longitude.
 
-import { Suspense, useEffect, useMemo, useRef, type RefObject } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, useTexture } from '@react-three/drei';
+import { Html, OrbitControls, useTexture } from '@react-three/drei';
 import gsap from 'gsap';
 import * as THREE from 'three';
 import type { Geometry } from '../api/types';
@@ -29,6 +29,8 @@ export interface MoonSceneProps {
   onMoonClick: () => void;
   onPickPoint: (lat: number, lonEast: number) => void;
   onSiteClick: (site: KnownSite) => void;
+  /** Pixels on the left covered by the floating Sites pane; edge arrows stay right of it. */
+  leftInset?: number;
 }
 
 /** The parts of OrbitControls the camera rig uses. */
@@ -74,7 +76,7 @@ export function MoonScene(props: MoonSceneProps) {
         {props.view === 'sites' ? <SiteMarkers {...props} /> : null}
         <OrbitControls makeDefault enablePan={false} minDistance={1.35} maxDistance={12} rotateSpeed={0.6} zoomSpeed={0.8} enableDamping dampingFactor={0.08} />
         <CameraRig view={props.view} sites={props.sites} highlightedId={props.highlightedId} shiftPx={props.view === 'sites' && !props.isPhone ? PANE_SHIFT_PX : 0} />
-        <EdgeTracker geometry={geometry} sunArrow={sunArrow} earthArrow={earthArrow} />
+        <EdgeTracker geometry={geometry} sunArrow={sunArrow} earthArrow={earthArrow} leftInset={props.leftInset ?? 0} />
       </Canvas>
       <EdgeArrow ref={sunArrow} label="Sun" color="var(--ch-sun)" />
       <EdgeArrow ref={earthArrow} label="Earth" color="var(--ch-earth)" />
@@ -130,6 +132,7 @@ function SunAndEarth({ geometry }: { geometry: Geometry }) {
 }
 
 function SiteMarkers({ sites, highlightedId, savedIds, onSiteClick }: MoonSceneProps) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const colors = useMemo(() => ({ base: cssColor('--ch-marker'), saved: cssColor('--ch-marker-saved'), active: cssColor('--ch-marker-active') }), []);
   return (
     <group>
@@ -148,8 +151,12 @@ function SiteMarkers({ sites, highlightedId, savedIds, onSiteClick }: MoonSceneP
               onPointerOver={(e) => {
                 e.stopPropagation();
                 document.body.style.cursor = 'pointer';
+                setHoveredId(site.id);
               }}
-              onPointerOut={() => (document.body.style.cursor = '')}
+              onPointerOut={() => {
+                document.body.style.cursor = '';
+                setHoveredId((h) => (h === site.id ? null : h));
+              }}
             >
               <sphereGeometry args={[0.03, 12, 8]} />
               <meshBasicMaterial transparent opacity={0} depthWrite={false} />
@@ -159,10 +166,30 @@ function SiteMarkers({ sites, highlightedId, savedIds, onSiteClick }: MoonSceneP
               <meshBasicMaterial color={active ? colors.active : savedIds.has(site.id) ? colors.saved : colors.base} toneMapped={false} />
             </mesh>
             {active ? <Ring color={colors.active} normal={pos} /> : null}
+            {active || hoveredId === site.id ? <MarkerLabel name={site.name} normal={pos} /> : null}
           </group>
         );
       })}
     </group>
+  );
+}
+
+/** Name tag next to a marker; hidden while the marker is on the far side of the Moon. */
+function MarkerLabel({ name, normal }: { name: string; normal: THREE.Vector3 }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const dir = useMemo(() => normal.clone().normalize(), [normal]);
+  const cam = useMemo(() => new THREE.Vector3(), []);
+  useFrame(({ camera }) => {
+    if (!ref.current) return;
+    cam.copy(camera.position).normalize();
+    ref.current.style.opacity = cam.dot(dir) > 0.12 ? '1' : '0';
+  });
+  return (
+    <Html position={[0, 0, 0]} zIndexRange={[15, 10]} style={{ pointerEvents: 'none' }}>
+      <span ref={ref} className="ml-3 -mt-2.5 block whitespace-nowrap rounded-md border border-line bg-glass px-1.5 py-0.5 text-[12px] text-ink" style={{ transition: 'opacity 150ms ease' }}>
+        {name}
+      </span>
+    </Html>
   );
 }
 
@@ -261,12 +288,23 @@ function CameraRig({ view, sites, highlightedId, shiftPx }: { view: MoonScenePro
 }
 
 /** Points a small arrow at the screen edge towards the Sun or Earth marker when it is out of view. */
-function EdgeTracker({ geometry, sunArrow, earthArrow }: { geometry: Geometry; sunArrow: RefObject<HTMLDivElement | null>; earthArrow: RefObject<HTMLDivElement | null> }) {
+function EdgeTracker({
+  geometry,
+  sunArrow,
+  earthArrow,
+  leftInset,
+}: {
+  geometry: Geometry;
+  sunArrow: RefObject<HTMLDivElement | null>;
+  earthArrow: RefObject<HTMLDivElement | null>;
+  leftInset: number;
+}) {
   const sunPos = useMemo(() => toVector(geometry.subsolar_lat, geometry.subsolar_lon_east, SUN_DISTANCE), [geometry]);
   const earthPos = useMemo(() => toVector(geometry.subearth_lat, geometry.subearth_lon_east, EARTH_DISTANCE), [geometry]);
   const tmp = useMemo(() => new THREE.Vector3(), []);
   const camSpace = useMemo(() => new THREE.Vector3(), []);
   useFrame(({ camera, size }) => {
+    const placed: { x: number; y: number }[] = [];
     for (const [pos, el] of [
       [sunPos, sunArrow.current],
       [earthPos, earthArrow.current],
@@ -287,8 +325,11 @@ function EdgeTracker({ geometry, sunArrow, earthArrow }: { geometry: Geometry; s
         continue;
       }
       const k = 1 / Math.max(Math.abs(x) / 0.9, Math.abs(y) / 0.84, 1e-6);
-      const px = ((x * k + 1) / 2) * size.width;
-      const py = ((1 - y * k) / 2) * size.height;
+      const px = Math.max(leftInset + 36, ((x * k + 1) / 2) * size.width);
+      let py = ((1 - y * k) / 2) * size.height;
+      // Two arrows pointing the same way would overlap: stack the second one.
+      for (const p of placed) if (Math.abs(p.x - px) < 70 && Math.abs(p.y - py) < 24) py = p.y + (py > size.height / 2 ? -26 : 26);
+      placed.push({ x: px, y: py });
       const angle = Math.atan2(-y, x);
       el.style.opacity = '1';
       el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -50%)`;
@@ -303,7 +344,7 @@ function EdgeArrow({ ref, label, color }: { ref: RefObject<HTMLDivElement | null
   return (
     <div
       ref={ref}
-      className="pointer-events-none absolute left-0 top-0 flex items-center gap-1 rounded-full border border-line bg-glass px-1.5 py-0.5 text-[11px] text-ink"
+      className="pointer-events-none absolute left-0 top-0 z-[5] flex items-center gap-1 rounded-full border border-line bg-glass px-1.5 py-0.5 text-[12px] text-ink"
       style={{ opacity: 0, transition: 'opacity 150ms ease' }}
       data-testid={`edge-arrow-${label.toLowerCase()}`}
       aria-hidden

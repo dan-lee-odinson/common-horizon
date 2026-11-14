@@ -22,7 +22,7 @@ export function PlannerPanel() {
   return (
     <section aria-labelledby={ids.heading} className="flex h-full min-h-0 flex-col" data-testid="planner">
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
-        <h2 id={ids.heading} className="m-0 text-[14px] font-semibold">
+        <h2 id={ids.heading} className="m-0 text-[15px] font-semibold">
           Mission planner
         </h2>
         <button type="button" className="btn btn-icon md:hidden" aria-label="Close the planner" onClick={() => actions.setDrawer('none')}>
@@ -45,7 +45,14 @@ export function PlannerPanel() {
         </fieldset>
 
         <div className="border-t border-line px-4 py-3">
-          <PowerBalance check={check.refreshing && check.data?.balance_margin_percent === null ? null : check.data} status={check.status} hasHardware={hardwareChosen.length > 0} siteName={highlighted?.name ?? null} onRetry={check.retry} />
+          <PowerBalance
+            check={check.refreshing && check.data?.balance_margin_percent === null ? null : check.data}
+            status={check.status}
+            hasHardware={hardwareChosen.length > 0}
+            siteName={highlighted?.name ?? null}
+            darkHours={row ? Math.max(0, stayDays * 24 - row.evaluation.sunlight_hours) : null}
+            onRetry={check.retry}
+          />
         </div>
 
         <div className="border-t border-line px-4 py-3">
@@ -120,7 +127,7 @@ function HardwareRow({ item, pick }: { item: CatalogItem; pick: HardwarePick | u
         <input id={id} type="checkbox" checked={selected} onChange={(e) => actions.toggleHardware(item.id, e.target.checked)} className="size-4 shrink-0" />
         <label htmlFor={id} className="min-w-0 cursor-pointer">
           <span className="block truncate text-[13px] font-medium">{item.name}</span>
-          {item.note ? <span className="block truncate text-[11px] text-muted">{item.note}</span> : null}
+          {item.note ? <span className={`block truncate text-[12px] ${selected ? 'text-ink-2' : 'text-muted'}`}>{item.note}</span> : null}
         </label>
       </div>
       {item.countable ? (
@@ -157,12 +164,15 @@ function PowerBalance({
   status,
   hasHardware,
   siteName,
+  darkHours,
   onRetry,
 }: {
   check: CheckResponse | null;
   status: string;
   hasHardware: boolean;
   siteName: string | null;
+  /** Hours of darkness in the stay at the picked site, when known. */
+  darkHours: number | null;
   onRetry: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -200,9 +210,16 @@ function PowerBalance({
     );
   }
   const level = powerLevel(check.balance_margin_percent);
+  // Name the check that sets the headline number, so a red number always has a visible cause.
+  const nightSets =
+    check.night.needed && check.night.margin_percent !== null && (!check.day.needed || check.day.margin_percent === null || check.night.margin_percent <= check.day.margin_percent);
+  const driver = check.balance_margin_percent === null ? null : nightSets ? check.night : check.day;
+  const driverText = driver
+    ? `${nightSets ? 'Night' : 'Day'} check: ${driver.generation_kw} kW made, ${driver.load_kw} kW used${nightSets && darkHours !== null ? ` · ${Math.round(darkHours)} h of darkness in this stay` : ''}`
+    : null;
   return (
     <div>
-      <p className="label m-0">Power balance{siteName ? ` · ${siteName}` : ' · no site picked'}</p>
+      <p className="label m-0">Power balance{siteName ? ` · ${siteName}` : ''}</p>
       <button
         type="button"
         className="mt-1 flex w-full items-baseline gap-2 rounded-lg px-1 py-1 text-left hover:bg-surface-2"
@@ -218,15 +235,17 @@ function PowerBalance({
         <span className="text-[12px]" style={{ color: powerColorVar(level) }}>
           {powerWord(level)}
         </span>
-        <span className="ml-auto text-[11px] text-muted">{open ? 'hide checks' : 'day / night checks'}</span>
+        <span className="ml-auto text-[12px] text-muted">{open ? 'hide checks' : 'day / night checks'}</span>
       </button>
+      {driverText ? <p className="m-0 mt-1 text-[12px] text-ink-2">{driverText}</p> : null}
+      {!siteName ? <p className="m-0 mt-0.5 text-[12px] text-muted">No site picked yet, so this assumes the stay has both day and night.</p> : null}
       {open ? (
         <dl id={detailsId} className="m-0 mt-2 grid gap-2 text-[12px]">
           <CheckLine label="Day check" c={check.day} notNeeded="no daylight during this stay" />
           <CheckLine label="Night check" c={check.night} notNeeded="no darkness during this stay" />
           <div className="flex justify-between border-t border-line pt-2">
             <dt className="text-muted">Energy over the stay</dt>
-            <dd className="num m-0" style={{ color: powerColorVar(level) }}>
+            <dd className="num m-0 text-ink">
               {formatKwh(check.energy_added_kwh)}
             </dd>
           </div>

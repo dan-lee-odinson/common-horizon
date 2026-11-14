@@ -1,6 +1,6 @@
 // Side-by-side comparison of the saved (starred) sites. Opens over whatever view is showing.
 
-import { useId } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { SiteRef } from '../api/types';
 import { actions, appStore, simClock } from '../state/app';
 import { useData, useHorizonFor } from '../state/data';
@@ -9,12 +9,22 @@ import { formatLatLon } from '../util/geo';
 import { formatKwh, formatPercent, powerColorVar, powerLevel } from '../util/power';
 import { formatHours } from '../util/time';
 import { AsyncView } from './AsyncView';
-import { EARTH_LINK_COLOR, EARTH_LINK_WORD, HorizonPlot } from './HorizonPlot';
+import { EARTH_LINK_COLOR, EARTH_LINK_WORD, HorizonPlot, naturalElRange } from './HorizonPlot';
 import { Icon } from './Icon';
 
 export function ComparePanel() {
   const saved = useStore(appStore, (s) => s.saved);
   const headingId = useId();
+  // Every plot in the compare panel uses one shared height scale, so the skylines compare fairly.
+  const [ranges, setRanges] = useState<Record<string, { min: number; max: number }>>({});
+  const report = useCallback((id: string, r: { min: number; max: number }) => {
+    setRanges((prev) => (prev[id]?.min === r.min && prev[id]?.max === r.max ? prev : { ...prev, [id]: r }));
+  }, []);
+  const shared = useMemo(() => {
+    const list = saved.map((s) => ranges[s.id]).filter((r): r is { min: number; max: number } => Boolean(r));
+    if (!list.length) return null;
+    return { min: Math.min(...list.map((r) => r.min)), max: Math.max(...list.map((r) => r.max)) };
+  }, [ranges, saved]);
   return (
     <section
       aria-labelledby={headingId}
@@ -26,7 +36,7 @@ export function ComparePanel() {
         <h2 id={headingId} className="m-0 text-[14px] font-semibold">
           Compare saved sites
         </h2>
-        <span className="text-[12px] text-muted">{saved.length} saved</span>
+        <span className="text-[12px] text-muted">{saved.length} saved · horizon plots share one height scale</span>
         <button type="button" className="btn ml-auto" onClick={() => actions.setCompareOpen(false)}>
           <Icon name="close" size={14} /> Close
         </button>
@@ -37,7 +47,7 @@ export function ComparePanel() {
         ) : (
           <ul className="m-0 flex list-none gap-3 p-0" style={{ minWidth: saved.length * 280 }}>
             {saved.map((site) => (
-              <CompareColumn key={site.id} site={site} />
+              <CompareColumn key={site.id} site={site} elRange={shared} onRange={report} />
             ))}
           </ul>
         )}
@@ -46,12 +56,15 @@ export function ComparePanel() {
   );
 }
 
-function CompareColumn({ site }: { site: SiteRef }) {
+function CompareColumn({ site, elRange, onRange }: { site: SiteRef; elRange: { min: number; max: number } | null; onRange: (id: string, r: { min: number; max: number }) => void }) {
   const { evaluation, landingMs, plannedLandingMs, windowStartMs, windowEndMs } = useData();
   const timeScale = useStore(appStore, (s) => s.timeScale);
   const nowMs = useStore(simClock, (s) => s.nowMs);
   const horizon = useHorizonFor(site, windowStartMs, windowEndMs);
   const row = evaluation.data?.rows.find((r) => r.siteId === site.id);
+  useEffect(() => {
+    if (horizon.data && horizon.data.skyline.length) onRange(site.id, naturalElRange(horizon.data));
+  }, [horizon.data, onRange, site.id]);
   const e = row?.evaluation;
   return (
     <li className="panel flex w-[280px] shrink-0 flex-col gap-2 rounded-lg p-3" data-testid="compare-column">
@@ -117,6 +130,7 @@ function CompareColumn({ site }: { site: SiteRef }) {
               plannedLandingMs={plannedLandingMs}
               readouts={null}
               timeScale={timeScale}
+              elRange={elRange}
             />
           ) : null
         }

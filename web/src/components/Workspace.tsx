@@ -86,21 +86,23 @@ function MoonView({ webgl, isPhone }: { webgl: boolean; isPhone: boolean }) {
     onPickPoint: (lat: number, lon: number) => actions.setCustomSite(lat, lon),
     onSiteClick: selectSite,
   };
-  const fallback = <MoonFallback {...common} />;
+  // Wide screens: keep the flat Moon and the edge arrows clear of the floating Sites pane.
+  const leftInset = view === 'sites' && !isPhone ? 424 : 0;
+  const fallback = <MoonFallback {...common} leftInset={leftInset} />;
 
   return (
     <>
       {webgl ? (
         <SceneBoundary fallback={fallback}>
           <Suspense fallback={<SceneLoading />}>
-            <MoonScene {...common} isPhone={isPhone} />
+            <MoonScene {...common} isPhone={isPhone} leftInset={leftInset} />
           </Suspense>
         </SceneBoundary>
       ) : (
         fallback
       )}
 
-      <p className="pointer-events-none absolute bottom-2 right-3 m-0 rounded-full border border-line bg-glass px-2.5 py-0.5 text-[11px] text-ink-2" data-testid="not-to-scale">
+      <p className="pointer-events-none absolute bottom-2 right-3 m-0 rounded-full border border-line bg-glass px-2.5 py-0.5 text-[12px] text-ink-2" data-testid="not-to-scale">
         Sun and Earth markers: not to scale
       </p>
       {MOON_TEXTURE.enabled ? <p className="pointer-events-none absolute bottom-2 left-3 m-0 text-[10px] text-muted">{MOON_TEXTURE.credit}</p> : null}
@@ -120,9 +122,6 @@ function MoonView({ webgl, isPhone }: { webgl: boolean; isPhone: boolean }) {
               <Icon name="back" size={14} /> Whole Moon
             </button>
           </div>
-          <p className="pointer-events-none absolute right-3 top-14 m-0 max-w-[15rem] text-right text-[11px] text-muted">
-            Click a marker or a row to highlight a site, then click it again to open it. Click anywhere else on the Moon to pick that point.
-          </p>
         </>
       )}
     </>
@@ -194,7 +193,7 @@ function SiteView({ webgl, isPhone }: { webgl: boolean; isPhone: boolean }) {
           </button>
         </div>
       ) : null}
-      <p className="pointer-events-none absolute bottom-3 right-14 m-0 max-w-[14rem] text-right text-[11px] text-muted">
+      <p className="pointer-events-none absolute bottom-3 right-14 m-0 max-w-[14rem] text-right text-[12px] text-muted">
         Placeholder ground. Earth and Sun not to scale. Drag to look around.
       </p>
 

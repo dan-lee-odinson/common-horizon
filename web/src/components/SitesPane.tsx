@@ -6,13 +6,29 @@ import gsap from 'gsap';
 import { actions, appStore, simClock } from '../state/app';
 import { useData, type KnownSite } from '../state/data';
 import { useStore } from '../state/store';
-import { prefersReducedMotion } from '../state/useMedia';
+import { prefersReducedMotion, useIsPhone } from '../state/useMedia';
 import { formatLatLon, isValidLatitude, toEastLongitude, type Hemisphere } from '../util/geo';
 import { formatKwh, formatPercent, powerColorVar, powerLevel } from '../util/power';
 import { movedText, type RankedRow } from '../util/ranking';
 import { AsyncView, SkeletonLines } from './AsyncView';
 import { EARTH_LINK_COLOR, EARTH_LINK_WORD, HorizonPlot } from './HorizonPlot';
 import { Icon } from './Icon';
+
+/** Suggested next step when every ranked site fails the same requirement. */
+const FIX_HINT: Record<string, string> = {
+  'night power': 'Nothing makes power at night: add the Nuclear generator, or shorten the stay so it has no night.',
+  'day power': 'Daytime load is more than daytime generation: add Solar panels or the Nuclear generator.',
+  'hardware fit': 'See the fit notes under the power balance in the mission planner.',
+  'Earth contact': 'Earth is never above the horizon: pick a near-side site.',
+};
+
+/** The requirement every row fails, or null when the results differ. */
+function sharedFailure(rows: RankedRow[]): string | null {
+  if (rows.length < 2) return null;
+  const req = rows[0].evaluation.verdict.requirement;
+  if (rows[0].evaluation.verdict.result !== 'fail' || !req) return null;
+  return rows.every((r) => r.evaluation.verdict.result === 'fail' && r.evaluation.verdict.requirement === req) ? req : null;
+}
 
 /** Click once to highlight a site; click the highlighted site again to open its scene. */
 export function selectSite(site: KnownSite) {
@@ -30,19 +46,36 @@ export function selectSite(site: KnownSite) {
  */
 export function SitesContent({ onClose, layout = 'pane' }: { onClose?: () => void; layout?: 'pane' | 'sheet' }) {
   const data = useData();
-  const { evaluation, sites, highlighted, hardwareChosen, horizon, landingMs, plannedLandingMs, windowStartMs, windowEndMs } = data;
+  const { evaluation, sites, catalog, highlighted, hardwareChosen, horizon, landingMs, plannedLandingMs, windowStartMs, windowEndMs } = data;
+  const isPhone = useIsPhone();
   const saved = useStore(appStore, (s) => s.saved);
   const compareOpen = useStore(appStore, (s) => s.compareOpen);
   const timeScale = useStore(appStore, (s) => s.timeScale);
   const slipDays = useStore(appStore, (s) => s.slipDays);
   const nowMs = useStore(simClock, (s) => s.nowMs);
   const compareId = useId();
-  const highlightedRow = highlighted ? evaluation.data?.rows.find((r) => r.siteId === highlighted.id) : undefined;
+  const rows = hardwareChosen.length > 0 ? (evaluation.data?.rows ?? []) : [];
+  const shared = sharedFailure(rows);
+  const first = rows[0];
+  const announcement =
+    slipDays > 0 && first && evaluation.status === 'answer'
+      ? `Slip ${slipDays} days: ${data.siteById.get(first.siteId)?.name ?? first.siteId} is now first${first.moved > 0 ? `, ${movedText(first.moved)}` : ''}.`
+      : '';
 
   return (
     <div className={layout === 'sheet' ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain' : 'flex min-h-0 flex-1 flex-col'}>
       <div className="flex flex-col gap-3 border-b border-line px-3 py-3">
-        <CoordinateEntry />
+        <details className="group">
+          <summary className="label flex cursor-pointer list-none items-center gap-1 select-none [&::-webkit-details-marker]:hidden">
+            <span className="inline-block transition-transform group-open:rotate-90" aria-hidden>
+              <Icon name="right" size={12} />
+            </span>
+            Go to a coordinate
+          </summary>
+          <div className="pt-2">
+            <CoordinateEntry />
+          </div>
+        </details>
         <AsyncView result={sites} what="the preset sites" waiting={<div className="skeleton h-8 w-full" />} empty="No preset sites came back.">
           {(list) => <PresetPicker presets={list.sites} highlightedId={highlighted?.id ?? null} />}
         </AsyncView>
@@ -52,16 +85,36 @@ export function SitesContent({ onClose, layout = 'pane' }: { onClose?: () => voi
         <h3 className="label m-0">
           Ranked sites{slipDays > 0 ? <span className="normal-case tracking-normal text-ink-2"> · slipped +{slipDays} d</span> : null}
         </h3>
-        {evaluation.refreshing ? <span className="text-[11px] text-muted">updating…</span> : null}
+        {evaluation.refreshing ? <span className="text-[12px] text-muted">updating…</span> : null}
       </div>
+      <p className="m-0 px-3 pb-1.5 text-[12px] text-muted">Score 0–100, higher is better. Select a site once to highlight it, again to open it.</p>
+      <p className="sr-only" aria-live="polite" data-testid="rank-announcement">
+        {announcement}
+      </p>
+      {shared ? (
+        <p className="mx-2 mb-1.5 rounded-lg border border-line-strong bg-surface-2 px-2.5 py-1.5 text-[12px] text-ink-2" role="note" data-testid="shared-verdict">
+          <span className="font-semibold text-bad">Every site fails: {shared}.</span> {FIX_HINT[shared] ?? 'Change the hardware or the stay to compare sites on a passing plan.'}
+        </p>
+      ) : null}
       <div className={layout === 'sheet' ? 'px-2 pb-2' : 'min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2'} data-testid="ranked-region">
         {hardwareChosen.length === 0 ? (
-          <p className="m-0 px-2 py-3 text-[13px] text-muted" data-state="empty" data-testid="ranked-empty">
-            Tick hardware in the mission planner to rank the sites.
-          </p>
+          <div className="flex flex-col items-start gap-2 px-2 py-3 text-[13px] text-muted" data-state="empty" data-testid="ranked-empty">
+            {catalog.status === 'error' || catalog.status === 'empty' ? (
+              <p className="m-0">The hardware list did not load, so the sites cannot be ranked yet. Try again from the mission planner.</p>
+            ) : (
+              <p className="m-0">Tick hardware in the mission planner to rank the sites.</p>
+            )}
+            {isPhone ? (
+              <button type="button" className="btn" onClick={() => actions.setDrawer('planner')}>
+                <Icon name="planner" size={14} /> Open the planner
+              </button>
+            ) : null}
+          </div>
         ) : (
           <AsyncView result={evaluation} what="the ranked sites" waiting={<SkeletonLines lines={6} />} empty="No sites came back from the evaluation.">
-            {(bundle) => <RankedList rows={bundle.rows} siteById={data.siteById} highlightedId={highlighted?.id ?? null} savedIds={new Set(saved.map((s) => s.id))} />}
+            {(bundle) => (
+              <RankedList rows={bundle.rows} siteById={data.siteById} highlightedId={highlighted?.id ?? null} savedIds={new Set(saved.map((s) => s.id))} sharedVerdict={shared} />
+            )}
           </AsyncView>
         )}
       </div>
@@ -86,7 +139,7 @@ export function SitesContent({ onClose, layout = 'pane' }: { onClose?: () => voi
                   windowEndMs={windowEndMs}
                   landingMs={landingMs}
                   plannedLandingMs={plannedLandingMs}
-                  readouts={highlightedRow?.evaluation ?? null}
+                  readouts={null}
                   timeScale={timeScale}
                 />
               ) : null
@@ -109,7 +162,7 @@ export function SitesContent({ onClose, layout = 'pane' }: { onClose?: () => voi
           />
           Compare saved sites
         </label>
-        <span className="text-[12px] text-muted num">{saved.length === 0 ? 'star a site to save it' : `${saved.length} saved`}</span>
+        <span className="num text-[12px] text-muted">{saved.length === 0 ? 'star a site to save it' : `${saved.length} saved`}</span>
       </div>
     </div>
   );
@@ -148,11 +201,11 @@ function CoordinateEntry() {
       <div className="flex items-end gap-1.5">
         <label htmlFor={ids.lat} className="flex flex-col text-[11px] text-muted">
           Lat (°, S is −)
-          <input id={ids.lat} inputMode="decimal" className="field num w-[5.5rem] text-[13px] text-ink" value={lat} onChange={(e) => setLat(e.target.value)} placeholder="-89.684" aria-describedby={error ? ids.err : undefined} />
+          <input id={ids.lat} inputMode="decimal" className="field num w-[5.5rem] text-[13px] text-ink" value={lat} onChange={(e) => setLat(e.target.value)} placeholder="e.g. -89.7" aria-describedby={error ? ids.err : undefined} />
         </label>
         <label htmlFor={ids.lon} className="flex flex-col text-[11px] text-muted">
           Lon (°)
-          <input id={ids.lon} inputMode="decimal" className="field num w-[5.5rem] text-[13px] text-ink" value={lon} onChange={(e) => setLon(e.target.value)} placeholder="196.739" aria-describedby={error ? ids.err : undefined} />
+          <input id={ids.lon} inputMode="decimal" className="field num w-[5.5rem] text-[13px] text-ink" value={lon} onChange={(e) => setLon(e.target.value)} placeholder="e.g. 196.7" aria-describedby={error ? ids.err : undefined} />
         </label>
         <label htmlFor={ids.hemi} className="sr-only">
           East or west
@@ -170,7 +223,7 @@ function CoordinateEntry() {
           {error}
         </p>
       ) : (
-        <p className="m-0 text-[11px] text-muted">West longitudes are turned into east (0–360). You can also click the Moon.</p>
+        <p className="m-0 text-[12px] text-muted">West longitudes become east (0–360). You can also click a spot on the Moon.</p>
       )}
     </form>
   );
@@ -203,7 +256,19 @@ function PresetPicker({ presets, highlightedId }: { presets: KnownSite[]; highli
   );
 }
 
-function RankedList({ rows, siteById, highlightedId, savedIds }: { rows: RankedRow[]; siteById: Map<string, KnownSite>; highlightedId: string | null; savedIds: Set<string> }) {
+function RankedList({
+  rows,
+  siteById,
+  highlightedId,
+  savedIds,
+  sharedVerdict,
+}: {
+  rows: RankedRow[];
+  siteById: Map<string, KnownSite>;
+  highlightedId: string | null;
+  savedIds: Set<string>;
+  sharedVerdict: string | null;
+}) {
   const listRef = useRef<HTMLOListElement>(null);
   const lastTops = useRef(new Map<string, number>());
 
@@ -235,16 +300,18 @@ function RankedList({ rows, siteById, highlightedId, savedIds }: { rows: RankedR
       {rows.map((row) => {
         const site = siteById.get(row.siteId);
         if (!site) return null;
-        return <SiteRow key={row.siteId} row={row} site={site} highlighted={row.siteId === highlightedId} saved={savedIds.has(row.siteId)} />;
+        return <SiteRow key={row.siteId} row={row} site={site} highlighted={row.siteId === highlightedId} saved={savedIds.has(row.siteId)} quietVerdict={sharedVerdict !== null} />;
       })}
     </ol>
   );
 }
 
-function SiteRow({ row, site, highlighted, saved }: { row: RankedRow; site: KnownSite; highlighted: boolean; saved: boolean }) {
+function SiteRow({ row, site, highlighted, saved, quietVerdict }: { row: RankedRow; site: KnownSite; highlighted: boolean; saved: boolean; quietVerdict: boolean }) {
   const e = row.evaluation;
   const level = powerLevel(e.power_margin_percent);
   const fail = e.verdict.result === 'fail';
+  const verdictText = fail ? `fail: ${e.verdict.requirement}` : 'pass';
+  const slipText = row.planned ? ` ${movedText(row.moved)} since the plan, score was ${row.planned.score}.` : '';
   return (
     <li
       data-site-id={row.siteId}
@@ -256,7 +323,7 @@ function SiteRow({ row, site, highlighted, saved }: { row: RankedRow; site: Know
         className="block w-full rounded-lg px-2 py-1.5 pr-9 text-left"
         onClick={() => selectSite(site)}
         aria-pressed={highlighted}
-        aria-label={`${row.rank}. ${site.name}, score ${e.score}. ${highlighted ? 'Highlighted. Press again to open the site scene.' : 'Press to highlight.'}`}
+        aria-label={`${row.rank}. ${site.name}, score ${e.score}.${slipText} ${verdictText}. ${highlighted ? 'Highlighted. Press again to open the site scene.' : 'Press to highlight.'}`}
       >
         <span className="flex items-baseline gap-2">
           <span className="num w-5 shrink-0 text-right text-[12px] text-muted">{row.rank}</span>
@@ -266,7 +333,7 @@ function SiteRow({ row, site, highlighted, saved }: { row: RankedRow; site: Know
           {row.planned ? (
             <span className="num flex shrink-0 items-center gap-1 text-[11px] text-ink-2" title={`Planned rank ${row.planned.rank}, now ${row.rank}`} data-testid="moved">
               {row.moved !== 0 ? (
-                <span className="flex items-center" style={{ color: row.moved > 0 ? 'var(--ch-good)' : 'var(--ch-bad)' }}>
+                <span className="flex items-center" style={{ color: row.moved > 0 ? 'var(--ch-good)' : 'var(--ch-ink-2)' }}>
                   <Icon name={row.moved > 0 ? 'up' : 'down'} size={12} />
                   {Math.abs(row.moved)}
                 </span>
@@ -283,9 +350,12 @@ function SiteRow({ row, site, highlighted, saved }: { row: RankedRow; site: Know
             {e.score}
           </span>
         </span>
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 pl-7 text-[11px] text-ink-2 num">
-          <span title="Sunlight during the stay">
-            <span className="text-sun">☀</span> {formatPercent(e.sunlight_percent)} · {Math.round(e.sunlight_hours)} h
+        <span className="num mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 pl-7 text-[11.5px] text-ink-2">
+          <span className="flex items-center gap-1" title="Sunlight during the stay">
+            <span className="text-sun">
+              <Icon name="sun" size={12} />
+            </span>
+            {formatPercent(e.sunlight_percent)} · {Math.round(e.sunlight_hours)} h
           </span>
           <span title="Clear view of the sky">sky {formatPercent(e.clear_sky_percent)}</span>
           <span className="flex items-center gap-1" title="Earth link">
@@ -296,12 +366,12 @@ function SiteRow({ row, site, highlighted, saved }: { row: RankedRow; site: Know
           <span style={{ color: powerColorVar(level) }} title="Energy the site adds over the stay">
             {formatKwh(e.energy_added_kwh)}
           </span>
-          <span className={fail ? 'text-bad' : 'text-good'} data-testid="verdict">
-            {fail ? `fail: ${e.verdict.requirement}` : 'pass'}
+          <span className={fail ? (quietVerdict ? 'text-muted' : 'text-bad') : 'text-good'} data-testid="verdict">
+            {verdictText}
           </span>
         </span>
-        {site.note ? <span className="mt-0.5 block pl-7 text-[11px] text-muted">{site.note}</span> : null}
-        {site.custom ? <span className="mt-0.5 block pl-7 text-[11px] text-muted">{formatLatLon(site.lat, site.lon_east, 3)}</span> : null}
+        {site.note ? <span className="mt-0.5 block pl-7 text-[12px] text-muted">{site.note}</span> : null}
+        {site.custom ? <span className="num mt-0.5 block pl-7 text-[12px] text-muted">{formatLatLon(site.lat, site.lon_east, 3)}</span> : null}
       </button>
       <button
         type="button"
@@ -370,10 +440,10 @@ export function FloatingSitesPane() {
         <span className="text-muted">
           <Icon name="grip" size={14} />
         </span>
-        <h2 id={headingId} className="m-0 text-[14px] font-semibold">
+        <h2 id={headingId} className="m-0 text-[15px] font-semibold">
           Sites
         </h2>
-        <span className="ml-auto text-[11px] text-muted">drag to move</span>
+        <span className="ml-auto text-[12px] text-muted">drag to move</span>
       </div>
       <SitesContent />
     </section>

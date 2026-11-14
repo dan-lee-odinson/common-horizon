@@ -7,6 +7,7 @@ import type { KnownSite } from '../state/data';
 import type { View } from '../state/app';
 import { clamp } from '../state/app';
 import { DEG, RAD, normalizeLon360 } from '../util/geo';
+import { Icon } from '../components/Icon';
 
 interface Props {
   view: Exclude<View, 'scene'>;
@@ -17,6 +18,8 @@ interface Props {
   onMoonClick: () => void;
   onPickPoint: (lat: number, lonEast: number) => void;
   onSiteClick: (site: KnownSite) => void;
+  /** Pixels on the left covered by the floating Sites pane. */
+  leftInset?: number;
 }
 
 const R = 160;
@@ -66,7 +69,7 @@ function graticule(lat0: number, lon0: number): string[] {
   return lines;
 }
 
-export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, onMoonClick, onPickPoint, onSiteClick }: Props) {
+export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, onMoonClick, onPickPoint, onSiteClick, leftInset = 0 }: Props) {
   const highlighted = sites.find((s) => s.id === highlightedId) ?? null;
   const [center, setCenter] = useState({ lat: -35, lon: 20 });
   useEffect(() => {
@@ -93,7 +96,7 @@ export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, o
   const nudge = (dLat: number, dLon: number) => setCenter((c) => ({ lat: clamp(c.lat + dLat, -80, 80), lon: normalizeLon360(c.lon + dLon) }));
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4" data-testid="moon-fallback">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4" style={leftInset ? { paddingLeft: leftInset } : undefined} data-testid="moon-fallback">
       <p className="m-0 max-w-md text-center text-[12px] text-muted">3D is not available in this browser, so this is a flat view of the Moon.</p>
       <svg viewBox="0 0 400 400" className="h-auto max-h-[70%] w-full max-w-[min(70vh,520px)]" role="img" aria-label="Flat view of the Moon">
         <circle cx={C} cy={C} r={R} fill="var(--ch-moon-dark)" stroke="var(--ch-line-strong)" onClick={onDiscClick} className="cursor-pointer" />
@@ -149,16 +152,16 @@ export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, o
       </svg>
       <div className="flex items-center gap-1" role="group" aria-label="Turn the Moon">
         <button type="button" className="btn btn-icon" aria-label="Turn west" onClick={() => nudge(0, -20)}>
-          ←
+          <Icon name="left" />
         </button>
         <button type="button" className="btn btn-icon" aria-label="Turn north" onClick={() => nudge(20, 0)}>
-          ↑
+          <Icon name="up" />
         </button>
         <button type="button" className="btn btn-icon" aria-label="Turn south" onClick={() => nudge(-20, 0)}>
-          ↓
+          <Icon name="down" />
         </button>
         <button type="button" className="btn btn-icon" aria-label="Turn east" onClick={() => nudge(0, 20)}>
-          →
+          <Icon name="right" />
         </button>
         <span className="ml-2 text-[11px] text-muted num">
           centre {Math.round(center.lat)}°, {Math.round(normalizeLon360(center.lon))}° E

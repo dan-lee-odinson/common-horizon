@@ -35,7 +35,7 @@ function Shell() {
   return (
     <div className="grid h-dvh grid-rows-[auto_minmax(0,1fr)_auto]">
       <TopBar />
-      <main className="relative grid min-h-0 grid-cols-1 md:grid-cols-[minmax(0,1fr)_340px]">
+      <main className="relative grid min-h-0 grid-cols-1 overflow-hidden md:grid-cols-[minmax(0,1fr)_340px]">
         <div className="relative min-h-0">
           <Workspace />
           {compareOpen ? <ComparePanel /> : null}

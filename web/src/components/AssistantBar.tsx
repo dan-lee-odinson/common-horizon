@@ -29,14 +29,15 @@ export function AssistantBar() {
   const controller = useRef<AbortController | null>(null);
   const nextId = useRef(1);
   const ids = { input: useId(), log: useId() };
-  const logEnd = useRef<HTMLDivElement>(null);
+  const latestRef = useRef<HTMLDivElement>(null);
 
   const unavailable = offline || (health.status === 'answer' && health.data?.assistant_available === false);
   const latest = log[log.length - 1];
 
   useEffect(() => {
-    logEnd.current?.scrollIntoView({ block: 'nearest' });
-  }, [log, expanded]);
+    // Show the start of the newest exchange (the question), not the end of a long answer.
+    latestRef.current?.scrollIntoView({ block: 'start' });
+  }, [log.length, expanded]);
 
   useEffect(() => () => controller.current?.abort(), []);
 
@@ -87,7 +88,7 @@ export function AssistantBar() {
           aria-live="polite"
         >
           {(expanded ? log : latest ? [latest] : []).map((x) => (
-            <div key={x.id} className="mb-2 last:mb-0">
+            <div key={x.id} ref={x.id === latest?.id ? latestRef : undefined} className="mb-2 scroll-mt-2 last:mb-0">
               <p className="m-0 text-ink-2">
                 <span className="text-muted">You: </span>
                 {x.question}
@@ -95,7 +96,6 @@ export function AssistantBar() {
               <AnswerView x={x} onRetry={() => send(x.question, x.id)} />
             </div>
           ))}
-          <div ref={logEnd} />
         </div>
       ) : null}
       <form onSubmit={onSubmit} className="flex items-center gap-2 px-3 py-2 md:px-4">
@@ -116,6 +116,19 @@ export function AssistantBar() {
           <Icon name="send" size={14} />
           Ask
         </button>
+        {log.length > 0 ? (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              controller.current?.abort();
+              setLog([]);
+              setExpanded(false);
+            }}
+          >
+            Clear
+          </button>
+        ) : null}
         {log.length > 1 ? (
           <button type="button" className="btn" aria-expanded={expanded} aria-controls={ids.log} onClick={() => setExpanded((v) => !v)}>
             {expanded ? 'Less' : `All (${log.length})`}
@@ -127,7 +140,7 @@ export function AssistantBar() {
           The assistant is unavailable right now. Everything else on this page still works.
         </p>
       ) : (
-        <p className="m-0 hidden px-4 pb-1.5 text-[11px] text-muted md:block">Answers in text only. The assistant never changes the planner or the views.</p>
+        <p className="m-0 hidden px-4 pb-1.5 text-[12px] text-muted md:block">Answers in text only. The assistant never changes the planner or the views.</p>
       )}
     </section>
   );

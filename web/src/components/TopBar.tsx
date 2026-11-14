@@ -1,7 +1,7 @@
 // Always on screen: launch date and time, the slip control, the UTC / LTC switch and,
 // in the site scene, the play control. On phones a second row opens the drawers.
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { isMockMode } from '../api/client';
 import { actions, appStore, MAX_SLIP_DAYS, simClock } from '../state/app';
 import { useData } from '../state/data';
@@ -22,6 +22,30 @@ export function TopBar() {
   const [draft, setDraft] = useState<string | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
 
+  const noteRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!noteOpen) return;
+    const onKey = (e: globalThis.KeyboardEvent) => e.key === 'Escape' && setNoteOpen(false);
+    const onDown = (e: PointerEvent) => {
+      if (noteRef.current && !noteRef.current.contains(e.target as Node)) setNoteOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onDown);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onDown);
+    };
+  }, [noteOpen]);
+
+  function onScaleKey(e: KeyboardEvent<HTMLDivElement>) {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      e.preventDefault();
+      const next = timeScale === 'UTC' ? 'LTC' : 'UTC';
+      actions.setTimeScale(next);
+      (e.currentTarget.querySelector(`[data-scale="${next}"]`) as HTMLButtonElement | null)?.focus();
+    }
+  }
+
   const launchValue = draft ?? toDatetimeLocalUtc(launchUtcMs);
   const shownTime = view === 'scene' && nowMs !== null ? nowMs : landingMs;
 
@@ -29,7 +53,7 @@ export function TopBar() {
     <header className="relative z-30 flex flex-col border-b border-line bg-surface">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-3 py-2 md:px-4">
         <div className="mr-auto flex min-w-0 items-baseline gap-2">
-          <h1 className="m-0 truncate text-[15px] font-semibold tracking-[-0.01em]">Lunar Landing Site Navigator</h1>
+          <h1 className="m-0 truncate text-[16px] font-semibold tracking-[-0.01em]">Lunar Landing Site Navigator</h1>
           <span className="hidden text-[12px] text-muted lg:inline">Common Horizon</span>
           {isMockMode() ? (
             <span
@@ -83,21 +107,23 @@ export function TopBar() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div role="radiogroup" aria-label="Time scale" className="flex rounded-lg border border-line-strong p-0.5">
+          <div role="radiogroup" aria-label="Time scale" className="flex rounded-lg border border-line-strong p-0.5" onKeyDown={onScaleKey}>
             {(['UTC', 'LTC'] as const).map((scale) => (
               <button
                 key={scale}
                 type="button"
                 role="radio"
+                data-scale={scale}
+                tabIndex={timeScale === scale ? 0 : -1}
                 aria-checked={timeScale === scale}
                 onClick={() => actions.setTimeScale(scale)}
-                className={`rounded-md px-2.5 py-0.5 text-[12px] font-medium transition-colors ${timeScale === scale ? 'bg-accent text-accent-ink' : 'text-ink-2 hover:text-ink'}`}
+                className={`min-h-7 rounded-md px-3 text-[12px] font-medium transition-colors ${timeScale === scale ? 'bg-accent text-accent-ink' : 'text-ink-2 hover:text-ink'}`}
               >
                 {scale}
               </button>
             ))}
           </div>
-          <div className="relative">
+          <div className="relative" ref={noteRef}>
             <button
               type="button"
               className="btn btn-icon"
@@ -159,7 +185,7 @@ export function TopBar() {
 
 function DrawerButton({ label, icon, active, onClick }: { label: string; icon: 'planner' | 'sites' | 'horizon'; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" className={`btn h-7 min-h-7 px-2 text-[12px] ${active ? 'border-accent text-accent' : ''}`} aria-pressed={active} onClick={onClick}>
+    <button type="button" className={`btn h-8 min-h-8 px-2.5 text-[12px] ${active ? 'border-accent text-accent' : ''}`} aria-pressed={active} onClick={onClick}>
       <Icon name={icon} size={14} />
       {label}
     </button>
