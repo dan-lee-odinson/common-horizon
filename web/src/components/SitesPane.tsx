@@ -53,6 +53,7 @@ export function SitesContent({ onClose, layout = 'pane' }: { onClose?: () => voi
   const timeScale = useStore(appStore, (s) => s.timeScale);
   const slipDays = useStore(appStore, (s) => s.slipDays);
   const nowMs = useStore(simClock, (s) => s.nowMs);
+  const view = useStore(appStore, (s) => s.view);
   const compareId = useId();
   const rows = hardwareChosen.length > 0 ? (evaluation.data?.rows ?? []) : [];
   const shared = sharedFailure(rows);
@@ -111,7 +112,13 @@ export function SitesContent({ onClose, layout = 'pane' }: { onClose?: () => voi
             ) : null}
           </div>
         ) : (
-          <AsyncView result={evaluation} what="the ranked sites" waiting={<SkeletonLines lines={6} />} empty="No sites came back from the evaluation.">
+          <AsyncView
+            result={evaluation}
+            what="the ranked sites"
+            waiting={<SkeletonLines lines={6} />}
+            empty="No sites came back from the evaluation."
+            idle={<p className="m-0 px-2 py-3 text-[13px] text-muted">There are no sites to rank yet: the site list is empty. Type a coordinate above to add one.</p>}
+          >
             {(bundle) => (
               <RankedList rows={bundle.rows} siteById={data.siteById} highlightedId={highlighted?.id ?? null} savedIds={new Set(saved.map((s) => s.id))} sharedVerdict={shared} />
             )}
@@ -119,7 +126,8 @@ export function SitesContent({ onClose, layout = 'pane' }: { onClose?: () => voi
         )}
       </div>
 
-      {highlighted ? (
+      {/* Compact horizon plot for the highlighted site (the site scene shows the full plot instead). */}
+      {highlighted && view !== 'scene' ? (
         <div className="border-t border-line px-3 py-2">
           <div className="mb-1 flex items-center justify-between gap-2">
             <p className="m-0 truncate text-[12px] font-medium">{highlighted.name}</p>
@@ -311,7 +319,6 @@ function SiteRow({ row, site, highlighted, saved, quietVerdict }: { row: RankedR
   const level = powerLevel(e.power_margin_percent);
   const fail = e.verdict.result === 'fail';
   const verdictText = fail ? `fail: ${e.verdict.requirement}` : 'pass';
-  const slipText = row.planned ? ` ${movedText(row.moved)} since the plan, score was ${row.planned.score}.` : '';
   return (
     <li
       data-site-id={row.siteId}
@@ -323,10 +330,13 @@ function SiteRow({ row, site, highlighted, saved, quietVerdict }: { row: RankedR
         className="block w-full rounded-lg px-2 py-1.5 pr-9 text-left"
         onClick={() => selectSite(site)}
         aria-pressed={highlighted}
-        aria-label={`${row.rank}. ${site.name}, score ${e.score}.${slipText} ${verdictText}. ${highlighted ? 'Highlighted. Press again to open the site scene.' : 'Press to highlight.'}`}
       >
+        <span className="sr-only">{highlighted ? 'Highlighted. Press again to open the site scene. ' : ''}</span>
         <span className="flex items-baseline gap-2">
-          <span className="num w-5 shrink-0 text-right text-[12px] text-muted">{row.rank}</span>
+          <span className="num w-5 shrink-0 text-right text-[12px] text-muted">
+            {row.rank}
+            <span className="sr-only">.</span>
+          </span>
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium" data-testid="row-name">
             {site.name}
           </span>
@@ -340,13 +350,16 @@ function SiteRow({ row, site, highlighted, saved, quietVerdict }: { row: RankedR
               ) : (
                 <span className="text-muted">=</span>
               )}
-              <span className="sr-only">{movedText(row.moved)}, score was {row.planned.score}, now {e.score}</span>
+              <span className="sr-only">
+                {movedText(row.moved)} since the plan, score was {row.planned.score}, now {e.score}.
+              </span>
               <span aria-hidden>
                 {row.planned.score}→{e.score}
               </span>
             </span>
           ) : null}
           <span className="num w-8 shrink-0 text-right text-[15px] font-semibold" aria-hidden={Boolean(row.planned)}>
+            <span className="sr-only">score </span>
             {e.score}
           </span>
         </span>
@@ -386,10 +399,19 @@ function SiteRow({ row, site, highlighted, saved, quietVerdict }: { row: RankedR
   );
 }
 
-/** Wide screens: the pane floats over the scene and can be dragged by its title bar. */
-export function FloatingSitesPane() {
+/**
+ * Wide screens: the pane floats over the scene and can be dragged by its title bar.
+ * View 2 starts it top left; view 3 starts it top right, clear of the horizon plot (bottom left)
+ * and the zoom buttons (bottom right).
+ */
+export function FloatingSitesPane({ side = 'left', top = 12, bottomReserve = 12 }: { side?: 'left' | 'right'; top?: number; bottomReserve?: number }) {
   const paneRef = useRef<HTMLElement>(null);
-  const [pos, setPos] = useState({ x: 12, y: 12 });
+  const [pos, setPos] = useState({ x: 12, y: top });
+  useLayoutEffect(() => {
+    const pane = paneRef.current;
+    const parent = pane?.parentElement;
+    if (side === 'right' && pane && parent) setPos({ x: Math.max(0, parent.clientWidth - pane.offsetWidth - 12), y: top });
+  }, [side, top]);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   const headingId = useId();
 
@@ -425,8 +447,8 @@ export function FloatingSitesPane() {
     <section
       ref={paneRef}
       aria-labelledby={headingId}
-      className="glass enter absolute z-20 flex max-h-[calc(100%-24px)] w-[min(400px,calc(100%-24px))] flex-col overflow-hidden rounded-xl"
-      style={{ left: pos.x, top: pos.y }}
+      className="glass enter absolute z-20 flex w-[min(400px,calc(100%-24px))] flex-col overflow-hidden rounded-xl"
+      style={{ left: pos.x, top: pos.y, maxHeight: `calc(100% - ${top + bottomReserve}px)` }}
       data-testid="sites-pane"
     >
       <div

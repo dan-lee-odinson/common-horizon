@@ -4,12 +4,14 @@ import { useEffect, useRef, type ReactNode } from 'react';
 
 export function Drawer({ open, side, label, onClose, children, testId }: { open: boolean; side: 'right' | 'bottom' | 'left'; label: string; onClose: () => void; children: ReactNode; testId?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     // Remember what opened the drawer and give focus back to it when the drawer closes.
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('keydown', onKey);
     ref.current?.focus();
@@ -17,7 +19,7 @@ export function Drawer({ open, side, label, onClose, children, testId }: { open:
       window.removeEventListener('keydown', onKey);
       if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open]);
 
   const closedTransform = side === 'right' ? 'translateX(100%)' : side === 'left' ? 'translateX(-100%)' : 'translateY(100%)';
   const placement =

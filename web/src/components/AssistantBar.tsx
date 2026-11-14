@@ -9,7 +9,7 @@ import { useData } from '../state/data';
 import { toIsoUtc } from '../util/time';
 import { Icon } from './Icon';
 
-type Status = 'waiting' | 'answer' | 'empty' | 'error' | 'unavailable';
+type Status = 'waiting' | 'answer' | 'empty' | 'error' | 'unavailable' | 'stopped';
 
 interface Exchange {
   id: number;
@@ -45,6 +45,8 @@ export function AssistantBar() {
     const q = text.trim();
     if (!q || unavailable) return;
     controller.current?.abort();
+    // A question still waiting is stopped by the new one; say so instead of leaving "Thinking…".
+    setLog((l) => l.map((x) => (x.status === 'waiting' && x.id !== replaceId ? { ...x, status: 'stopped' } : x)));
     const c = new AbortController();
     controller.current = c;
     const id = replaceId ?? nextId.current++;
@@ -169,6 +171,8 @@ function AnswerView({ x, onRetry }: { x: Exchange; onRetry: () => void }) {
           </button>
         </p>
       );
+    case 'stopped':
+      return <p className="m-0 mt-0.5 text-muted">Stopped: a newer question was asked.</p>;
     case 'unavailable':
       return (
         <p className="m-0 mt-0.5 text-muted" data-state="unavailable">

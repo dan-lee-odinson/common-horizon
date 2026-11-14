@@ -187,7 +187,7 @@ function PowerBalance({
       </div>
     );
   }
-  if (status === 'error') {
+  if (status === 'error' || status === 'unavailable') {
     return (
       <div role="alert">
         <p className="label m-0">Power balance</p>

@@ -300,7 +300,7 @@ export function evaluateSite(
     earth_link: earthLink,
     hardware_fits: fit.fits,
     energy_added_kwh: Math.round(genKwh - loadKwh),
-    power_margin_percent: stayMargin === null ? null : round(stayMargin, 1),
+    power_margin_percent: nullableRound(balance),
     verdict,
   };
   const check: CheckResponse = {

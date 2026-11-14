@@ -45,7 +45,9 @@ export function useAsync<T>(
       return;
     }
     const controller = new AbortController();
-    setState((s) => (s.data !== null && (s.status === 'answer' || s.status === 'empty') ? { ...s, refreshing: true } : { status: 'waiting', data: null, error: null, refreshing: false }));
+    setState((s) =>
+      s.data !== null && (s.status === 'answer' || s.status === 'empty') ? { ...s, refreshing: true } : { status: 'waiting', data: s.data, error: null, refreshing: false },
+    );
     const timer = setTimeout(() => {
       runRef
         .current(controller.signal)
@@ -57,7 +59,8 @@ export function useAsync<T>(
           if (controller.signal.aborted || isAbortError(err)) return;
           const unavailable = err instanceof ApiError && err.kind === 'unavailable';
           const message = err instanceof Error ? err.message : 'Something went wrong.';
-          setState({ status: unavailable ? 'unavailable' : 'error', data: null, error: message, refreshing: false });
+          // Keep the last good answer in `data` (for example the landing time) while showing the error.
+          setState((s) => ({ status: unavailable ? 'unavailable' : 'error', data: s.data, error: message, refreshing: false }));
         });
     }, debounceMs);
     return () => {

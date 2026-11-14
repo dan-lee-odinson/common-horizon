@@ -175,6 +175,7 @@ function SiteView({ webgl, isPhone }: { webgl: boolean; isPhone: boolean }) {
           {highlighted.name}
         </span>
       </div>
+      {!isPhone ? <FloatingSitesPane side="right" top={56} bottomReserve={96} /> : null}
       {!isPhone ? (
         <div className="absolute right-3 top-3 flex gap-2">
           <label className="btn select-none">

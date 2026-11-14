@@ -57,7 +57,5 @@ export function formatPercent(value: number | null | undefined, signed = false):
 export function formatKwh(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—';
   const sign = value > 0 ? '+' : value < 0 ? '−' : '';
-  const abs = Math.abs(value);
-  const text = abs >= 10_000 ? `${(abs / 1000).toFixed(1)} MWh` : `${Math.round(abs).toLocaleString('en-US')} kWh`;
-  return `${sign}${text}`;
+  return `${sign}${Math.round(Math.abs(value)).toLocaleString('en-US')} kWh`;
 }

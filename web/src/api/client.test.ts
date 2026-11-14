@@ -175,10 +175,12 @@ describe('live mode (VITE_API_BASE set)', () => {
     expect(JSON.parse(String(init?.body)).slip_days).toBe(5);
   });
 
-  it('maps HTTP 503 to "unavailable" and other failures to errors', async () => {
+  it('maps HTTP 503 from the assistant to "unavailable" and other failures to errors', async () => {
     vi.stubEnv('VITE_API_BASE', 'http://backend.test');
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 503 })));
     await expect(api.ask({ question: 'x', context: { site_id: null, launch_utc: LAUNCH, slip_days: 0, stay_days: 1, hardware: [] } })).rejects.toMatchObject({ kind: 'unavailable' });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 503 })));
+    await expect(api.evaluate(request(0))).rejects.toMatchObject({ kind: 'http', status: 503 });
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 500 })));
     await expect(api.health()).rejects.toMatchObject({ kind: 'http', status: 500 });
     vi.stubGlobal('fetch', vi.fn(async () => new Response('not json', { status: 200 })));

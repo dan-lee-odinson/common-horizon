@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DAY_MS, LTC_MICROSECONDS_PER_DAY, formatLtc, formatTimeShort, formatUtc, ltcOffsetMicros, parseDatetimeLocalUtc, toDatetimeLocalUtc, utcToLtcMicros } from './time';
+import { DAY_MS, LTC_MICROSECONDS_PER_DAY, formatHours, formatLtc, formatTimeShort, formatUtc, ltcOffsetMicros, parseDatetimeLocalUtc, toDatetimeLocalUtc, utcToLtcMicros } from './time';
 
 const LANDING = Date.UTC(2027, 1, 15, 15, 0, 0);
 
@@ -45,6 +45,15 @@ describe('LTC (model value) = UTC + 56.02 µs per day since landing', () => {
 
   it('formats UTC plainly', () => {
     expect(formatUtc(LANDING)).toBe('2027-02-15 15:00:00 UTC');
+  });
+});
+
+describe('durations', () => {
+  it('rounds before splitting into days and hours', () => {
+    expect(formatHours(71.9)).toBe('3 d');
+    expect(formatHours(743.5)).toBe('31 d');
+    expect(formatHours(335)).toBe('13 d 23 h');
+    expect(formatHours(47.4)).toBe('47 h');
   });
 });
 

@@ -36,6 +36,6 @@ describe('number formats', () => {
   it('signs energy', () => {
     expect(formatKwh(672)).toBe('+672 kWh');
     expect(formatKwh(-56)).toBe('−56 kWh');
-    expect(formatKwh(25_000)).toBe('+25.0 MWh');
+    expect(formatKwh(25_000)).toBe('+25,000 kWh');
   });
 });

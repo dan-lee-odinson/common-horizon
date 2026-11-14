@@ -55,6 +55,8 @@ test('plan a landing: hardware, ranking, slip, site scene and back', async ({ pa
   await row().click();
   await expect(page.getByTestId('back-to-moon')).toBeVisible();
   await expect(page.getByTestId('scene-title')).toHaveText(name);
+  // The Sites pane is part of the site scene too (a floating pane on desktop, a drawer on phones).
+  if (!phone) await expect(page.getByTestId('sites-pane')).toBeVisible();
   if (phone) await page.getByRole('button', { name: 'Horizon', exact: true }).click();
   await expect(page.getByTestId('horizon-full')).toBeVisible();
   await expect(page.getByTestId('horizon-full').getByTestId('ghost-marker')).toBeVisible();

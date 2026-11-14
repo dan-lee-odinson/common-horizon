@@ -319,7 +319,10 @@ function EdgeTracker({
         x = -x;
         y = -y;
       }
-      const inView = !behind && Math.abs(x) <= 0.96 && Math.abs(y) <= 0.94;
+      const hiddenByMoon = !behind && rayHitsMoon(camera.position, pos);
+      const inView = !behind && !hiddenByMoon && Math.abs(x) <= 0.96 && Math.abs(y) <= 0.94;
+      const text = el.querySelector<HTMLElement>('[data-label]');
+      if (text) text.textContent = hiddenByMoon ? `${text.dataset.label} (behind the Moon)` : (text.dataset.label ?? '');
       if (inView) {
         el.style.opacity = '0';
         continue;
@@ -340,6 +343,20 @@ function EdgeTracker({
   return null;
 }
 
+/** True when the straight line from the camera to a point passes through the Moon (radius 1). */
+function rayHitsMoon(from: THREE.Vector3, to: THREE.Vector3): boolean {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const dz = to.z - from.z;
+  const a = dx * dx + dy * dy + dz * dz;
+  const b = 2 * (from.x * dx + from.y * dy + from.z * dz);
+  const c = from.x * from.x + from.y * from.y + from.z * from.z - 1;
+  const disc = b * b - 4 * a * c;
+  if (disc <= 0) return false;
+  const t = (-b - Math.sqrt(disc)) / (2 * a);
+  return t > 0 && t < 1;
+}
+
 function EdgeArrow({ ref, label, color }: { ref: RefObject<HTMLDivElement | null>; label: string; color: string }) {
   return (
     <div
@@ -354,7 +371,7 @@ function EdgeArrow({ ref, label, color }: { ref: RefObject<HTMLDivElement | null
           <path d="M2 7h9M8 3.5 11.5 7 8 10.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
-      {label}
+      <span data-label={label}>{label}</span>
     </div>
   );
 }

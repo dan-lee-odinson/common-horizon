@@ -19,7 +19,7 @@
       "earth_link": "intermittent",
       "hardware_fits": true,
       "energy_added_kwh": 7367,
-      "power_margin_percent": 548.6,
+      "power_margin_percent": -100,
       "verdict": {
         "result": "fail",
         "requirement": "night power"
@@ -34,7 +34,7 @@
       "earth_link": "clear",
       "hardware_fits": true,
       "energy_added_kwh": 1410,
-      "power_margin_percent": 127.6,
+      "power_margin_percent": -100,
       "verdict": {
         "result": "fail",
         "requirement": "night power"
@@ -49,7 +49,7 @@
       "earth_link": "intermittent",
       "hardware_fits": false,
       "energy_added_kwh": 637,
-      "power_margin_percent": 59.3,
+      "power_margin_percent": -100,
       "verdict": {
         "result": "fail",
         "requirement": "hardware fit"

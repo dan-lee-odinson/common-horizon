@@ -46,7 +46,7 @@ function mock(): Promise<MockModule> {
   return mockModule;
 }
 
-async function http<T>(method: 'GET' | 'POST', path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+async function http<T>(method: 'GET' | 'POST', path: string, body: unknown, signal?: AbortSignal, unavailableOn503 = false): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${apiBase()}${path}`, {
@@ -59,7 +59,7 @@ async function http<T>(method: 'GET' | 'POST', path: string, body: unknown, sign
     if (isAbortError(err)) throw err;
     throw new ApiError('network', 'Could not reach the backend. Check that it is running and that VITE_API_BASE is right.');
   }
-  if (res.status === 503) {
+  if (res.status === 503 && unavailableOn503) {
     throw new ApiError('unavailable', 'The backend says this service is unavailable right now.', 503);
   }
   if (!res.ok) {
@@ -99,7 +99,7 @@ export const api = {
 
   /** The assistant answers in text only. It never changes the interface. */
   ask(req: AskRequest, signal?: AbortSignal): Promise<AskResponse> {
-    return isMockMode() ? mock().then((m) => m.ask(req, signal)) : http('POST', '/assistant', req, signal);
+    return isMockMode() ? mock().then((m) => m.ask(req, signal)) : http('POST', '/assistant', req, signal, true);
   },
 };
 

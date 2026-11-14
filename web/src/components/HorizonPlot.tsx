@@ -5,7 +5,7 @@
 // Under it: a timeline of lit and dark periods, a marker for "now" and, when the launch slipped,
 // a ghost marker at the planned landing.
 
-import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import type { EarthLink, HorizonResponse } from '../api/types';
 import { normalizeLon360, sampleProfile, wrap180 } from '../util/geo';
 import { formatHours, formatTime, formatTimeShort, HOUR_MS, type TimeScale } from '../util/time';
@@ -233,7 +233,7 @@ export function HorizonPlot(props: HorizonPlotProps) {
   const periods = useMemo(() => litPeriods(data), [data]);
   const sun = sunAt(data, times, nowMs);
   const plotW = g.W - g.left - g.right;
-  const clipId = `hz-clip-${compact ? 'c' : 'f'}-${data.site_id.replace(/[^a-z0-9-]/gi, '')}`;
+  const clipId = `hz-clip-${useId().replace(/[^a-z0-9-]/gi, '')}`;
 
   const elStep = niceStep(g.elMax - g.elMin);
   const elTicks: number[] = [];

@@ -82,7 +82,11 @@ export interface SiteEvaluation {
   hardware_fits: boolean;
   /** Net energy over the stay (generation minus load). Negative means a deficit. */
   energy_added_kwh: number;
-  /** Generation over load for the stay, as a margin. null when nothing draws power. */
+  /**
+   * The site's power balance margin: the lower of the day and night checks that apply during the
+   * stay (the same number the planner shows for this site). Colours the energy figure.
+   * null when nothing draws power.
+   */
   power_margin_percent: number | null;
   verdict: Verdict;
 }

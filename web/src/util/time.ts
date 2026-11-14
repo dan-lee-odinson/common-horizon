@@ -95,9 +95,10 @@ export function addDays(utcMs: number, days: number): number {
 /** "3 d 4 h" for durations, "45 h" for short ones. */
 export function formatHours(hours: number): string {
   if (!Number.isFinite(hours)) return '—';
-  if (hours < 48) return `${Math.round(hours)} h`;
-  const days = Math.floor(hours / 24);
-  const rest = Math.round(hours - days * 24);
+  const total = Math.round(hours); // round first, so 71.9 h reads "3 d", never "2 d 24 h"
+  if (total < 48) return `${total} h`;
+  const days = Math.floor(total / 24);
+  const rest = total - days * 24;
   return rest === 0 ? `${days} d` : `${days} d ${rest} h`;
 }
 
