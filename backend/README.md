@@ -84,7 +84,11 @@ docker run --rm -p 8080:8080 common-horizon-backend
 - The app writes nothing to disk, so it runs on Lambda's read-only filesystem.
 - Responses are capped (`MAX_SAMPLES`) to stay under Lambda's 6 MB synchronous payload limit.
 
-Nothing is deployed by this repository; deployment needs team authorisation.
+Every merge to `main` deploys this image: `.github/workflows/deploy-backend.yml` builds it,
+pushes it to the ECR repository `common-horizon-backend` (tagged with the commit SHA) and, if
+the Lambda function `common-horizon-backend` exists, updates the function to it. The workflow
+signs in to AWS through the OIDC role `common-horizon-deploy`; no AWS keys are stored. Changes
+to that workflow or to the AWS setup need team authorisation.
 
 ## Layout
 
