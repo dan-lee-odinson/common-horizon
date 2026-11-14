@@ -7,8 +7,9 @@
 # function does not exist yet, the run still succeeds and says so.
 #
 # The AWS role it assumes (common-horizon-deploy) trusts only the main branch
-# of this repository and may only push to the one ECR repository and update
-# the code of the one Lambda function named below.
+# of this repository and may only push to the one ECR repository, update the
+# code of the one Lambda function named below, and read that one function's
+# configuration (to wait for the update to finish).
 name: Deploy backend
 
 on:
@@ -90,9 +91,10 @@ jobs:
       # Only a "function not found" error is treated as success; any other
       # error (for example access denied) fails the run. The --query keeps the
       # output to three fields so the function's settings never reach this
-      # public log. Lambda applies the new image in the background, so a
-      # successful call means the update has started (LastUpdateStatus
-      # InProgress), not that it has finished.
+      # public log. Lambda applies the new image in the background, so after
+      # starting the update the step waits (up to 5 minutes, polling
+      # GetFunctionConfiguration) until Lambda reports it finished, and fails
+      # if Lambda reports the update failed.
       - name: Update the Lambda function if it exists
         run: |
           set -uo pipefail
@@ -101,8 +103,19 @@ jobs:
                 --image-uri "$IMAGE" \
                 --query '{State:State,LastUpdateStatus:LastUpdateStatus,CodeSha256:CodeSha256}' \
                 --output json 2>&1); then
-            echo "Update of $LAMBDA_FUNCTION to the new image has started; LastUpdateStatus below shows its state."
+            echo "Update of $LAMBDA_FUNCTION to the new image has started:"
             echo "$out"
+            echo "Waiting for Lambda to finish applying it (up to 5 minutes)..."
+            if aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION"; then
+              echo "Done: $LAMBDA_FUNCTION now runs the new image."
+            else
+              aws lambda get-function-configuration \
+                --function-name "$LAMBDA_FUNCTION" \
+                --query '{LastUpdateStatus:LastUpdateStatus,LastUpdateStatusReason:LastUpdateStatusReason}' \
+                --output json >&2 || true
+              echo "::error title=Lambda update did not finish::The update of $LAMBDA_FUNCTION failed or did not finish within 5 minutes; see the status above."
+              exit 1
+            fi
           elif grep -q 'ResourceNotFoundException' <<<"$out"; then
             echo "::notice title=Lambda not created yet::$LAMBDA_FUNCTION does not exist yet, so only the image was pushed. This is expected until the function is created."
           else
