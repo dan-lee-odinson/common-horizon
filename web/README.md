@@ -132,7 +132,11 @@ can pass these straight through:
   for example "power short at night". When the night check fails, the planner shows about how much
   storage would cover the picked site's darkness. Try the nuclear generator, then solar panels with
   batteries, at a site with long darkness and at one with short darkness.
-* **Assistant** (bottom, always).
+* **Assistant** (bottom, always): a one-line question box. Asking opens the conversation as a
+  semi-opaque panel floating over the bottom of the workspace, so nothing behind it moves or resizes.
+  It keeps the history of questions and answers (at least six lines tall, at most about 40 % of the
+  window, scrolling), has **Hide** (or Escape) and **Clear**, and new answers are announced to screen
+  readers. When hidden, a button beside the question box shows it again.
 * **View 1**: the Moon with Earth and the Sun in the directions the data gives. Earth is drawn at its
   true size beside the Moon (3.67 times the Moon's diameter) and the Sun larger than Earth, both much
   farther out than before; sizes and distances are still **not to scale**, and a note on screen says
