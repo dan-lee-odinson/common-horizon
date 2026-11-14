@@ -66,7 +66,7 @@ export function specFor({ height = DEFAULTS.height, panelWidth = DEFAULTS.panelW
     parameters: { height_m: height, panel_width_m: panelWidth, defaults: { height_m: DEFAULTS.height, panel_width_m: DEFAULTS.panelWidth } },
     simplifications: [
       'No published size is on file: the mast height and panel width are parameters (defaults 10 m and 4 m), and the 2 m square base, the panel height and the mast thickness are our estimates.',
-      'The solar blanket is one flat sheet split by the mast, with a bar along its top and bottom. Cells, wiring and the sun-tracking drive are not shown.',
+      'The solar blanket is one flat sheet split by the mast, with a bar along its top and bottom and a plain grid of lighter strips standing in for cell rows. Individual cells, wiring and the sun-tracking drive are not shown.',
       'No markings or lettering.',
     ],
     built_by: 'tools/models/solar-array-mast.mjs',
@@ -81,6 +81,7 @@ export function build(params = {}) {
   const baseGrey = plainMaterial('base-grey', 0x60656c, { metalness: 0.2, roughness: 0.6 });
   const mastGrey = plainMaterial('mast-grey', 0xa9aeb5, { metalness: 0.3, roughness: 0.45 });
   const cellBlue = plainMaterial('cell-blue', 0x243a6e, { metalness: 0.2, roughness: 0.35 });
+  const cellFrame = plainMaterial('cell-frame', 0x9aa3b0, { metalness: 0.2, roughness: 0.5 });
 
   const half = BASE_SIZE / 2;
   const base = new Part('base')
@@ -107,6 +108,27 @@ export function build(params = {}) {
       cylinder({ radius: 0.02, bottom: blanketBottom, top: blanketTop, x: -w + 0.02, segments: 8 }), // edge rods
       cylinder({ radius: 0.02, bottom: blanketBottom, top: blanketTop, x: w - 0.02, segments: 8 }),
     );
+
+  // Cell grid: thin, lighter strips on both faces, about every 0.5 m across and 1 m up, so the
+  // blanket reads as a solar array rather than a plain sheet. No markings.
+  const strip = 0.015;
+  const raise = 0.01;
+  for (const [a, b] of [[-w, -gap], [gap, w]]) {
+    const columns = Math.max(1, Math.round((b - a) / 0.5));
+    const rows = Math.max(1, Math.round((blanketTop - blanketBottom) / 1.0));
+    for (const face of [1, -1]) {
+      const z0 = face > 0 ? t : -t - raise;
+      const z1 = face > 0 ? t + raise : -t;
+      for (let k = 1; k < columns; k++) {
+        const x = a + (k * (b - a)) / columns;
+        array.add(cellFrame, box([x - strip, blanketBottom, z0], [x + strip, blanketTop, z1]));
+      }
+      for (let k = 1; k < rows; k++) {
+        const y = blanketBottom + (k * (blanketTop - blanketBottom)) / rows;
+        array.add(cellFrame, box([a, y - strip, z0], [b, y + strip, z1]));
+      }
+    }
+  }
 
   return { scene: assemble(spec.id, [base, mast, array]), spec };
 }

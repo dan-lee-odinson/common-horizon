@@ -42,11 +42,11 @@
       "panel_width_m": 4
     }
   },
-  "triangles": 380,
+  "triangles": 812,
   "triangle_limit": 20000,
   "simplifications": [
     "No published size is on file: the mast height and panel width are parameters (defaults 10 m and 4 m), and the 2 m square base, the panel height and the mast thickness are our estimates.",
-    "The solar blanket is one flat sheet split by the mast, with a bar along its top and bottom. Cells, wiring and the sun-tracking drive are not shown.",
+    "The solar blanket is one flat sheet split by the mast, with a bar along its top and bottom and a plain grid of lighter strips standing in for cell rows. Individual cells, wiring and the sun-tracking drive are not shown.",
     "No markings or lettering."
   ],
   "built_by": "tools/models/solar-array-mast.mjs"
