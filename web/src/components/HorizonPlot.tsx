@@ -8,7 +8,7 @@
 import { useMemo, useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import type { EarthLink, HorizonResponse } from '../api/types';
 import { normalizeLon360, sampleProfile, wrap180 } from '../util/geo';
-import { formatHours, formatTime, HOUR_MS, type TimeScale } from '../util/time';
+import { formatHours, formatTime, formatTimeShort, HOUR_MS, type TimeScale } from '../util/time';
 import { formatPercent } from '../util/power';
 
 export interface HorizonReadouts {
@@ -416,10 +416,10 @@ export function HorizonPlot(props: HorizonPlotProps) {
         {!compact ? (
           <>
             <text x={g.left} y={TL_H - 3} fontSize={10} fill="var(--ch-muted)" className="num">
-              {formatTime(windowStartMs, timeScale, landingMs).replace(/:\d\d(\.\d+)? /, ' ')}
+              {formatTimeShort(windowStartMs, timeScale, landingMs)}
             </text>
             <text x={g.W - g.right} y={TL_H - 3} textAnchor="end" fontSize={10} fill="var(--ch-muted)" className="num">
-              {formatTime(windowEndMs, timeScale, landingMs).replace(/:\d\d(\.\d+)? /, ' ')}
+              {formatTimeShort(windowEndMs, timeScale, landingMs)}
             </text>
           </>
         ) : null}

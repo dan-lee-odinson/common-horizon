@@ -52,6 +52,13 @@ export function formatTime(utcMs: number, scale: TimeScale, landingUtcMs: number
   return scale === 'UTC' ? formatUtc(utcMs) : formatLtc(utcMs, landingUtcMs);
 }
 
+/** Short label rounded to the minute: "2027-02-15 15:00 UTC" or "2027-02-15 15:00 LTC". */
+export function formatTimeShort(utcMs: number, scale: TimeScale, landingUtcMs: number): string {
+  const ms = scale === 'UTC' ? utcMs : utcToLtcMicros(utcMs, landingUtcMs) / 1000;
+  const d = new Date(Math.round(ms / 60_000) * 60_000);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} ${scale}`;
+}
+
 /** "+1.234 ms" style offset text for the LTC note. */
 export function formatLtcOffset(utcMs: number, landingUtcMs: number): string {
   const us = ltcOffsetMicros(utcMs, landingUtcMs);
