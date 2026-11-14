@@ -1,0 +1,1033 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Common Horizon API",
+    "summary": "Lunar landing-site Sun/Earth visibility evaluation",
+    "description": "\nBackend bridge between the Common Horizon website and the lunar physics engine.\n\n**The physics engine calculates; the backend validates and passes results through.**\nEvery response states its data source in `provenance`. While the real engine is\nbeing integrated, responses come from a clearly labelled synthetic fixture\n(`provenance.is_synthetic = true`).\n\nUnits are part of every field name: `_deg` degrees, `_m` metres, `_km` kilometres,\n`_s` seconds, `_hours`, `_days`, `_utc` ISO 8601 timestamps in UTC.\n",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness and configuration check",
+        "description": "Always cheap: used as the AWS Lambda Web Adapter readiness check. Never runs the engine.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/missions/evaluate": {
+      "post": {
+        "tags": [
+          "missions"
+        ],
+        "summary": "Evaluate one landing site and mission window",
+        "description": "Returns Sun/Earth time series, mission metrics, communication windows,\nrequirement checks and (optionally) a launch-delay comparison.\n\nCheck ``provenance.is_synthetic`` (also sent as the ``X-Data-Source`` header):\nsynthetic fixtures are placeholders, not physics results.",
+        "operationId": "evaluate_api_v1_missions_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionEvaluation"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Engine output violated the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Physics engine unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BodyTimeseries": {
+        "properties": {
+          "position_km": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "type": "array",
+            "title": "Position Km",
+            "description": "Body position, km, MOON_ME frame, origin at the Moon's centre."
+          },
+          "direction_unit": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array",
+              "maxItems": 3,
+              "minItems": 3
+            },
+            "type": "array",
+            "title": "Direction Unit",
+            "description": "Unit vector from the observer to the body, MOON_ME frame."
+          },
+          "azimuth_deg": {
+            "items": {
+              "type": "number",
+              "exclusiveMaximum": 360.0,
+              "minimum": 0.0
+            },
+            "type": "array",
+            "title": "Azimuth Deg",
+            "description": "Azimuth, degrees clockwise from local north, 0..360."
+          },
+          "elevation_deg": {
+            "items": {
+              "type": "number",
+              "maximum": 90.0,
+              "minimum": -90.0
+            },
+            "type": "array",
+            "title": "Elevation Deg",
+            "description": "Elevation above the local horizontal plane, degrees."
+          },
+          "visibility_fraction": {
+            "items": {
+              "type": "number",
+              "maximum": 1.0,
+              "minimum": 0.0
+            },
+            "type": "array",
+            "title": "Visibility Fraction",
+            "description": "Fraction of the body's disc visible above terrain, 0..1."
+          },
+          "obstruction_state": {
+            "items": {
+              "$ref": "#/components/schemas/ObstructionState"
+            },
+            "type": "array",
+            "title": "Obstruction State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "position_km",
+          "direction_unit",
+          "azimuth_deg",
+          "elevation_deg",
+          "visibility_fraction",
+          "obstruction_state"
+        ],
+        "title": "BodyTimeseries",
+        "description": "Sun or Earth as seen from the observer, one entry per timestamp."
+      },
+      "DataProvenance": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "is_synthetic": {
+            "type": "boolean",
+            "title": "Is Synthetic",
+            "description": "True when the numbers are placeholder fixtures, not physics results."
+          },
+          "engine_name": {
+            "type": "string",
+            "title": "Engine Name"
+          },
+          "engine_version": {
+            "type": "string",
+            "title": "Engine Version"
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "description": "Human-readable statement of where the numbers come from."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "is_synthetic",
+          "engine_name",
+          "engine_version",
+          "notice"
+        ],
+        "title": "DataProvenance"
+      },
+      "DataSource": {
+        "type": "string",
+        "enum": [
+          "synthetic",
+          "physics_engine"
+        ],
+        "title": "DataSource"
+      },
+      "EngineStatus": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "is_synthetic": {
+            "type": "boolean",
+            "title": "Is Synthetic"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "version",
+          "is_synthetic",
+          "available"
+        ],
+        "title": "EngineStatus"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HardwareRequirements": {
+        "properties": {
+          "min_sunlight_percentage": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Sunlight Percentage",
+            "description": "Minimum share of the stay with the Sun visible, percent."
+          },
+          "min_sunlight_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Sunlight Hours",
+            "description": "Minimum total hours with the Sun visible during the stay."
+          },
+          "max_darkness_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Darkness Hours",
+            "description": "Longest continuous darkness the hardware can survive, hours."
+          },
+          "min_earth_visibility_percentage": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Earth Visibility Percentage",
+            "description": "Minimum share of the stay with Earth visible, percent."
+          },
+          "min_earth_visibility_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Earth Visibility Hours",
+            "description": "Minimum total hours with Earth visible during the stay."
+          },
+          "max_slope_deg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Slope Deg",
+            "description": "Maximum landing-site slope the hardware tolerates, degrees."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "HardwareRequirements",
+        "description": "Pass/fail thresholds for a lander or payload. Every field is optional."
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "contract_version": {
+            "type": "string",
+            "title": "Contract Version"
+          },
+          "physics_engine": {
+            "$ref": "#/components/schemas/EngineStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "service",
+          "version",
+          "contract_version",
+          "physics_engine"
+        ],
+        "title": "HealthResponse"
+      },
+      "LandingSite": {
+        "properties": {
+          "latitude_deg": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude Deg",
+            "description": "Selenographic latitude in degrees, north positive (MOON_ME frame).",
+            "examples": [
+              -89.5
+            ]
+          },
+          "longitude_deg": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude Deg",
+            "description": "Selenographic longitude in degrees, east positive, range -180..180 (MOON_ME frame).",
+            "examples": [
+              -45.0
+            ]
+          },
+          "altitude_m": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 11000.0,
+                "minimum": -10000.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Altitude M",
+            "description": "Site elevation in metres relative to the 1737.4 km lunar reference sphere. Null means the engine derives it from terrain data.",
+            "examples": [
+              1200.0
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "latitude_deg",
+          "longitude_deg"
+        ],
+        "title": "LandingSite"
+      },
+      "LaunchDelayCase": {
+        "properties": {
+          "launch_delay_days": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Launch Delay Days"
+          },
+          "mission_start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Mission Start Utc"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/MissionMetrics"
+          },
+          "requirements_passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements Passed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "launch_delay_days",
+          "mission_start_utc",
+          "metrics",
+          "requirements_passed"
+        ],
+        "title": "LaunchDelayCase"
+      },
+      "MissionEvaluation": {
+        "properties": {
+          "contract_version": {
+            "type": "string",
+            "title": "Contract Version"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/DataProvenance"
+          },
+          "mission": {
+            "$ref": "#/components/schemas/MissionInput",
+            "description": "The validated, normalised request."
+          },
+          "site": {
+            "$ref": "#/components/schemas/SiteInfo"
+          },
+          "timeseries": {
+            "$ref": "#/components/schemas/Timeseries"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/MissionMetrics"
+          },
+          "communication_windows": {
+            "items": {
+              "$ref": "#/components/schemas/TimeWindow"
+            },
+            "type": "array",
+            "title": "Communication Windows"
+          },
+          "terrain_skyline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TerrainSkyline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requirement_results": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementResult"
+            },
+            "type": "array",
+            "title": "Requirement Results"
+          },
+          "requirements_passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements Passed",
+            "description": "Null when no requirements were given or checkable."
+          },
+          "launch_delay_results": {
+            "items": {
+              "$ref": "#/components/schemas/LaunchDelayCase"
+            },
+            "type": "array",
+            "title": "Launch Delay Results",
+            "description": "Empty unless launch_delay_days > 0; then includes the 0-day baseline."
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contract_version",
+          "provenance",
+          "mission",
+          "site",
+          "timeseries",
+          "metrics",
+          "communication_windows",
+          "requirement_results",
+          "requirements_passed",
+          "launch_delay_results",
+          "warnings"
+        ],
+        "title": "MissionEvaluation",
+        "description": "Full response of ``POST /api/v1/missions/evaluate``."
+      },
+      "MissionInput": {
+        "properties": {
+          "landing_site": {
+            "$ref": "#/components/schemas/LandingSite"
+          },
+          "observer_height_m": {
+            "type": "number",
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Observer Height M",
+            "description": "Height of the observer (camera, antenna, panel) above the local surface, metres.",
+            "default": 0.0
+          },
+          "mission_start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Mission Start Utc",
+            "description": "Mission start as an ISO 8601 string with an explicit timezone, e.g. 2027-01-15T00:00:00Z. Normalised to UTC."
+          },
+          "stay_duration_days": {
+            "type": "number",
+            "maximum": 365.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Stay Duration Days",
+            "description": "Length of the surface stay, days."
+          },
+          "time_step_s": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 60.0,
+            "title": "Time Step S",
+            "description": "Simulation resolution: seconds between samples."
+          },
+          "launch_delay_days": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Launch Delay Days",
+            "description": "Maximum launch slip to analyse, whole days. 0 disables the analysis; otherwise the mission is re-evaluated for delays 0, step, 2*step, ... up to this value.",
+            "default": 0
+          },
+          "launch_delay_step_days": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Launch Delay Step Days",
+            "description": "Spacing between analysed launch delays, whole days.",
+            "default": 1
+          },
+          "hardware_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.\\-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hardware Id",
+            "description": "Identifier of the selected lander or payload (letters, digits, '.', '_', '-')."
+          },
+          "hardware_requirements": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HardwareRequirements"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "landing_site",
+          "mission_start_utc",
+          "stay_duration_days",
+          "time_step_s"
+        ],
+        "title": "MissionInput",
+        "examples": [
+          {
+            "hardware_id": "example-lander-01",
+            "hardware_requirements": {
+              "max_darkness_hours": 72,
+              "min_earth_visibility_percentage": 30,
+              "min_sunlight_percentage": 50
+            },
+            "landing_site": {
+              "latitude_deg": -89.5,
+              "longitude_deg": -45.0
+            },
+            "launch_delay_days": 5,
+            "launch_delay_step_days": 1,
+            "mission_start_utc": "2027-01-15T00:00:00Z",
+            "observer_height_m": 2.0,
+            "stay_duration_days": 14,
+            "time_step_s": 3600
+          }
+        ]
+      },
+      "MissionMetrics": {
+        "properties": {
+          "sunlight_hours": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Sunlight Hours"
+          },
+          "sunlight_percentage": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Sunlight Percentage"
+          },
+          "longest_sunlight_hours": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Longest Sunlight Hours"
+          },
+          "longest_darkness_hours": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Longest Darkness Hours"
+          },
+          "earth_visibility_hours": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Earth Visibility Hours"
+          },
+          "earth_visibility_percentage": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Earth Visibility Percentage"
+          },
+          "sky_visibility_fraction": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sky Visibility Fraction",
+            "description": "Fraction of the sky hemisphere not blocked by terrain."
+          },
+          "time_to_sunset_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Sunset Hours",
+            "description": "Hours from mission start to the first sunset; null if none occurs."
+          },
+          "sunset_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sunset Utc"
+          },
+          "time_to_earthset_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time To Earthset Hours",
+            "description": "Hours from mission start to the first Earthset; null if none occurs."
+          },
+          "earthset_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earthset Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sunlight_hours",
+          "sunlight_percentage",
+          "longest_sunlight_hours",
+          "longest_darkness_hours",
+          "earth_visibility_hours",
+          "earth_visibility_percentage"
+        ],
+        "title": "MissionMetrics"
+      },
+      "ObstructionState": {
+        "type": "string",
+        "enum": [
+          "visible",
+          "partial",
+          "terrain_blocked",
+          "below_horizon"
+        ],
+        "title": "ObstructionState",
+        "description": "Why a body is (not) visible from the observer."
+      },
+      "RequirementResult": {
+        "properties": {
+          "requirement": {
+            "type": "string",
+            "title": "Requirement",
+            "description": "Name of the field in hardware_requirements."
+          },
+          "metric": {
+            "type": "string",
+            "title": "Metric",
+            "description": "Metric the threshold is compared against."
+          },
+          "comparison": {
+            "type": "string",
+            "enum": [
+              ">=",
+              "<="
+            ],
+            "title": "Comparison"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "actual": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed",
+            "description": "Null when the engine did not provide the metric."
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement",
+          "metric",
+          "comparison",
+          "threshold",
+          "actual",
+          "unit",
+          "passed"
+        ],
+        "title": "RequirementResult"
+      },
+      "SiteInfo": {
+        "properties": {
+          "latitude_deg": {
+            "type": "number",
+            "title": "Latitude Deg"
+          },
+          "longitude_deg": {
+            "type": "number",
+            "title": "Longitude Deg"
+          },
+          "elevation_m": {
+            "type": "number",
+            "title": "Elevation M",
+            "description": "Site elevation relative to the 1737.4 km reference sphere, metres."
+          },
+          "elevation_source": {
+            "type": "string",
+            "enum": [
+              "input",
+              "terrain_model",
+              "synthetic_default"
+            ],
+            "title": "Elevation Source"
+          },
+          "slope_deg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope Deg",
+            "description": "Local terrain slope, degrees."
+          }
+        },
+        "type": "object",
+        "required": [
+          "latitude_deg",
+          "longitude_deg",
+          "elevation_m",
+          "elevation_source"
+        ],
+        "title": "SiteInfo"
+      },
+      "TerrainSkyline": {
+        "properties": {
+          "azimuth_deg": {
+            "items": {
+              "type": "number",
+              "exclusiveMaximum": 360.0,
+              "minimum": 0.0
+            },
+            "type": "array",
+            "title": "Azimuth Deg"
+          },
+          "horizon_elevation_deg": {
+            "items": {
+              "type": "number",
+              "maximum": 90.0,
+              "minimum": -90.0
+            },
+            "type": "array",
+            "title": "Horizon Elevation Deg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "azimuth_deg",
+          "horizon_elevation_deg"
+        ],
+        "title": "TerrainSkyline",
+        "description": "Terrain horizon profile around the site (angular elevation per azimuth)."
+      },
+      "TimeWindow": {
+        "properties": {
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          },
+          "duration_hours": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Duration Hours"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_utc",
+          "end_utc",
+          "duration_hours"
+        ],
+        "title": "TimeWindow"
+      },
+      "Timeseries": {
+        "properties": {
+          "frame": {
+            "type": "string",
+            "const": "MOON_ME",
+            "title": "Frame",
+            "default": "MOON_ME"
+          },
+          "timestamps_utc": {
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "type": "array",
+            "minItems": 2,
+            "title": "Timestamps Utc"
+          },
+          "sun": {
+            "$ref": "#/components/schemas/BodyTimeseries"
+          },
+          "earth": {
+            "$ref": "#/components/schemas/BodyTimeseries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamps_utc",
+          "sun",
+          "earth"
+        ],
+        "title": "Timeseries"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

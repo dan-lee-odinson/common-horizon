@@ -1,0 +1,19 @@
+[project]
+name = "common-horizon-backend"
+version = "0.1.0"
+description = "FastAPI backend bridging the Common Horizon website and the lunar physics engine"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+filterwarnings = [
+    "error",
+    # Emitted by starlette's TestClient when used with httpx; harmless for tests.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"

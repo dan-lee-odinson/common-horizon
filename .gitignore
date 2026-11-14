@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Private local notes: personal coordination, meeting notes, timelines. Never committed.
+/.local-notes/
