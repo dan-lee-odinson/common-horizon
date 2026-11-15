@@ -3,7 +3,7 @@
  "format_version": 1,
  "what": "Heights around each preset site, in meters above the horizontal plane through the site. Row 0 is the north edge, column 0 the west edge. Little-endian 32-bit floats, row by row.",
  "source": "NASA Moon Trek (https://trek.nasa.gov/moon/), LOLA elevation layers, subset service https://trek.nasa.gov/moon/TrekWS/rest/transform/latlon/subset/stream/tiff",
- "fetched_utc": "2026-11-15T19:04:57Z",
+ "fetched_utc": "2026-11-15T19:10:01Z",
  "sites": {
   "shackleton-ridge": {
    "latitude_deg": -89.684,
@@ -28,7 +28,15 @@
     "min_m": -5067.3,
     "max_m": 206.8,
     "curvature": "included"
-   }
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 1.33,
+    "highest_at_azimuth_deg": 55.5,
+    "lowest_deg": -5.68,
+    "share_of_directions_above_1_deg": 0.025
+   },
+   "engine_sunlight_uses_terrain_skyline": true
   },
   "nobile": {
    "latitude_deg": -85.42088,
@@ -53,7 +61,15 @@
     "min_m": -8618.6,
     "max_m": 341.4,
     "curvature": "included"
-   }
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 6.86,
+    "highest_at_azimuth_deg": 30.0,
+    "lowest_deg": -4.76,
+    "share_of_directions_above_1_deg": 0.392
+   },
+   "engine_sunlight_uses_terrain_skyline": true
   },
   "apollo-11": {
    "latitude_deg": 0.67416,
@@ -67,7 +83,26 @@
     "site_elevation_m": -1927.5,
     "min_m": -12.0,
     "max_m": 13.6
-   }
+   },
+   "far": {
+    "file": "apollo-11.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -1927.5,
+    "min_m": -699.2,
+    "max_m": 227.2,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 1.17,
+    "highest_at_azimuth_deg": 270.0,
+    "lowest_deg": -0.64,
+    "share_of_directions_above_1_deg": 0.015
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   },
   "apollo-12": {
    "latitude_deg": -3.0128,
@@ -81,7 +116,26 @@
     "site_elevation_m": -1429.3,
     "min_m": -9.0,
     "max_m": 12.5
-   }
+   },
+   "far": {
+    "file": "apollo-12.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -1429.3,
+    "min_m": -713.9,
+    "max_m": 52.3,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 1.19,
+    "highest_at_azimuth_deg": 53.0,
+    "lowest_deg": -0.35,
+    "share_of_directions_above_1_deg": 0.086
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   },
   "apollo-14": {
    "latitude_deg": -3.64589,
@@ -95,7 +149,26 @@
     "site_elevation_m": -1059.4,
     "min_m": -10.4,
     "max_m": 15.7
-   }
+   },
+   "far": {
+    "file": "apollo-14.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -1059.4,
+    "min_m": -1041.7,
+    "max_m": 285.9,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 3.48,
+    "highest_at_azimuth_deg": 69.0,
+    "lowest_deg": -0.1,
+    "share_of_directions_above_1_deg": 0.501
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   },
   "apollo-15": {
    "latitude_deg": 26.13239,
@@ -109,7 +182,26 @@
     "site_elevation_m": -1925.6,
     "min_m": -15.3,
     "max_m": 8.2
-   }
+   },
+   "far": {
+    "file": "apollo-15.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -1925.6,
+    "min_m": -1230.8,
+    "max_m": 3934.3,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 13.49,
+    "highest_at_azimuth_deg": 180.0,
+    "lowest_deg": 0.1,
+    "share_of_directions_above_1_deg": 0.724
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   },
   "apollo-16": {
    "latitude_deg": -8.9734,
@@ -123,7 +215,26 @@
     "site_elevation_m": 14.7,
     "min_m": -31.6,
     "max_m": 25.3
-   }
+   },
+   "far": {
+    "file": "apollo-16.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": 14.7,
+    "min_m": -621.8,
+    "max_m": 804.0,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 5.35,
+    "highest_at_azimuth_deg": 164.5,
+    "lowest_deg": -0.07,
+    "share_of_directions_above_1_deg": 0.607
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   },
   "apollo-17": {
    "latitude_deg": 20.1911,
@@ -137,7 +248,26 @@
     "site_elevation_m": -2626.8,
     "min_m": -16.2,
     "max_m": 16.7
-   }
+   },
+   "far": {
+    "file": "apollo-17.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -2626.8,
+    "min_m": -792.3,
+    "max_m": 2364.6,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 14.03,
+    "highest_at_azimuth_deg": 358.0,
+    "lowest_deg": -0.05,
+    "share_of_directions_above_1_deg": 0.975
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   },
   "im-1-odysseus": {
    "latitude_deg": -80.13,
@@ -162,7 +292,15 @@
     "min_m": -3638.6,
     "max_m": 530.2,
     "curvature": "included"
-   }
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 11.49,
+    "highest_at_azimuth_deg": 149.0,
+    "lowest_deg": -0.82,
+    "share_of_directions_above_1_deg": 0.756
+   },
+   "engine_sunlight_uses_terrain_skyline": true
   },
   "im-2-athena": {
    "latitude_deg": -84.7906,
@@ -187,7 +325,15 @@
     "min_m": -6889.7,
     "max_m": 1467.6,
     "curvature": "included"
-   }
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 4.06,
+    "highest_at_azimuth_deg": 117.5,
+    "lowest_deg": -1.48,
+    "share_of_directions_above_1_deg": 0.454
+   },
+   "engine_sunlight_uses_terrain_skyline": true
   },
   "blue-ghost-m1": {
    "latitude_deg": 18.562,
@@ -201,7 +347,26 @@
     "site_elevation_m": -3652.8,
     "min_m": -3.7,
     "max_m": 7.4
-   }
+   },
+   "far": {
+    "file": "blue-ghost-m1.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -3652.8,
+    "min_m": -572.9,
+    "max_m": 144.1,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 2.22,
+    "highest_at_azimuth_deg": 138.5,
+    "lowest_deg": -0.15,
+    "share_of_directions_above_1_deg": 0.143
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   },
   "im-3-reiner-gamma": {
    "latitude_deg": 7.585,
@@ -215,7 +380,26 @@
     "site_elevation_m": -1769.7,
     "min_m": -20.3,
     "max_m": 7.0
-   }
+   },
+   "far": {
+    "file": "im-3-reiner-gamma.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -1769.7,
+    "min_m": -737.2,
+    "max_m": 63.0,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 0.79,
+    "highest_at_azimuth_deg": 113.5,
+    "lowest_deg": 0.03,
+    "share_of_directions_above_1_deg": 0.0
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   },
   "blue-ghost-m2": {
    "latitude_deg": -24.9,
@@ -229,7 +413,26 @@
     "site_elevation_m": -3577.9,
     "min_m": -115.5,
     "max_m": 12.8
-   }
+   },
+   "far": {
+    "file": "blue-ghost-m2.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -3577.9,
+    "min_m": -1002.4,
+    "max_m": 2999.5,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 3.14,
+    "highest_at_azimuth_deg": 94.5,
+    "lowest_deg": -0.5,
+    "share_of_directions_above_1_deg": 0.7
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   },
   "blue-ghost-m3": {
    "latitude_deg": 36.56,
@@ -243,7 +446,26 @@
     "site_elevation_m": -475.8,
     "min_m": -69.9,
     "max_m": 58.7
-   }
+   },
+   "far": {
+    "file": "blue-ghost-m3.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -475.8,
+    "min_m": -2297.2,
+    "max_m": 141.9,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 4.79,
+    "highest_at_azimuth_deg": 246.5,
+    "lowest_deg": -0.83,
+    "share_of_directions_above_1_deg": 0.572
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   },
   "draper-cp12": {
    "latitude_deg": -75.0,
@@ -268,7 +490,15 @@
     "min_m": -1207.7,
     "max_m": 2012.9,
     "curvature": "included"
-   }
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 3.81,
+    "highest_at_azimuth_deg": 239.5,
+    "lowest_deg": 0.06,
+    "share_of_directions_above_1_deg": 0.508
+   },
+   "engine_sunlight_uses_terrain_skyline": true
   },
   "chandrayaan-3": {
    "latitude_deg": -69.373,
@@ -293,7 +523,15 @@
     "min_m": -1387.5,
     "max_m": 1359.5,
     "curvature": "included"
-   }
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 2.4,
+    "highest_at_azimuth_deg": 347.5,
+    "lowest_deg": 0.4,
+    "share_of_directions_above_1_deg": 0.517
+   },
+   "engine_sunlight_uses_terrain_skyline": true
   },
   "slim": {
    "latitude_deg": -13.316,
@@ -307,7 +545,26 @@
     "site_elevation_m": -927.3,
     "min_m": -98.0,
     "max_m": 104.4
-   }
+   },
+   "far": {
+    "file": "slim.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -927.3,
+    "min_m": -4316.2,
+    "max_m": 3408.5,
+    "curvature": "included"
+   },
+   "skyline_from_these_files": {
+    "what": "highest ground in view from 2 m above the site, out to 31.9 km, worked out from these two files",
+    "highest_deg": 9.7,
+    "highest_at_azimuth_deg": 349.5,
+    "lowest_deg": -1.17,
+    "share_of_directions_above_1_deg": 0.808
+   },
+   "engine_sunlight_uses_terrain_skyline": false
   }
  }
 }

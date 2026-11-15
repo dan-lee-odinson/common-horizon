@@ -8,8 +8,8 @@ from NASA's Lunar Orbiter Laser Altimeter (LOLA) elevation models, fetched throu
 | File | Covers | Posts | Spacing |
 |---|---|---|---|
 | `<site>.near.f32` (all 17 sites) | 1.28 km across, centered on the site | 129 x 129 | 10 m |
-| `<site>.far.f32` (the six sites south of 60° S) | 64 km across, centered on the site | 257 x 257 | 250 m |
-| `manifest.json` | For each file: the Moon Trek layer, its pixel size, the site's elevation, lowest and highest value | | |
+| `<site>.far.f32` (all 17 sites) | 64 km across, centered on the site | 257 x 257 | 250 m |
+| `manifest.json` | For each file: the Moon Trek layer, its pixel size, the site's elevation, lowest and highest value. For each site: how high the ground rises on the skyline, and whether the physics engine's sunlight numbers include terrain there | | |
 
 ## Format
 
@@ -26,21 +26,48 @@ from NASA's Lunar Orbiter Laser Altimeter (LOLA) elevation models, fetched throu
   `https://trek.nasa.gov/moon/TrekWS/rest/transform/latlon/subset/stream/tiff`.
 - **Fetched:** 15 November 2026 with `tools/site-terrain/fetch_site_terrain.py`.
 
-| Sites | Moon Trek layer | Pixel size |
-|---|---|---|
-| Shackleton Connecting Ridge, near | `LRO_LOLA_DEM_SPole875_5mp_v04` | 5 m |
-| Nobile, IM-1, IM-2, Draper, near | `LRO_LOLA_DEM_SPole75_30mp_v04` | 30 m |
-| The other twelve sites, near | `LRO_LOLA_DEM_Global_128ppd_v04` | about 237 m |
-| All six far files | `LRO_LOLA_DEM_SPole45_100mp_v04` | 100 m |
+| Sites | File | Moon Trek layer | Pixel size |
+|---|---|---|---|
+| Shackleton Connecting Ridge | near | `LRO_LOLA_DEM_SPole875_5mp_v04` | 5 m |
+| Nobile, IM-1, IM-2, Draper | near | `LRO_LOLA_DEM_SPole75_30mp_v04` | 30 m |
+| The other twelve sites | near | `LRO_LOLA_DEM_Global_128ppd_v04` | about 237 m |
+| The six sites south of 60° S | far | `LRO_LOLA_DEM_SPole45_100mp_v04` | 100 m |
+| The other eleven sites | far | `LRO_LOLA_DEM_Global_128ppd_v04` | about 237 m |
 
-The near grid is finer than the 237 m model at the twelve sites that use it, so there the ground
-is a smooth surface through that model's heights, with no small-scale detail.
+Where a grid is finer than the 237 m model it was made from, the ground is a smooth surface
+through that model's heights, with no small-scale detail.
+
+## The drawn ground and the sunlight numbers
+
+The physics engine works out sunlight with a stored terrain skyline at six sites and with a
+smooth horizon at the other eleven. At those eleven the drawn terrain is not in the sunlight
+numbers. The table gives the highest ground in view from 2 m above each site, out to 31.9 km,
+worked out from these files (`skyline_from_these_files` in the manifest).
+
+| Site | Engine's sunlight uses | Highest ground in view | Toward (clockwise from north) | Directions above 1° |
+|---|---|---|---|---|
+| IM-1 Odysseus | terrain skyline | 11.49° | 149° | 76% |
+| Nobile region | terrain skyline | 6.86° | 30° | 39% |
+| IM-2 Athena | terrain skyline | 4.06° | 118° | 45% |
+| Draper SERIES-2 (planned) | terrain skyline | 3.81° | 240° | 51% |
+| Chandrayaan-3 | terrain skyline | 2.40° | 348° | 52% |
+| Shackleton Connecting Ridge | terrain skyline | 1.33° | 56° | 2% |
+| Apollo 17 | smooth horizon | 14.03° | 358° | 98% |
+| Apollo 15 | smooth horizon | 13.49° | 180° | 72% |
+| SLIM | smooth horizon | 9.70° | 350° | 81% |
+| Apollo 16 | smooth horizon | 5.35° | 164° | 61% |
+| Blue Ghost Mission 3 (planned) | smooth horizon | 4.79° | 246° | 57% |
+| Apollo 14 | smooth horizon | 3.48° | 69° | 50% |
+| Blue Ghost Mission 2 (planned) | smooth horizon | 3.14° | 94° | 70% |
+| Blue Ghost Mission 1 | smooth horizon | 2.22° | 138° | 14% |
+| Apollo 12 | smooth horizon | 1.19° | 53° | 9% |
+| Apollo 11 | smooth horizon | 1.17° | 270° | 2% |
+| IM-3 (planned) | smooth horizon | 0.79° | 114° | 0% |
 
 ## Checked against the physics engine's stored skylines
 
-A skyline was worked out from these files (observer 2 m above the site, out to 32 km) and compared
-with the engine's stored profile in `backend/data/horizon/`, for the directions whose skyline point
-lies within 30 km.
+A skyline worked out from these files was compared with the engine's stored profile in
+`backend/data/horizon/`, for the directions whose skyline point lies within 30 km.
 
 | Site | Directions compared | Correlation | Mean difference | Largest difference |
 |---|---|---|---|---|
@@ -60,7 +87,7 @@ LOLA elevation data: NASA/GSFC. Served by NASA Moon Trek, NASA/JPL-Caltech.
 
 ```
 pip install numpy rasterio
-python tools/site-terrain/fetch_site_terrain.py sites.json web/public/site-terrain
+python tools/site-terrain/fetch_site_terrain.py sites.json web/public/site-terrain backend/data/horizon
 ```
 
 `sites.json` is the answer from the backend's `GET /sites`. The script needs `curl` on the path.
