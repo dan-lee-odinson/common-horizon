@@ -54,6 +54,7 @@ import { AnchorTag } from './AnchorTag';
 import { ClockPanel, EarthPanel, HardwarePanel, Inline, SunPanel } from './SitePanels';
 import { useEntrance } from './useEntrance';
 import { SiteChecks } from './SiteChecks';
+import { SiteMap } from './SiteMap';
 import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
 const LEADERS: LeaderSpec[] = [
@@ -358,6 +359,8 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
     'data-phase': q.beforeLanding ? 'before-landing' : 'stay',
     'data-layout': isPhone ? 'phone' : 'wide',
   } as const;
+  // The Site map (NASA Moon Trek): a button over the scene that opens its panel there.
+  const siteMap = <SiteMap site={site} phone={isPhone} />;
 
   if (isPhone) {
     return (
@@ -424,6 +427,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             ) : null}
           </section>
         </div>
+        {siteMap}
       </div>
     );
   }
@@ -568,6 +572,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
           </div>
         </Glass>
       </div>
+      {siteMap}
     </div>
   );
 }
