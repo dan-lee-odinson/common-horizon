@@ -69,6 +69,7 @@ def evaluate_mission(mission: MissionInput, engine: PhysicsEngine) -> MissionEva
         engine_name=info.name,
         engine_version=info.version,
         notice=SYNTHETIC_NOTICE if info.is_synthetic else PHYSICS_NOTICE,
+        sources=base.sources,
     )
     return MissionEvaluation(
         contract_version=CONTRACT_VERSION,

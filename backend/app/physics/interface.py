@@ -50,6 +50,9 @@ class SimulationResult(BaseModel):
     communication_windows: list[TimeWindow]
     terrain_skyline: TerrainSkyline | None = None
     warnings: list[str] = Field(default_factory=list)
+    # Data sets and models behind the numbers (kernels, terrain profile, citation). Copied to
+    # ``provenance.sources`` of the response.
+    sources: list[str] = Field(default_factory=list)
 
 
 class PhysicsEngine(Protocol):

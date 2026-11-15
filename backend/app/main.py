@@ -24,7 +24,8 @@ Units are part of every field name: `_deg` degrees, `_m` metres, `_km` kilometre
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
-    engine = build_engine(settings.physics_engine)  # fails fast on a misconfigured engine name
+    # Fails fast on a misconfigured engine name. Missing engine data is reported per request (503).
+    engine = build_engine(settings.physics_engine, settings.spice_kernel_dir, settings.horizon_profile_dir)
 
     app = FastAPI(
         title="Common Horizon API",

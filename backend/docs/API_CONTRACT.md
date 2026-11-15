@@ -67,7 +67,7 @@ full response under the 6 MB AWS Lambda synchronous payload limit; a test checks
 | Sun / Earth visibility (bool / fraction) | `timeseries.{sun,earth}.visibility_fraction[]` (0 … 1; visible ⇔ > 0) |
 | Sun / Earth obstruction state | `timeseries.{sun,earth}.obstruction_state[]`: `visible`, `partial`, `terrain_blocked`, `below_horizon` |
 | Solar-disc visibility | `timeseries.sun.visibility_fraction[]` with `obstruction_state = partial` |
-| Terrain skyline | `terrain_skyline` (`azimuth_deg[]`, `horizon_elevation_deg[]`); nullable, not populated yet |
+| Terrain skyline | `terrain_skyline` (`azimuth_deg[]`, `horizon_elevation_deg[]`); null unless a stored terrain profile was used |
 | Terrain elevation grid | not part of this endpoint (too large); planned as a separate endpoint |
 | Landing-site elevation | `site.elevation_m` (+ `site.elevation_source`) |
 | Landing-site slope | `site.slope_deg` |
@@ -81,7 +81,8 @@ full response under the 6 MB AWS Lambda synchronous payload limit; a test checks
 | Requirement results | `requirement_results[]`, overall `requirements_passed` |
 | Launch delay results | `launch_delay_results[]` (`launch_delay_days`, `mission_start_utc`, `metrics`, `requirements_passed`) |
 
-Also returned: `contract_version`, `provenance`, the normalised request as `mission`, and `warnings[]`.
+Also returned: `contract_version`, `provenance` (with `sources[]`: kernels, terrain profile and citations behind
+the numbers; empty for the synthetic fixture), the normalised request as `mission`, and `warnings[]`.
 
 ## Engine interface (backend ↔ physics code)
 
@@ -103,8 +104,26 @@ class PhysicsEngine(Protocol):
 - The backend currently runs the launch-delay sweep (one `simulate` call per delay) and the
   requirement comparisons (threshold vs engine metric; no physics).
 
-`app/physics/engine_adapter.py` is where the real engine will be wired in. Until then,
-`CH_PHYSICS_ENGINE=physics` answers 503 and never silently falls back to synthetic data.
+`app/physics/engine_adapter.py` is the real engine (`CH_PHYSICS_ENGINE=physics`). It answers 503 while its
+kernels or stored profiles are missing and never falls back to synthetic data. Per request it:
+
+1. picks the terrain: the stored horizon profile within 50 m of the site, for the same observer height
+   (±0.01 m) and, when `altitude_m` is given, the same site height (±0.5 m); otherwise a smooth sphere
+   through the site, with a warning that local terrain is not included;
+2. asks the engine's SPICE functions for Moon-centred Sun and Earth positions at every timestamp of the
+   backend time grid, subtracts the observer position (1737.4 km + site height + observer height) and
+   gets azimuth and elevation from the engine's frame functions;
+3. computes each disc's angular radius from its distance (Sun 695 700 km, Earth 6 378.1366 km), its
+   visible fraction and obstruction state against the skyline (`body_visibility`);
+4. aggregates metrics and communication windows (`app/physics/metrics.py`, sample-and-hold).
+
+`slope_deg` is null (no slope data at run time). Without a stored profile, `terrain_skyline` and
+`sky_visibility_fraction` are null, and with no `altitude_m` either, `site.elevation_m` is a 0 m placeholder
+labelled `elevation_source = "synthetic_default"` with a warning (the contract requires a number). With a
+profile, `sky_visibility_fraction` is the share of the upper hemisphere's solid angle above the skyline.
+Launch-delay (metric-only) runs skip the time series and reuse samples shared with earlier runs.
+Time series are rounded for transport (positions 1 m, unit vectors 1e-9, angles 1e-6 degree); metrics
+are computed before rounding and visibility fractions are not rounded.
 
 ## Synthetic fixture
 
@@ -121,25 +140,24 @@ response shapes bumps `contract_version`.
 
 | Area | Current assumption (implemented) | Not yet defined |
 |---|---|---|
-| Coordinates | Planetocentric latitude, east-positive longitude in -180 … 180, `MOON_ME` frame | Kernel set (e.g. DE440, `moon_pa` / `moon_me` frame kernels) |
-| Elevation reference | `altitude_m` and `site.elevation_m` are relative to the 1737.4 km sphere. A supplied altitude is passed to the engine; `null` means the engine derives it from terrain. `site.elevation_source` reports which applied | Precedence between a supplied altitude and the terrain-model (LOLA) value |
-| Position vectors | `position_km` from the Moon's centre; `direction_unit` from the observer to the body; both in `MOON_ME` | Aberration correction (e.g. `LT+S`) |
+| Coordinates | Planetocentric latitude, east-positive longitude in -180 … 180, `MOON_ME` frame. Real engine kernels: `naif0012.tls`, `de440s.bsp`, `moon_pa_de440_200625.bpc`, `moon_de440_250416.tf` | |
+| Elevation reference | `altitude_m` and `site.elevation_m` are relative to the 1737.4 km sphere. `null` means the engine takes it from the stored terrain profile; a supplied altitude that disagrees with the profile by more than 0.5 m disables the profile (smooth sphere + warning). `site.elevation_source` reports which applied | Elevation of sites without a stored profile (no DEM at run time) |
+| Position vectors | `position_km` from the Moon's centre; `direction_unit` from the observer to the body; both in `MOON_ME`. Real engine: geometric positions (aberration correction `NONE`) | Whether to apply `LT+S` |
 | Visibility | A body counts as visible when any part of its disc is above the horizon (`visibility_fraction > 0`) | Centre-of-disc or fraction-weighted definitions; elevation mask for Earth communication |
 | Obstruction states | `visible`, `partial`, `terrain_blocked`, `below_horizon` | Whether these four classes are sufficient |
 | Metrics | Sample-and-hold: each interval takes the state sampled at its start. `time_to_sunset_hours` / `time_to_earthset_hours` are `null` when the body is already down at mission start or does not set | Interpolated crossings; meaning of time-to-set when the body starts below the horizon |
 | Launch delay | Sweep of whole-day delays 0, step, 2·step, … up to `launch_delay_days` | Whether a single fixed slip is needed instead |
 | Limits | Values in `app/models/limits.py` (see [Inputs](#inputs-website--engine-missioninput)) | Kernel coverage and per-simulation runtime, which bound the date window and whether a launch-delay sweep fits one synchronous request (API Gateway ~29 s) |
 | Requirement checks, launch-delay sweep | Run in the backend as threshold comparisons on engine values. `hardware_id` is echoed in the response, not passed to the engine, and not mapped to a catalogue | Whether these move into the engine; which requirement fields the engine uses |
-| Observer height | Default 0 m. The synthetic model applies it only as horizon dip | Its role in terrain line-of-sight |
+| Observer height | Default 0 m. The synthetic model applies it only as horizon dip. Stored terrain profiles are for 2 m; another height gets the smooth sphere (+ warning) | Profiles for other heights |
 
-## Physics engine integration requirements
+## Physics engine runtime requirements
 
-To replace the stub in `app/physics/engine_adapter.py`, the engine integration needs:
-
-- A Python entry point: package/module name, function signatures and return types (e.g. numpy arrays or
-  dicts), which the adapter converts into `SimulationResult`.
-- Runtime dependencies (e.g. spiceypy, numpy) and their size, since they ship in the Lambda container image.
-- Location and size of kernel and terrain data (container image or S3).
-- Per-simulation runtime for the largest allowed request.
-- Terrain outputs: skyline azimuth resolution; extent, resolution and format of the elevation grid
-  (planned as a separate endpoint).
+- Python packages at run time: `spiceypy`, `numpy` (the adapter never imports `rasterio` or the DEM tools).
+- Data: the four NAIF kernels in `CH_SPICE_KERNEL_DIR` (not in Git; not yet in the container image) and the
+  stored profiles in `CH_HORIZON_PROFILE_DIR` (default `backend/data/horizon`; not yet copied into the image).
+  See `backend/README.md`, "Real physics engine".
+- Runtime: the adapter's own work for the largest allowed request with a 30-day launch-delay sweep is about
+  17 s on a laptop before SPICE time, which is close to the API Gateway limit (~29 s); typical requests
+  (14 days hourly, 30-day sweep) take about 0.5 s. SPICE time per sample is not measured yet.
+- Not provided yet: site slope, site elevation away from stored profiles, the terrain elevation grid.

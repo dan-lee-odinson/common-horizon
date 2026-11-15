@@ -49,6 +49,11 @@ class DataProvenance(_OutputModel):
     engine_name: str
     engine_version: str
     notice: str = Field(description="Human-readable statement of where the numbers come from.")
+    sources: list[str] = Field(
+        default_factory=list,
+        description="Data sets and models behind the numbers (ephemeris kernels, terrain profile, citations). "
+        "Empty for the synthetic fixture.",
+    )
 
 
 class BodyTimeseries(_OutputModel):

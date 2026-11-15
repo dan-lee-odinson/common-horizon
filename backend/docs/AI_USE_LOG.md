@@ -86,3 +86,31 @@ the source files' modification times.
 | UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
 |---|---|---|---|
 | 15:28:19 | 17:28:19 | Drafted with Claude Code: open coordination questions in `API_CONTRACT.md` restated as neutral provisional technical assumptions and engine integration requirements; private working notes moved to a git-ignored `.local-notes/` directory | No change to the API, code behaviour or OpenAPI contract |
+
+## Physics adapter: real engine behind the API (2026-11-15)
+
+Drafted with Claude Code (Claude Opus 5.5) on branch `feat/physics-adapter` from `main` at `2d4bbd9`
+(after PRs #10, #12 and #13). Tests ran in a local Python 3.12.10 virtual environment with the pinned
+`requirements-dev.txt` (numpy 2.5.4 needs Python 3.12, the Docker image's version) and ruff 0.17.5.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 10:18:46 | 12:18:46 | `main` fast-forwarded to `2d4bbd9`; `feat/physics-adapter` created (git reflog) | Clean tree; PR #6 branch untouched |
+| by 10:24:15 | by 12:24:15 | Read the interface, evaluation service, engine (`ephemeris`, `positions`, `frames`, `kernel_loader`), horizon package and their tests; baseline run | 338 passed, 14 skipped; 60 pre-existing ruff findings, none in files changed here |
+| ~10:27:07 onward | ~12:27:07 onward | Adapter, metrics module, `provenance.sources`, kernel/profile settings | Implemented |
+| ~10:34:07 onward | ~12:34:07 onward | Adapter and metrics regression tests (injected positions, fixture profile) | 380 passed, 15 skipped (real-kernel check skipped: no kernels on this machine) |
+
+What the AI did and did not decide:
+
+- The adapter calls the physics engine's own SPICE position and frame functions; it computes no
+  ephemeris itself. `compute_sun_earth_angles` is not called: it returns angles only and puts the
+  observer on the 1737.4 km sphere, while the contract also needs position vectors and disc radii.
+- Terrain comes from the stored horizon profiles; sites without one get a smooth sphere with an
+  explicit warning. Slope stays null; elevation without a profile or input is a labelled placeholder.
+- Matching tolerances (50 m, 0.5 m site height, 0.01 m observer height), the sky-visibility definition
+  and the transport rounding are proposals in code and docs for the physics owner to confirm.
+- All numbers in the new unit tests come from injected positions and a fixture profile (mocked, not
+  physics). Only the opt-in real-kernel test (`CH_SPICE_KERNEL_DIR`) produces physical output; it has
+  not been run yet.
+- Not done: Docker image changes for kernels and profiles (kept apart from the open PR #6), production
+  switch to the real engine, deployment.

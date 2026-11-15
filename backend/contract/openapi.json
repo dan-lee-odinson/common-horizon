@@ -194,6 +194,14 @@
             "type": "string",
             "title": "Notice",
             "description": "Human-readable statement of where the numbers come from."
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources",
+            "description": "Data sets and models behind the numbers (ephemeris kernels, terrain profile, citations). Empty for the synthetic fixture."
           }
         },
         "type": "object",
