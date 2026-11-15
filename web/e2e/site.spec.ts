@@ -1069,3 +1069,35 @@ for (const name of ['Apollo 17', 'Shackleton Connecting Ridge']) {
     await expect(world).toHaveAttribute('data-site-skyline', 'in-view');
   });
 }
+
+// ---------- the surface picture ----------
+
+for (const [name, words] of [
+  ['Apollo 15', 'Surface: LRO camera mosaic (NASA/GSFC/Arizona State University).'],
+  ['Shackleton Connecting Ridge', 'Surface: relief drawn from LOLA heights.'],
+] as const) {
+  test(`site surface: at ${name} the ground carries its surface picture, and the Ground panel says what it is`, async ({ page }) => {
+    await enterMission(page);
+    test.skip(isPhone(page), 'the phone layout has its own test');
+    await spotlight(page, name);
+    await zoomIn(page);
+    const world = page.getByTestId('world');
+    await expect(world).toHaveAttribute('data-site-ground', 'terrain');
+    await expect(world).toHaveAttribute('data-site-surface', 'picture');
+    await expect(page.getByTestId('site-ground-surface')).toHaveText(words);
+  });
+}
+
+test('site surface: when the picture cannot be loaded, the ground stays plain grey and nothing is said of a picture', async ({ page }) => {
+  await page.route('**/site-texture/*.jpg', (route) => route.abort());
+  await enterMission(page);
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  await spotlight(page, 'Apollo 15');
+  await zoomIn(page);
+  const world = page.getByTestId('world');
+  await expect(world).toHaveAttribute('data-site-ground', 'terrain');
+  // It was asked for, and fell back.
+  await expect(world).toHaveAttribute('data-site-surface', 'plain');
+  await expect(page.getByTestId('site-ground-source')).toBeVisible();
+  await expect(page.getByTestId('site-ground-surface')).toHaveCount(0);
+});

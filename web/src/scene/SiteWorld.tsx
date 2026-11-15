@@ -33,6 +33,7 @@ import { createGroundUniforms, createSiteClock, createSiteNow, type GroundUnifor
 import { SiteRig } from './SiteRig';
 import { SiteSky } from './SiteSky';
 import { everyOtherPost, groundHeight, terrainSkylineDeg, type SiteGroundShape } from './siteTerrain';
+import { useSiteSurface } from './siteSurface';
 import { useSiteTerrain } from './siteTerrainLoad';
 import { bandProfile, bandTopAt, domePoint, earthDiscRadius, insideFrame, siteArrival, siteFrame, SITE_VIEW, sunDiscRadius, sunPathOnDome } from './siteView';
 
@@ -52,7 +53,10 @@ export function SiteWorld({ data, active }: { data: SceneData; active: boolean }
   const ids = useMemo(() => choices.map((h) => h.id), [choices]);
   const metas = useModelMetas(ids);
   // The real ground, at a preset site whose near file has loaded (custom points keep the level ground).
-  const terrain = useSiteTerrain(data.focus?.custom ? null : (data.focus?.id ?? null));
+  const siteId = data.focus?.custom ? null : (data.focus?.id ?? null);
+  const terrain = useSiteTerrain(siteId);
+  // The surface picture laid over that ground (custom points have none).
+  const surface = useSiteSurface(siteId);
   // On phones the far ground keeps every other post.
   const isPhone = data.isPhone;
   const shape = useMemo<SiteGroundShape | null>(
@@ -79,7 +83,7 @@ export function SiteWorld({ data, active }: { data: SceneData; active: boolean }
     <group visible={active}>
       {/* First, so every other part reads this frame's sky. */}
       <SiteClock active={active} dataRef={dataRef} horizonRef={horizonRef} now={now} uniforms={uniforms} />
-      <SiteGround uniforms={uniforms} shape={shape} />
+      <SiteGround uniforms={uniforms} shape={shape} siteId={siteId} surface={surface.entry} />
       <SiteHardware layout={layout} now={now} uniforms={uniforms} />
       <SiteMarkers layout={layout} names={data.hardwareNames ?? {}} now={now} active={active} />
       <SiteSky now={now} profile={profile} sunPath={sunPath} />

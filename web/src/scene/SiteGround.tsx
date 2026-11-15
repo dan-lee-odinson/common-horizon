@@ -2,7 +2,8 @@
 //
 // At a preset site whose height file has loaded: the real ground, one mesh at true scale (one unit
 // is one metre) built from the LOLA heights round the site (siteTerrain.ts), lit by the Sun's
-// direction against its own slopes and drawn by the terrain shader (siteShaders.ts). Shading only:
+// direction against its own slopes and drawn by the terrain shader (siteShaders.ts). The site's
+// surface picture (public/site-texture/) sets its tone, laid by ground position. Shading only:
 // the terrain casts no shadows. With both files the mesh runs out to 32 km (the near file joined
 // into the far one); with the near file alone it eases back to the level ground past the file's
 // edge, and the level ground carries on beyond it.
@@ -12,12 +13,77 @@
 // ones the readouts give, and never drawn above the cut-off that keeps it under the data's skyline.
 
 import { useEffect, useMemo } from 'react';
+import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { createGroundMaterial, createTerrainMaterial, type GroundUniforms } from './siteNow';
 import { buildGroundMesh, FAR_FADE_M, FAR_RADIUS_M, groundReach, type SiteGroundShape } from './siteTerrain';
+import { markSurface, surfaceUrl, type SurfaceEntry } from './siteSurface';
 import { SITE_VIEW } from './siteView';
 
-export function SiteGround({ uniforms, shape }: { uniforms: GroundUniforms; shape: SiteGroundShape | null }) {
+export function SiteGround({
+  uniforms,
+  shape,
+  siteId = null,
+  surface = null,
+}: {
+  uniforms: GroundUniforms;
+  shape: SiteGroundShape | null;
+  /** The site the ground belongs to, and its surface picture's entry in the manifest (siteSurface.ts). */
+  siteId?: string | null;
+  surface?: SurfaceEntry | null;
+}) {
+  const gl = useThree((s) => s.gl);
+  // The surface picture: laid over the real ground only (the level ground is an illustration and
+  // stays plain). Loaded once the ground is in; on any failure the ground stays plain grey.
+  const pictureUrl = shape && surface ? surfaceUrl(surface) : null;
+  const pictureMean = surface ? surface.mean_brightness / 255 : 0.5;
+  useEffect(() => {
+    const host = gl.domElement.closest<HTMLElement>('[data-testid="world"]');
+    const say = (word: string) => {
+      if (host) host.dataset.siteSurface = word;
+    };
+    // 'loading' while the picture is on its way, 'picture' once drawn, 'plain' with none or on a failure.
+    if (!pictureUrl || !siteId) {
+      say('plain');
+      return;
+    }
+    say('loading');
+    let live = true;
+    let texture: THREE.Texture | null = null;
+    new THREE.TextureLoader().load(
+      pictureUrl,
+      (t) => {
+        if (!live) {
+          t.dispose();
+          return;
+        }
+        texture = t;
+        // Raw grey values (no colour decoding): the tone is the pixel over the manifest's mean.
+        t.colorSpace = THREE.NoColorSpace;
+        t.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy());
+        t.needsUpdate = true;
+        uniforms.uSurface.value = t;
+        uniforms.uSurfaceMean.value = pictureMean;
+        uniforms.uSurfaceOn.value = 1;
+        markSurface(siteId, 'ready');
+        say('picture');
+      },
+      undefined,
+      () => {
+        if (!live) return;
+        markSurface(siteId, 'failed');
+        say('plain');
+      },
+    );
+    return () => {
+      live = false;
+      uniforms.uSurfaceOn.value = 0;
+      uniforms.uSurface.value = null;
+      texture?.dispose();
+      say('plain');
+    };
+  }, [pictureUrl, pictureMean, siteId, uniforms, gl]);
+
   const material = useMemo(() => createGroundMaterial(uniforms, false), [uniforms]);
   useEffect(() => () => material.dispose(), [material]);
   const terrainMaterial = useMemo(() => createTerrainMaterial(uniforms), [uniforms]);
