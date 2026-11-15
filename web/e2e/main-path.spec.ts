@@ -154,7 +154,7 @@ test('main path: hardware, ranking, launch delay, a site and its horizon chart',
   await expect(checks.getByTestId('horizons-check')).toContainText('Checked against NASA JPL Horizons');
   await expect(checks.getByTestId('horizons-check')).toContainText('0.005991°');
   if (live) {
-    await expect(page.getByTestId('site-terrain')).toHaveText('smooth Moon, terrain not included');
+    await expect(checks.getByTestId('site-terrain-note')).toHaveText('smooth Moon, terrain not included');
     await expect(checks.getByTestId('horizon-warnings').locator('li').first()).toBeVisible();
     // Compare now: this backend cannot reach JPL Horizons from here, so the stored figure stands, and it says so.
     await checks.getByTestId('horizons-compare').click();

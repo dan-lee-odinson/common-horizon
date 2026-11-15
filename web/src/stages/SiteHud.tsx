@@ -446,7 +446,6 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
               <span data-q-text>{result.verdict.text}</span>
             </span>
           )}
-          {terrainTag}
           <span className="num flex shrink-0 items-center gap-3 rounded-[3px] bg-glass-strong px-2.5 py-2 text-[13px] leading-none text-ink-2 max-xl:hidden" data-testid="site-coordinates">
             <Inline q={fixed.siteLat} />
             <Inline q={fixed.siteLon} />

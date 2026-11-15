@@ -200,11 +200,11 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
   await expect(rings.locator('[data-q="ground_ring_minor"]')).toHaveText(/^10\s?m$/);
   await expect(rings.locator('[data-q="ground_ring_major"]')).toHaveText(/^100\s?m$/);
 
-  // The hardware of the example mission, with each model's height (the rover has no model).
+  // The hardware of the example mission, with each model's height (the crewed habitat's power load has no model).
   await expect(page.getByTestId('hardware-row')).toHaveCount(4);
   await expect.poll(() => readout(page, 'hw_height:starship_hls')).toBe('52');
-  expect(await readout(page, 'hw_height:rover')).toBe('no model');
-  expect(await readout(page, 'hw_count:solar')).toBe('× 4');
+  expect(await readout(page, 'hw_height:hab_crewed')).toBe('no model');
+  expect(await readout(page, 'hw_count:vsat')).toBe('× 4');
   // It is drawn at true scale, and its place is said to be an illustration. Every shape has loaded:
   // no row says its item is missing from the picture.
   await expect(page.getByTestId('site-illustration')).toContainText('true scale');

@@ -117,7 +117,7 @@ export function Spotlight() {
             </span>
           )}
           {smooth ? (
-            <span className="tag min-h-8 shrink-0 px-2 normal-case tracking-[0.02em]" data-tone="warn" data-testid="terrain-note">
+            <span className="tag min-h-8 min-w-0 flex-1 whitespace-normal px-2 py-0.5 normal-case leading-snug tracking-[0.02em]" data-tone="warn" data-testid="terrain-note">
               {TERRAIN_NOT_INCLUDED}
             </span>
           ) : null}
