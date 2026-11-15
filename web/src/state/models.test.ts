@@ -11,26 +11,31 @@ function file(modelId: string): unknown {
 }
 
 describe('catalog items and their models', () => {
-  it('maps the five items that have a model, and nothing else', () => {
+  it('maps the five planner items that have a model, by the planner ids, and nothing else', () => {
     expect(MODEL_FOR).toEqual({
-      starship: 'starship-lander',
+      starship_hls: 'starship-lander',
       griffin: 'griffin-lander',
-      hab: 'habitat-unit',
-      nuclear: 'fission-power-unit',
-      solar: 'solar-array-mast',
+      surface_habitat: 'habitat-unit',
+      fsp_40kwe: 'fission-power-unit',
+      vsat: 'solar-array-mast',
     });
-    // The rover has no model, and neither has an id the catalog may add later.
-    expect(modelFor('rover')).toBeNull();
-    expect(modelFor('drill')).toBeNull();
+    // The power rows of a landed object have no model of their own (its payload row has it), and
+    // neither has an id the catalog may add later, nor the old example ids.
+    expect(modelFor('fission_40kwe')).toBeNull();
+    expect(modelFor('hab_crewed')).toBeNull();
+    expect(modelFor('astrolab_clv1')).toBeNull();
+    expect(modelFor('starship')).toBeNull();
     expect(modelFor('toString')).toBeNull();
-    expect(modelFor('starship')).toBe('starship-lander');
+    expect(modelFor('starship_hls')).toBe('starship-lander');
   });
 
-  it('the Starship lander takes the landing point before the Griffin lander', () => {
-    expect(primaryLanderId(['hab', 'rover', 'solar', 'starship'])).toBe('starship');
-    expect(primaryLanderId(['griffin', 'starship'])).toBe('starship');
-    expect(primaryLanderId(['griffin', 'solar'])).toBe('griffin');
-    expect(primaryLanderId(['hab', 'solar'])).toBeNull();
+  it('the Starship HLS lander takes the landing point before the Griffin lander', () => {
+    expect(primaryLanderId(['surface_habitat', 'astrolab_clv1', 'vsat', 'starship_hls'])).toBe('starship_hls');
+    expect(primaryLanderId(['griffin', 'starship_hls'])).toBe('starship_hls');
+    expect(primaryLanderId(['griffin', 'vsat'])).toBe('griffin');
+    // A lander with no model (Blue Moon) stands as a marker, not at the landing point.
+    expect(primaryLanderId(['blue_moon_mk1', 'vsat'])).toBeNull();
+    expect(primaryLanderId(['surface_habitat', 'vsat'])).toBeNull();
     expect(primaryLanderId([])).toBeNull();
   });
 

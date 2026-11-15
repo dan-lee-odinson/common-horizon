@@ -1,10 +1,14 @@
 // The bar across the top of every stage: the app's name, where you are among the three stages,
-// the "Example data" badge and "About" (which reopens the landing card).
+// the data source label and "About" (which reopens the landing card).
+//
+// The data source label says where every number on screen comes from:
+//   EXAMPLE DATA            example mode (no backend address): the website's own example model
+//   TEST DATA               the backend answers with provenance.is_synthetic true (its synthetic fixture)
+//   LIVE: PHYSICS ENGINE    the backend answers from the real physics engine
 
-import { isMockMode } from '../api/client';
 import { Icon } from '../components/Icon';
 import { actions, appStore, type Stage } from '../state/app';
-import { useData } from '../state/data';
+import { useData, type DataSourceKind } from '../state/data';
 import { useStore } from '../state/store';
 
 const STAGES: { id: Stage; label: string }[] = [
@@ -23,12 +27,21 @@ const BACKING = 'linear-gradient(to bottom, rgb(2 5 11 / 0.82), rgb(2 5 11 / 0))
  */
 const BACKING_UNDER_MOON = 'linear-gradient(to bottom, rgb(2 5 11 / 0.92), rgb(2 5 11 / 0.8) 72%, rgb(2 5 11 / 0))';
 
+/** The label's words (shown in capitals) and what it means, by data source. */
+export const DATA_SOURCE_LABEL: Record<DataSourceKind, { text: string; title: string; tone?: 'warn' | 'good' }> = {
+  example: { text: 'Example data', title: "No backend address is set (VITE_API_BASE), so every number comes from the website's built-in example model." },
+  test: { text: 'Test data', title: "The backend answers from its synthetic test fixture (provenance.is_synthetic), not from the physics engine. Not for planning.", tone: 'warn' },
+  physics: { text: 'Live: physics engine', title: "The backend answers from the physics engine (NASA NAIF SPICE ephemerides).", tone: 'good' },
+  unknown: { text: 'Live: waiting for the backend', title: 'The backend has not said yet where its numbers come from.' },
+};
+
 export function TopBar() {
   const stage = useStore(appStore, (s) => s.stage);
   const flight = useStore(appStore, (s) => s.flight);
   const cardOpen = useStore(appStore, (s) => s.cardOpen);
   const assistantOpen = useStore(appStore, (s) => s.assistantOpen);
-  const { focus } = useData();
+  const { focus, dataSource } = useData();
+  const source = DATA_SOURCE_LABEL[dataSource];
 
   function go(to: Stage) {
     if (to === stage || flight !== null) return;
@@ -67,11 +80,14 @@ export function TopBar() {
         </ol>
       </nav>
 
-      {isMockMode() ? (
-        <span className="tag pointer-events-auto shrink-0" title="No backend address is set (VITE_API_BASE), so every number comes from built-in example answers." data-testid="example-badge">
-          Example data
-        </span>
-      ) : null}
+      <span
+        className={`tag pointer-events-auto shrink-0 max-md:max-w-[9rem] max-md:truncate ${source.tone === 'warn' ? 'tag-warn' : source.tone === 'good' ? 'tag-good' : ''}`}
+        title={source.title}
+        data-testid={dataSource === 'example' ? 'example-badge' : 'data-source'}
+        data-source={dataSource}
+      >
+        {source.text}
+      </span>
 
       {/* About sits with the title: the upper right is left clear for the scene and the panels. */}
       <button type="button" className="btn btn-quiet pointer-events-auto shrink-0 max-md:ml-auto max-md:w-11 max-md:px-0" onClick={actions.openCard} aria-haspopup="dialog" aria-expanded={cardOpen} aria-label="About Common Horizon" data-testid="about">

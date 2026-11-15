@@ -12,7 +12,7 @@
 // scene. So the picture and the numbers cannot disagree. Nothing here re-renders while time runs: the readouts
 // are rewritten in place once per frame, and only when the instant has changed.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { SiteRef } from '../api/types';
 import { AsyncView } from '../components/AsyncView';
 import { Icon } from '../components/Icon';
@@ -28,7 +28,7 @@ import { useTicker } from '../hud/useTicker';
 import { hideAnchors } from '../scene/anchors';
 import { lookAtBody, lookAtLander, siteFrame, SITE_VIEW } from '../scene/siteView';
 import { actions, appStore, simClock, SPEEDS } from '../state/app';
-import { useData } from '../state/data';
+import { slopeContext, useData } from '../state/data';
 import { modelShapes, primaryLanderId, useModelMetas } from '../state/models';
 import { createStore, useStore } from '../state/store';
 import { useIsPhone, useShortWindow } from '../state/useMedia';
@@ -53,6 +53,8 @@ import { clipPeriods, dayTicks } from '../util/stay';
 import { AnchorTag } from './AnchorTag';
 import { ClockPanel, EarthPanel, HardwarePanel, Inline, SunPanel } from './SitePanels';
 import { useEntrance } from './useEntrance';
+import { SiteChecks } from './SiteChecks';
+import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
 const LEADERS: LeaderSpec[] = [
   { anchor: 'sun', to: '[data-leader-target="sun"]', color: 'var(--ch-sun)' },
@@ -65,7 +67,7 @@ const nextChangeAhead = createStore<{ kind: 'sunrise' | 'sunset' | null }>({ kin
 const JUMP_PAST_MS = 60_000;
 
 /** What of the hardware in the picture is true and what is an illustration. (Without 3D there is no picture: only what the heights are.) */
-const HARDWARE_NOTE = 'Drawn at true scale from its models. Where each piece stands is an illustration. An item with no model is listed, not drawn.';
+const HARDWARE_NOTE = 'Drawn at true scale from its models. Where each piece stands is an illustration. An item with no model stands as a plain labelled marker.';
 const HARDWARE_NOTE_FLAT = 'Heights are those of the hardware models, in their descriptions’ own words.';
 
 export function SiteHud({ webgl }: { webgl: boolean }) {
@@ -80,6 +82,15 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   const isPhone = useIsPhone();
   const short = useShortWindow();
   const rootRef = useRef<HTMLDivElement>(null);
+  // In a short window the Data checks band would take too much of the picture: it is shown on request.
+  const [checksShown, setChecksShown] = useState(false);
+  const checksButton = useRef<HTMLButtonElement>(null);
+  const checksId = useId();
+  const band = !short || checksShown;
+  const hideChecks = () => {
+    setChecksShown(false);
+    checksButton.current?.focus();
+  };
 
   const site = useMemo<SiteRef | null>(() => (focus ? { id: focus.id, name: focus.name, lat: focus.lat, lon_east: focus.lon_east } : null), [focus]);
   // The answer on hand can still be the previous site's while the new one loads: it is not this site's sky.
@@ -139,7 +150,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
   const q = live();
   const fixed = siteStageQuantities({ site, landingMs, plannedLandingMs, stayEndMs: windowEndMs, stayDays, evaluation: focusRow?.evaluation ?? null, check: focusCheck });
-  const result = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck);
+  const result = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck, slopeContext(focus, d.landerSlopeLimitDeg));
   const dates = missionDates(launchUtcMs, slipDays, landingMs, landingGeometry);
   const hardware = hardwareQuantities(hardwareChosen, catalogItems ?? [], models);
   const speeds = useMemo(() => speedQuantities(SPEEDS), []);
@@ -196,7 +207,28 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   }, [readLive]);
 
   const name = focus?.name ?? 'No site';
-  const passTag = result.passes === null ? 'tag' : result.passes ? 'tag tag-good' : 'tag tag-bad';
+  const passTag = result.result === 'pass' ? 'tag tag-good' : result.result === 'fail' ? 'tag tag-bad' : result.result === 'unknown' ? 'tag tag-warn' : 'tag';
+  const smooth = terrainNotIncluded(focusRow?.evaluation, horizonData);
+  const terrainTag = smooth ? (
+    <span className="tag min-h-9 shrink-0 bg-glass-strong px-2.5 normal-case tracking-[0.02em]" data-tone="warn" data-testid="site-terrain">
+      {TERRAIN_NOT_INCLUDED}
+    </span>
+  ) : null;
+  const checks = (layout: 'band' | 'bare', onHide?: () => void) => (
+    <SiteChecks
+      site={site}
+      evaluation={focusRow?.evaluation ?? null}
+      horizon={horizonData}
+      check={d.horizonsCheck.data ?? null}
+      moonTrek={d.moonTrekCheck.data ?? null}
+      landingMs={landingMs}
+      slope={result.slope}
+      slopeNote={result.slopeNote}
+      slopeDetail={result.slopeDetail}
+      layout={layout}
+      onHide={onHide}
+    />
+  );
   const plotLabel = `Horizon plot for ${name}: compass direction across, height above level upward. It shows the terrain skyline, the Sun’s path from ${slipDays > 0 ? 'the planned landing' : 'the landing'} to the end of the stay (solid where the Sun is above the skyline, dashed where the terrain hides it) and the part of the sky Earth moves through. The running figures are in the Sun and Earth panels.`;
   // The legend names the height where the plot's scale changes, when this site's plot has two bands.
   const scaleBreak = useMemo(() => {
@@ -311,7 +343,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
   const trueSize = (
     <p className="m-0 text-[13px] leading-snug text-ink-2" data-testid="true-size">
-      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. Lit and dark are for the Sun's centre, so part of its disc can show over a ridge while it is dark. <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
+      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. Lit means some part of the Sun's disc is above the skyline, so the disc can sit mostly behind a ridge while the site is lit. <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
       <span data-testid="site-rings">
         Range rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
       </span>
@@ -345,10 +377,11 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
               </span>
               {result.verdict.text === DASH ? null : (
                 <span className={`${passTag} min-h-11 shrink-0 px-2.5`} data-q={result.verdict.key} title={result.verdict.text}>
-                  {result.passes ? 'pass' : 'fail'}
+                  {result.verdictWord}
                 </span>
               )}
             </div>
+            {smooth ? <div className="flex">{terrainTag}</div> : null}
             <Glass as="section" tone="sun" className="grid grid-cols-2 gap-x-3 gap-y-2 p-3" aria-label="Sun, now" data-panel data-testid="site-status">
               <Readout q={q.sunState} />
               <Readout q={q.nextChange} size="sm" />
@@ -367,6 +400,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             {sunPanel({ bare: true })}
             {earthPanel({ bare: true })}
             {hardwarePanel({ bare: true })}
+            {checks('bare')}
           </div>
         </Drawer>
 
@@ -429,7 +463,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             </span>
           )}
           {result.verdict.text === DASH ? null : (
-            <span className={`${passTag} min-h-9 shrink-0 px-2.5`} data-q={result.verdict.key} data-testid="site-verdict">
+            <span className={`${passTag} min-h-9 shrink-0 px-2.5`} data-q={result.verdict.key} title={result.slopeNote ?? undefined} data-testid="site-verdict">
               <span data-q-text>{result.verdict.text}</span>
             </span>
           )}
@@ -443,6 +477,19 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
               <Icon name="target" size={14} />
               {/* Room for the words only in a wide window: the site's name comes first. */}
               <span className="max-[1439px]:hidden">Reset view</span>
+            </button>
+          ) : null}
+          {webgl && short ? (
+            <button
+              ref={checksButton}
+              type="button"
+              className="btn btn-glass shrink-0"
+              aria-expanded={checksShown}
+              aria-controls={checksShown ? checksId : undefined}
+              onClick={() => setChecksShown((v) => !v)}
+              data-testid="site-checks-show"
+            >
+              Data checks
             </button>
           ) : null}
         </div>
@@ -481,9 +528,25 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             </div>
             {plot(short ? 180 : 260, 'hero', 45)}
             <SkyLegend scaleBreak={scaleBreak} delayed={slipDays > 0} />
+            {checks('bare')}
           </Glass>
         </div>
       )}
+
+      {/* Data checks: a band between the wings, resting on the console. The 3D picture is framed above it. */}
+      {webgl && band ? (
+        <div className="hud-layer">
+          <div
+            id={checksId}
+            className="absolute left-[22.5rem] right-[22.5rem] flex flex-col justify-end max-lg:left-[18.5rem] max-lg:right-[18.5rem]"
+            style={{ bottom: 'calc(100% - var(--site-console-top, 100%) + 0.75rem)' }}
+            data-enter="rise"
+            data-site-zone="checks"
+          >
+            {checks('band', short ? hideChecks : undefined)}
+          </div>
+        </div>
+      ) : null}
 
       {/* The console: sky and time. The plot sits directly above the timeline that scrubs it.
           This layer does not drift with the pointer: the needle stays under the hand that drags it. */}
@@ -544,6 +607,9 @@ function useSiteFrame(rootRef: RefObject<HTMLDivElement | null>, isPhone: boolea
       const right = zone('right');
       const base = zone(isPhone ? 'dock' : 'console');
       const baseTop = base ? layoutBox(base, root).top : height;
+      // The Data checks band rests on the console between the wings: the picture is framed above it.
+      const checks = isPhone ? null : zone('checks');
+      const checksTop = checks && checks.offsetHeight > 0 ? layoutBox(checks, root).top : baseTop;
       siteFrame.set({
         measured: width > 0 && height > 0,
         width,
@@ -551,7 +617,7 @@ function useSiteFrame(rootRef: RefObject<HTMLDivElement | null>, isPhone: boolea
         left: left ? layoutBox(left, root).right : 0,
         right: right ? layoutBox(right, root).left : width,
         top: top ? layoutBox(top, root).bottom : 0,
-        bottom: baseTop,
+        bottom: Math.min(baseTop, checksTop),
       });
       root.style.setProperty('--site-console-top', `${baseTop}px`);
       root.style.setProperty('--site-dock', `${Math.max(0, height - baseTop)}px`);
@@ -559,7 +625,7 @@ function useSiteFrame(rootRef: RefObject<HTMLDivElement | null>, isPhone: boolea
     measure();
     // Sizes change with the window, when a panel's rows change and when the fonts arrive.
     const observer = new ResizeObserver(measure);
-    for (const el of [root, zone('top'), zone('left'), zone('right'), zone('console'), zone('dock')]) if (el) observer.observe(el);
+    for (const el of [root, zone('top'), zone('left'), zone('right'), zone('console'), zone('dock'), zone('checks')]) if (el) observer.observe(el);
     return () => observer.disconnect();
   }, [rootRef, isPhone]);
   // Leaving the stage: nothing is measured any more.

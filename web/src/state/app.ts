@@ -40,6 +40,13 @@ export interface AppState {
   hardware: Record<string, HardwarePick>;
   /** Battery storage typed in the planner, kWh. 0 = none. */
   storageKwh: number;
+  /**
+   * For a lander with several published payload figures (capacity_options): the one the visitor
+   * picked, by lander id. A lander not listed here uses its first figure.
+   */
+  capacityPick: Record<string, string>;
+  /** Catalog ids of the landers (kind "lander"), from the catalog: a mission carries one lander at most. */
+  landerIds: string[];
   /** The site the visitor picked. null = follow the best-ranked site. */
   highlightedId: string | null;
   /** The point typed into the coordinate entry or clicked on the Moon. */
@@ -79,11 +86,13 @@ export const SPEEDS = [0.5, 2, 6] as const;
 export const DEFAULT_SPEED = 2;
 
 /**
- * The example mission the app opens with, so the ranking is live on arrival: catalog ids and
- * counts, and battery storage. Only ids the catalog really has are ticked.
+ * The example mission the app opens with, so the ranking is live on arrival: catalog ids (the
+ * planner's) and counts, and battery storage. Only ids the catalog really has are ticked. A lander,
+ * the habitat (its payload mass and its crewed load) and four solar masts: about 100 hours of
+ * darkness on the typed storage, so the delay visibly reorders the ranking.
  */
 export const EXAMPLE_MISSION: { hardware: Record<string, number>; storageKwh: number } = {
-  hardware: { starship: 1, hab: 1, rover: 1, solar: 4 },
+  hardware: { starship_hls: 1, surface_habitat: 1, hab_crewed: 1, vsat: 4 },
   storageKwh: 2000,
 };
 
@@ -138,6 +147,8 @@ export const appStore = createStore<AppState>({
   stayDays: DEFAULT_STAY_DAYS,
   hardware: {},
   storageKwh: 0,
+  capacityPick: {},
+  landerIds: [],
   highlightedId: null,
   customSite: null,
   saved: loadSaved(),
@@ -271,26 +282,47 @@ export const actions = {
       } else next[item.id] = { selected: false, count: item.default_count, userSet: false };
     }
     if (items.length > 0) missionInitialised = true;
-    appStore.set({ hardware: next, storageKwh: ticked && appStore.get().storageKwh === 0 ? EXAMPLE_MISSION.storageKwh : appStore.get().storageKwh });
+    appStore.set({
+      hardware: next,
+      landerIds: items.filter((i) => i.kind === 'lander').map((i) => i.id),
+      storageKwh: ticked && appStore.get().storageKwh === 0 ? EXAMPLE_MISSION.storageKwh : appStore.get().storageKwh,
+    });
   },
+  /**
+   * Tick or untick a catalog row. A mission carries one lander at most (the backend refuses more):
+   * ticking a lander unticks any other.
+   */
   toggleHardware(id: string, selected: boolean) {
-    const hw = appStore.get().hardware;
+    const { hardware: hw, landerIds } = appStore.get();
     const pick = hw[id] ?? { selected: false, count: 1, userSet: false };
-    appStore.set({ hardware: { ...hw, [id]: { ...pick, selected, userSet: true } } });
+    const next: Record<string, HardwarePick> = { ...hw, [id]: { ...pick, selected, userSet: true } };
+    if (selected && landerIds.includes(id)) {
+      for (const other of landerIds) if (other !== id && next[other]?.selected) next[other] = { ...next[other], selected: false, userSet: true };
+    }
+    appStore.set({ hardware: next });
   },
   setHardwareCount(id: string, count: number, max: number) {
     const hw = appStore.get().hardware;
     const pick = hw[id] ?? { selected: true, count: 1, userSet: false };
     appStore.set({ hardware: { ...hw, [id]: { ...pick, count: clamp(Math.round(count), 1, max), userSet: true } } });
   },
+  /** A lander's payload figure, by its capacity option key. */
+  pickCapacity(landerId: string, option: string) {
+    appStore.set({ capacityPick: { ...appStore.get().capacityPick, [landerId]: option } });
+  },
   /** Battery storage in kWh. Anything not a positive number means none; the cap is MAX_STORAGE_KWH. */
   setStorage(kwh: number) {
     appStore.set({ storageKwh: Number.isFinite(kwh) && kwh > 0 ? clamp(kwh, 0, MAX_STORAGE_KWH) : 0 });
   },
-  /** Pick a site. Items the visitor has not touched follow the site's default hardware. null = follow the best. */
+  /**
+   * Pick a site. Items the visitor has not touched follow the site's default hardware, except that a
+   * default lander is not added to a mission that already has a lander the visitor chose (one
+   * lander at most). null = follow the best.
+   */
   highlight(id: string | null, site?: Pick<Site, 'default_hardware'> | null) {
-    const { hardware } = appStore.get();
-    const defaults = new Set(site?.default_hardware ?? []);
+    const { hardware, landerIds } = appStore.get();
+    const chosenLander = landerIds.some((l) => hardware[l]?.selected && hardware[l]?.userSet);
+    const defaults = new Set((site?.default_hardware ?? []).filter((d) => !(chosenLander && landerIds.includes(d))));
     const next: Record<string, HardwarePick> = {};
     for (const [key, pick] of Object.entries(hardware)) {
       next[key] = pick.userSet ? pick : { ...pick, selected: defaults.has(key) };

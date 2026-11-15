@@ -47,6 +47,12 @@ for (const motion of ['reduce', 'no-preference'] as const) {
     await page.getByTestId('begin').click();
     await page.getByTestId('enter-mission').click();
     await expect(page.getByTestId('spotlight-name')).not.toHaveText('', { timeout: 30_000 });
+    // A site with the Sun high at the landing, so the ground under the panel is brightly lit.
+    await page.getByTestId('drawer-toggle').click();
+    await page.getByTestId('preset-search').fill('Blue Ghost Mission 1');
+    await page.getByTestId('preset').first().click();
+    await expect(page.getByTestId('spotlight-name')).toHaveText('Blue Ghost Mission 1');
+    await page.keyboard.press('Escape');
     await page.getByTestId('zoom-to-site').click();
     await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'site', { timeout: 30_000 });
     const panel = page.getByTestId('sun-panel');
@@ -55,9 +61,11 @@ for (const motion of ['reduce', 'no-preference'] as const) {
     for (const wait of [3000, 2500, 2500]) {
       await page.waitForTimeout(wait);
       const box = (await panel.boundingBox())!;
-      // The panel's own bottom padding (no text there) against the open scene just below the panel.
+      // The panel's own bottom padding (no text there) against the open scene just beside it, above
+      // the Data checks band that rests on the console.
+      const band = await page.getByTestId('site-checks-panel').boundingBox();
       const inside = await brightness(page, box.x + box.width / 2, box.y + box.height - 9);
-      const outside = await brightness(page, box.x + box.width / 2, box.y + box.height + 14);
+      const outside = await brightness(page, box.x + box.width + 24, band ? Math.min(box.y + box.height - 9, band.y - 14) : box.y + box.height - 9);
       expect(outside).toBeGreaterThan(40);
       // Whether or not the browser dims the backdrop, the backing is under half as bright as the scene.
       expect(inside).toBeLessThan(outside * 0.5);

@@ -10,7 +10,7 @@
 // is the point (d sin b, -d cos b).
 
 import type { HardwareChoice } from '../api/types';
-import { modelFor, primaryLanderId } from '../state/models';
+import { isLanderModel, modelFor, primaryLanderId } from '../state/models';
 import { DEG } from '../util/geo';
 
 /** What the layout needs of a model's description (see state/models.ts). */
@@ -36,10 +36,25 @@ export interface PlacedItem {
   height: number;
 }
 
+/** A plain labelled marker for an item with no model: a thin post at a place that is an illustration. */
+export interface PlacedMarker {
+  key: string;
+  /** Catalog id. */
+  id: string;
+  x: number;
+  z: number;
+  count: number;
+}
+
+/** Height of a marker's post, metres: a sign, not a size. */
+export const MARKER_HEIGHT_M = 3;
+
 export interface SiteLayout {
   items: PlacedItem[];
-  /** Catalog ids in the mission that have no model: listed on screen, never drawn. */
+  /** Catalog ids in the mission that have no model: listed on screen, and drawn as plain labelled markers. */
   noModel: string[];
+  /** One marker for each item with no model, in a row south of the landing point. */
+  markers: PlacedMarker[];
   /** The lander at the landing point, when the mission has one and its model is known. */
   primaryLanderId: string | null;
   /** Height of what stands at the landing point: the primary lander, else the tallest item; null with nothing to draw. */
@@ -63,17 +78,24 @@ const ROW_GAP = 5;
 const RADIUS_MARGIN = 8;
 const MIN_RADIUS = 12;
 
-const SLOTS: Readonly<Record<string, Slot | undefined>> = {
+const LANDER_SLOTS = {
   // A second kind of lander stands off to the south-west; more of the kind on the landing point, further south.
   lander2: { bearingDeg: 240, distance: 60, quarterTurns: 0, pitch: 0 },
   landerMore: { bearingDeg: 200, distance: 110, quarterTurns: 0, pitch: 0 },
+} as const satisfies Record<string, Slot>;
+
+/** Places by model (see state/models.ts for which catalog item has which model). */
+const SLOTS: Readonly<Record<string, Slot | undefined>> = {
   // The habitat stands east of the lander, turned a quarter so its hatch faces it.
-  hab: { bearingDeg: 90, distance: 40, quarterTurns: -1, pitch: 0 },
+  'habitat-unit': { bearingDeg: 90, distance: 40, quarterTurns: -1, pitch: 0 },
   // The fission unit stands well away to the north-west.
-  nuclear: { bearingDeg: 300, distance: 120, quarterTurns: 0, pitch: 0 },
+  'fission-power-unit': { bearingDeg: 300, distance: 120, quarterTurns: 0, pitch: 0 },
   // Solar masts stand in a row north of the lander, nine metres apart.
-  solar: { bearingDeg: 0, distance: 45, quarterTurns: 0, pitch: 9 },
+  'solar-array-mast': { bearingDeg: 0, distance: 45, quarterTurns: 0, pitch: 9 },
 };
+
+/** Markers for items with no model stand in a row this far south-east of the landing point, this far apart (metres). */
+const MARKER_ROW = { bearingDeg: 150, distance: 28, pitch: 6 };
 
 /**
  * Places `count` of one item in a row centred on a slot. The row runs across the line from the
@@ -139,8 +161,8 @@ export function siteLayout(choices: readonly HardwareChoice[], models: Readonly<
       rest -= 1;
       if (rest <= 0) continue;
     }
-    const lander = id === 'starship' || id === 'griffin';
-    const slot = lander ? (id === primary ? SLOTS.landerMore : SLOTS.lander2) : SLOTS[id];
+    const lander = isLanderModel(id);
+    const slot = lander ? (id === primary ? LANDER_SLOTS.landerMore : LANDER_SLOTS.lander2) : SLOTS[modelId];
     if (!slot) {
       // A model with no place in this layout is not drawn (and is listed with the others that are not).
       noModel.push(id);
@@ -153,15 +175,30 @@ export function siteLayout(choices: readonly HardwareChoice[], models: Readonly<
     row.forEach((item, i) => items.push({ ...item, key: `${id}:${first + i}` }));
   }
 
+  // One marker per item with no model (its count is on its label), side by side across the row's bearing.
+  const b = MARKER_ROW.bearingDeg * DEG;
+  const markers: PlacedMarker[] = noModel.map((id, i) => {
+    const offset = (i - (noModel.length - 1) / 2) * MARKER_ROW.pitch;
+    return {
+      key: `marker:${id}`,
+      id,
+      x: MARKER_ROW.distance * Math.sin(b) + Math.cos(b) * offset,
+      z: -MARKER_ROW.distance * Math.cos(b) + Math.sin(b) * offset,
+      count: counted.find((c) => c.id === id)?.count ?? 1,
+    };
+  });
+
   const atOrigin = items.find((i) => i.x === 0 && i.z === 0);
   const tallest = items.reduce<number | null>((h, i) => (h === null || i.height > h ? i.height : h), null);
   const reach = items.reduce((r, i) => Math.max(r, Math.hypot(Math.abs(i.x) + i.halfX, Math.abs(i.z) + i.halfZ)), 0);
+  const markerReach = markers.reduce((r, m) => Math.max(r, Math.hypot(m.x, m.z) + 1), 0);
   return {
     items,
     noModel,
+    markers,
     primaryLanderId: primary,
     heightM: atOrigin ? atOrigin.height : tallest,
-    radius: Math.max(MIN_RADIUS, reach + RADIUS_MARGIN),
+    radius: Math.max(MIN_RADIUS, Math.max(reach, markerReach) + RADIUS_MARGIN),
   };
 }
 

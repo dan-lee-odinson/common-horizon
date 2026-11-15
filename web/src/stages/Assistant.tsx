@@ -8,6 +8,7 @@
 // a sheet from "Assistant" in the top bar. New answers are announced to screen readers.
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { isMockMode } from '../api/client';
 import { Icon } from '../components/Icon';
 import { Sheet } from '../hud/Sheet';
 import { actions, appStore } from '../state/app';
@@ -22,7 +23,10 @@ function useAssistant() {
   const historyOpen = useStore(assistantStore, (s) => s.historyOpen);
   const offline = useStore(assistantStore, (s) => s.offline);
   const announcement = useStore(assistantStore, (s) => s.announcement);
-  const unavailable = offline || (health.status === 'answer' && health.data?.assistant_available === false);
+  // Live mode: the backend has no assistant in this version when /health says so. (Example mode is
+  // unchanged: its assistant can be switched off with ?assistant=off, which says "unavailable right now".)
+  const notInVersion = !isMockMode() && health.status === 'answer' && health.data?.assistant_available === false;
+  const unavailable = notInVersion || offline || (health.status === 'answer' && health.data?.assistant_available === false);
   const send = (text: string, replaceId?: number) => {
     if (unavailable) return;
     const s = appStore.get();
@@ -32,14 +36,16 @@ function useAssistant() {
       replaceId,
     );
   };
-  return { log, historyOpen, unavailable, announcement, send };
+  return { log, historyOpen, unavailable, notInVersion, announcement, send };
 }
 
 const UNAVAILABLE = 'The assistant is unavailable right now. Everything else on this page still works.';
+/** Live mode, when /health says assistant_available is false. */
+export const NOT_IN_VERSION = 'The assistant is not available in this version. Everything else on this page works.';
 
 /** Mission select: the assistant along the bottom. */
 export function AssistantDock({ className = '' }: { className?: string }) {
-  const { log, historyOpen, unavailable, announcement, send } = useAssistant();
+  const { log, historyOpen, unavailable, notInVersion, announcement, send } = useAssistant();
   const ids = { panel: useId(), heading: useId() };
   const sectionRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -116,6 +122,7 @@ export function AssistantDock({ className = '' }: { className?: string }) {
       <AskForm
         inputRef={inputRef}
         unavailable={unavailable}
+        notInVersion={notInVersion}
         onAsk={send}
         trailing={
           log.length > 0 && !showPanel ? (
@@ -141,7 +148,7 @@ export function AssistantDock({ className = '' }: { className?: string }) {
       />
       {unavailable ? (
         <p className="sr-only" role="status" data-state="unavailable">
-          {UNAVAILABLE}
+          {notInVersion ? NOT_IN_VERSION : UNAVAILABLE}
         </p>
       ) : null}
     </section>
@@ -151,7 +158,7 @@ export function AssistantDock({ className = '' }: { className?: string }) {
 /** Orbit and site stages: the same conversation, opened as a sheet from the top bar. */
 export function AssistantSheet({ phone }: { phone: boolean }) {
   const open = useStore(appStore, (s) => s.assistantOpen);
-  const { log, unavailable, announcement, send } = useAssistant();
+  const { log, unavailable, notInVersion, announcement, send } = useAssistant();
   const logRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   return (
@@ -170,6 +177,7 @@ export function AssistantSheet({ phone }: { phone: boolean }) {
             <AskForm
               inputRef={inputRef}
               unavailable={unavailable}
+              notInVersion={notInVersion}
               onAsk={send}
               trailing={
                 log.length > 0 ? (
@@ -199,11 +207,13 @@ function Announcer({ announcement }: { announcement: { text: string; n: number }
 function AskForm({
   inputRef,
   unavailable,
+  notInVersion = false,
   onAsk,
   trailing,
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   unavailable: boolean;
+  notInVersion?: boolean;
   onAsk: (text: string) => void;
   trailing: React.ReactNode;
 }) {
@@ -224,7 +234,7 @@ function AskForm({
         id={inputId}
         aria-label="Ask the assistant"
         className="field min-w-0 flex-1 font-sans text-[15px]"
-        placeholder={unavailable ? 'The assistant is unavailable right now' : 'Ask about these sites, the delay, power or Earth contact'}
+        placeholder={notInVersion ? 'The assistant is not available in this version' : unavailable ? 'The assistant is unavailable right now' : 'Ask about these sites, the delay, power or Earth contact'}
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         disabled={unavailable}

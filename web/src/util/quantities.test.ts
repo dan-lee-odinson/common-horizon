@@ -107,10 +107,12 @@ describe('sky readouts come from the data layer', () => {
       expect(Math.abs(q.earthEl.value! - earth.el)).toBeLessThan(0.05);
       const change = nextSunChange(horizon, t);
       if (change) {
+        // A change is placed midway between two samples: a tenth of an hour only from samples six minutes apart.
+        const fine = change.sampleGapHours <= 0.1;
         expect(q.nextChange.value).toBe(change.hours);
-        expect(q.nextChange.text).toBe(change.hours.toFixed(1));
+        expect(q.nextChange.text).toBe(fine ? change.hours.toFixed(1) : String(Math.round(change.hours)));
         expect(q.nextChange.unit).toBe('h');
-        expect(q.nextChange.label).toBe(change.kind === 'sunrise' ? 'Sunrise in' : 'Sunset in');
+        expect(q.nextChange.label).toBe(`${change.kind === 'sunrise' ? 'Sunrise in' : 'Sunset in'}${fine ? '' : ' about'}`);
       } else {
         expect(q.nextChange.value).toBeNull();
       }
@@ -308,27 +310,32 @@ describe('how finely the next sunrise or sunset is shown', () => {
     for (let t = LANDING + 0.5 * HOUR_MS; ; t += HOUR_MS) if (nextSunChange(horizon, t)) return t;
   }
 
-  it('shows one decimal when the horizon samples around the change are an hour apart or closer', () => {
-    for (const stepHours of [0.25, 1]) {
-      const horizon = horizonFor(s, LANDING, LANDING + 90 * DAY_MS, stepHours);
-      const t = withChangeAhead(horizon);
-      const change = nextSunChange(horizon, t)!;
-      expect(change.sampleGapHours).toBeLessThanOrEqual(1);
-      const q = skyQuantities({ track: null, tMs: t, landingMs: LANDING, site: s, horizon });
-      expect(q.nextChange.label).toBe(change.kind === 'sunrise' ? 'Sunrise in' : 'Sunset in');
-      expect(q.nextChange.text).toBe(change.hours.toFixed(1));
-      expect(q.nextChange.text).toMatch(/^\d+\.\d$/);
-      expect(q.nextChange.unit).toBe('h');
-      expect(q.nextChange.value).toBe(change.hours);
-    }
+  it('shows one decimal when the samples around the change are six minutes apart or closer (it is placed midway between them)', () => {
+    // An answer sampled every five minutes, lit for the first 100 samples and dark after.
+    const base = horizonFor(s, LANDING, LANDING + DAY_MS, 1);
+    const fine: HorizonResponse = {
+      ...base,
+      time_step_s: 300,
+      sun_path: Array.from({ length: 200 }, (_, k) => ({ t: new Date(LANDING + k * 5 * 60_000).toISOString(), az: 100, el: 1, state: k < 100 ? 'above' : 'hidden' })),
+    };
+    const t = LANDING + 2 * HOUR_MS;
+    const change = nextSunChange(fine, t)!;
+    expect(change.sampleGapHours).toBeCloseTo(5 / 60, 9);
+    const q = skyQuantities({ track: null, tMs: t, landingMs: LANDING, site: s, horizon: fine });
+    expect(q.nextChange.label).toBe('Sunset in');
+    expect(q.nextChange.text).toBe(change.hours.toFixed(1));
+    expect(q.nextChange.text).toMatch(/^\d+\.\d$/);
+    // The same samples from an answer whose own step is coarser: the step wins.
+    const coarse = skyQuantities({ track: null, tMs: t, landingMs: LANDING, site: s, horizon: { ...fine, time_step_s: 900 } });
+    expect(coarse.nextChange.label).toBe('Sunset in about');
   });
 
   it('shows whole hours and says "about" when the samples are further apart', () => {
-    for (const stepHours of [1.25, 4, 14.5]) {
+    for (const stepHours of [0.25, 1, 1.25, 4, 14.5]) {
       const horizon = horizonFor(s, LANDING, LANDING + 365.25 * DAY_MS, stepHours);
       const t = withChangeAhead(horizon);
       const change = nextSunChange(horizon, t)!;
-      expect(change.sampleGapHours).toBeGreaterThan(1);
+      expect(change.sampleGapHours).toBeGreaterThan(0.1);
       const q = skyQuantities({ track: null, tMs: t, landingMs: LANDING, site: s, horizon });
       expect(q.nextChange.label).toBe(change.kind === 'sunrise' ? 'Sunrise in about' : 'Sunset in about');
       expect(q.nextChange.text).toBe(String(Math.round(change.hours)));
@@ -338,25 +345,16 @@ describe('how finely the next sunrise or sunset is shown', () => {
     }
   });
 
-  it('uses the decimal for the app’s own request, whatever the length of the window', async () => {
+  it('says "about" for the app’s own request (samples 15 minutes to an hour apart), whatever the length of the window', async () => {
     for (const days of [14, SYNODIC_MONTH_DAYS, 90, 112, 186, 365.25, 395.25]) {
       const end = LANDING + days * DAY_MS;
       const horizon = await loadHorizon(s, LANDING, end);
-      const q = skyQuantities({ track: null, tMs: withChangeAhead(horizon), landingMs: LANDING, site: s, horizon });
-      expect(q.nextChange.label.endsWith('about')).toBe(false);
-      expect(q.nextChange.text).toMatch(/^\d+\.\d$/);
+      const t = withChangeAhead(horizon);
+      expect(nextSunChange(horizon, t)!.sampleGapHours).toBeLessThanOrEqual(1);
+      const q = skyQuantities({ track: null, tMs: t, landingMs: LANDING, site: s, horizon });
+      expect(q.nextChange.label.endsWith('about')).toBe(true);
+      expect(q.nextChange.text).toMatch(/^\d+$/);
     }
-  });
-
-  it('says "about" when the words change between two samples but the heights do not cross the skyline', () => {
-    const horizon = horizonFor(s, LANDING, LANDING + 30 * DAY_MS, 0.25);
-    const times = sunPathTimes(horizon);
-    const i = horizon.sun_path.findIndex((p, k) => k + 1 < horizon.sun_path.length && p.state !== horizon.sun_path[k + 1].state);
-    const odd: HorizonResponse = { ...horizon, sun_path: horizon.sun_path.map((p, k) => (k === i || k === i + 1 ? { ...p, el: 60 } : p)) };
-    const q = skyQuantities({ track: null, tMs: times[i] - 10.2 * HOUR_MS, landingMs: LANDING, site: s, horizon: odd });
-    // The change is only known to lie between the two samples, so no tenth of an hour is claimed.
-    expect(q.nextChange.label).toMatch(/ in about$/);
-    expect(q.nextChange.text).toBe('10');
   });
 });
 
@@ -442,7 +440,7 @@ describe('a missing or non-finite time or value is a dash, never "NaN"', () => {
             expect(['lit', 'dark']).toContain(q.sunState.text);
           }
           // The change beside the hole is not claimed to a tenth of an hour.
-          const ahead = skyQuantities({ track: tr, tMs: times[i - 1] - 3.4 * HOUR_MS, landingMs: LANDING, site: sr, horizon });
+          const ahead = skyQuantities({ track: tr, tMs: Math.max(times[0], times[i - 1] - 3.4 * HOUR_MS), landingMs: LANDING, site: sr, horizon });
           expect(ahead.nextChange.label).toMatch(/ in about$/);
           expect(ahead.nextChange.text).toMatch(/^\d+$/);
         }
@@ -553,17 +551,17 @@ describe('mission dates and the south pole season', () => {
 
 describe('site readouts come from the evaluation answer', () => {
   it('shows the evaluation’s own figures', () => {
+    // Griffin publishes its slope limit, so every requirement can be checked and the site passes.
     const hardware = [
-      { id: 'starship', count: 1 },
-      { id: 'hab', count: 1 },
-      { id: 'rover', count: 1 },
-      { id: 'solar', count: 4 },
+      { id: 'griffin', count: 1 },
+      { id: 'comms_relay', count: 1 },
+      { id: 'vsat', count: 1 },
     ];
     const { evaluation, check } = evaluateSite(site('apollo-14'), LANDING, 14, hardware, 2000);
     const q = siteQuantities(1, evaluation, check);
     expect(q.rank.text).toBe('01');
     expect(q.score.value).toBe(evaluation.score);
-    expect(q.score.text).toBe(String(evaluation.score));
+    expect(q.score.text).toBe(String(Math.round(evaluation.score!)));
     expect(q.sunlightPercent.text).toBe(evaluation.sunlight_percent.toFixed(1));
     expect(q.sunlightHours.value).toBe(evaluation.sunlight_hours);
     expect(q.powerMargin.value).toBe(check.balance.margin_percent);
@@ -573,7 +571,7 @@ describe('site readouts come from the evaluation answer', () => {
   });
 
   it('names the failed requirement, and says "no supply" when nothing makes power', () => {
-    const { evaluation, check } = evaluateSite(site('blue-ghost-m1'), LANDING, 14, [{ id: 'hab', count: 1 }], 0);
+    const { evaluation, check } = evaluateSite(site('blue-ghost-m1'), LANDING, 14, [{ id: 'hab_crewed', count: 1 }], 0);
     const q = siteQuantities(12, evaluation, check);
     expect(q.verdict.text).toMatch(/^fail: /);
     expect(q.verdict.tone).toBe('bad');
@@ -641,44 +639,51 @@ describe('the sky at one instant, as plain values', () => {
 });
 
 describe('site stage readouts that run with the clock', () => {
+  // Southern summer at the pole (the Sun's overhead point south of the lunar equator), so the polar
+  // site has its low Sun. In February 2027 the Sun is north of the equator and the pole is dark.
+  const SUMMER = Date.UTC(2027, 9, 25, 15, 0, 0);
+  let summerTrack: GeometryTrack;
+  beforeAll(async () => {
+    summerTrack = await loadTrack(SUMMER - TRANSIT_DAYS * DAY_MS, SYNODIC_MONTH_DAYS);
+  });
   const s = site('shackleton-ridge');
-  const horizon = horizonFor(s, LANDING, LANDING + 14 * DAY_MS, 0.25);
+  const horizon = horizonFor(s, SUMMER, SUMMER + 14 * DAY_MS, 0.25);
   const lander = { name: 'Starship lander', heightM: 52 };
-  const at = (tMs: number, over: Partial<Parameters<typeof liveSiteQuantities>[0]> = {}) => liveSiteQuantities({ track, tMs, landingMs: LANDING, site: s, horizon, lander, ...over });
+  const at = (tMs: number, over: Partial<Parameters<typeof liveSiteQuantities>[0]> = {}) => liveSiteQuantities({ track: summerTrack, tMs, landingMs: SUMMER, site: s, horizon, lander, ...over });
 
   it('carries every sky readout unchanged', () => {
-    const tMs = LANDING + 30.5 * HOUR_MS;
+    const tMs = SUMMER + 30.5 * HOUR_MS;
     const live = at(tMs);
-    const sky = skyQuantities({ track, tMs, landingMs: LANDING, site: s, horizon });
+    const sky = skyQuantities({ track: summerTrack, tMs, landingMs: SUMMER, site: s, horizon });
     for (const [name, q] of Object.entries(sky)) expect(live[name as keyof typeof live]).toEqual(q);
   });
 
   it('Earth’s apparent width follows its elevation, to two decimals', () => {
-    const live = at(LANDING + 5 * HOUR_MS);
+    const live = at(SUMMER + 5 * HOUR_MS);
     expect(live.earthWidth.key).toBe('earth_width');
     expect(live.earthWidth.value).toBe(earthWidthDeg(live.sky.earth!.el));
     expect(live.earthWidth.text).toBe(earthWidthDeg(live.sky.earth!.el).toFixed(2));
     expect(['1.90', '1.91']).toContain(live.earthWidth.text);
     expect(live.earthWidth.unit).toBe('°');
     // Apollo 11 has Earth high in its sky: a Moon radius closer, so a hundredth wider.
-    const high = liveSiteQuantities({ track, tMs: LANDING, landingMs: LANDING, site: site('apollo-11'), horizon: null, lander });
+    const high = liveSiteQuantities({ track: summerTrack, tMs: SUMMER, landingMs: SUMMER, site: site('apollo-11'), horizon: null, lander });
     expect(high.sky.earth!.el).toBeGreaterThan(50);
     expect(high.earthWidth.text).toBe('1.91');
-    const none = at(LANDING, { track: null });
+    const none = at(SUMMER, { track: null });
     expect(none.earthWidth.text).toBe(DASH);
     expect(none.earthWidth.unit).toBe('');
   });
 
   it('shadow figures: h / tan(elevation) on level ground, one figure and "about" under a low Sun', () => {
     let lit = 0;
-    for (let tMs = LANDING; tMs <= LANDING + 14 * DAY_MS; tMs += 2.3 * HOUR_MS) {
+    for (let tMs = SUMMER; tMs <= SUMMER + 14 * DAY_MS; tMs += 2.3 * HOUR_MS) {
       const live = at(tMs);
       const { sun } = live.sky;
       if (live.shadow.kind !== 'length') continue;
       lit++;
-      // At the default site the Sun stays within a degree or so of level: 50 to 150 m of shadow a metre.
+      // At the polar site the Sun stays within a few degrees of level: 20 to 150 m of shadow a metre.
       expect(live.shadow.perMetre).toBe(shadowFactor(sun!.el));
-      expect(live.shadow.perMetre).toBeGreaterThan(50);
+      expect(live.shadow.perMetre).toBeGreaterThan(20);
       expect(live.shadow.perMetre).toBeLessThan(150);
       expect(live.shadowPerMetre.value).toBe(live.shadow.perMetre);
       expect(live.shadowPerMetre.label).toBe('Per metre of height, about');
@@ -697,10 +702,10 @@ describe('site stage readouts that run with the clock', () => {
   it('two figures from 5.3 degrees up, in metres under a kilometre', () => {
     // Apollo 11, mid-morning: the Sun is tens of degrees high.
     const a11 = site('apollo-11');
-    const h11 = horizonFor(a11, LANDING, LANDING + 14 * DAY_MS, 0.25);
+    const h11 = horizonFor(a11, SUMMER, SUMMER + 14 * DAY_MS, 0.25);
     let seen = 0;
-    for (let tMs = LANDING; tMs <= LANDING + 14 * DAY_MS; tMs += 7.1 * HOUR_MS) {
-      const live = liveSiteQuantities({ track, tMs, landingMs: LANDING, site: a11, horizon: h11, lander });
+    for (let tMs = SUMMER; tMs <= SUMMER + 14 * DAY_MS; tMs += 7.1 * HOUR_MS) {
+      const live = liveSiteQuantities({ track: summerTrack, tMs, landingMs: SUMMER, site: a11, horizon: h11, lander });
       if (live.shadow.kind !== 'length' || live.shadow.figures !== 2) continue;
       seen++;
       expect(live.shadowPerMetre.label).toBe('Per metre of height');
@@ -716,9 +721,9 @@ describe('site stage readouts that run with the clock', () => {
   });
 
   it('says "none" in darkness, "past the horizon" while the disc touches level, and a dash with no data', () => {
-    const dark = horizonFor(s, LANDING, LANDING + 14 * DAY_MS, 0.25);
+    const dark = horizonFor(s, SUMMER, SUMMER + 14 * DAY_MS, 0.25);
     const allDark: HorizonResponse = { ...dark, sun_path: dark.sun_path.map((p) => ({ ...p, state: 'hidden' as const })) };
-    const d = at(LANDING + HOUR_MS, { horizon: allDark });
+    const d = at(SUMMER + HOUR_MS, { horizon: allDark });
     expect(d.sunState.text).toBe('dark');
     expect(d.shadowPerMetre.text).toBe('none');
     expect(d.shadowPerMetre.unit).toBe('');
@@ -729,8 +734,8 @@ describe('site stage readouts that run with the clock', () => {
     const allLit: HorizonResponse = { ...dark, sun_path: dark.sun_path.map((p) => ({ ...p, state: 'above' as const })) };
     const lowSite = site('nobile');
     let grazing = 0;
-    for (let tMs = LANDING; tMs <= LANDING + SYNODIC_MONTH_DAYS * DAY_MS; tMs += 0.5 * HOUR_MS) {
-      const g = liveSiteQuantities({ track, tMs, landingMs: LANDING, site: lowSite, horizon: { ...allLit, site_id: lowSite.id, sun_path: [{ ...allLit.sun_path[0], t: new Date(LANDING).toISOString() }, { ...allLit.sun_path[0], t: new Date(LANDING + 40 * DAY_MS).toISOString() }] }, lander });
+    for (let tMs = SUMMER; tMs <= SUMMER + SYNODIC_MONTH_DAYS * DAY_MS; tMs += 0.5 * HOUR_MS) {
+      const g = liveSiteQuantities({ track: summerTrack, tMs, landingMs: SUMMER, site: lowSite, horizon: { ...allLit, site_id: lowSite.id, sun_path: [{ ...allLit.sun_path[0], t: new Date(SUMMER).toISOString() }, { ...allLit.sun_path[0], t: new Date(SUMMER + 40 * DAY_MS).toISOString() }] }, lander });
       if (g.shadow.kind !== 'grazing') continue;
       grazing++;
       expect(g.shadowPerMetre.text).toBe('past the horizon');
@@ -740,14 +745,14 @@ describe('site stage readouts that run with the clock', () => {
     }
     expect(grazing).toBeGreaterThan(0);
 
-    const none = at(LANDING + HOUR_MS, { horizon: null });
+    const none = at(SUMMER + HOUR_MS, { horizon: null });
     expect(none.shadowPerMetre.text).toBe(DASH);
     expect(none.shadowLander.text).toBe(DASH);
     expect(none.shadowBearing.text).toBe(DASH);
   });
 
   it('gives no lander shadow without a model height, and names a plain "Lander" when the mission has none', () => {
-    const tMs = LANDING + HOUR_MS;
+    const tMs = SUMMER + HOUR_MS;
     expect(at(tMs, { lander: { name: 'Starship lander', heightM: null } }).shadowLander.text).toBe(DASH);
     const bare = at(tMs, { lander: null });
     expect(bare.shadowLander.label).toMatch(/^Lander/);
@@ -757,8 +762,8 @@ describe('site stage readouts that run with the clock', () => {
   });
 
   it('before the landing it says so, with the time to the landing, and no lander stands there', () => {
-    const delayed = horizonFor(s, LANDING - 14 * DAY_MS, LANDING + 14 * DAY_MS, 0.25);
-    const before = liveSiteQuantities({ track, tMs: LANDING - 30 * HOUR_MS, landingMs: LANDING, site: s, horizon: delayed, lander });
+    const delayed = horizonFor(s, SUMMER - 14 * DAY_MS, SUMMER + 14 * DAY_MS, 0.25);
+    const before = liveSiteQuantities({ track: summerTrack, tMs: SUMMER - 30 * HOUR_MS, landingMs: SUMMER, site: s, horizon: delayed, lander });
     expect(before.beforeLanding).toBe(true);
     expect(before.phase.text).toBe('before landing');
     expect(before.toLanding.value).toBe(30);
@@ -767,18 +772,18 @@ describe('site stage readouts that run with the clock', () => {
     expect(before.sinceLanding.text).toBe('−1 d 06 h');
     expect(before.shadowLander.text).toBe('not landed');
     // The horizon answer covers the delay, so lit or dark is known there too.
-    expect(before.sunState.text).toBe(sunAt(delayed, LANDING - 30 * HOUR_MS)!.above ? 'lit' : 'dark');
-    expect(liveSiteQuantities({ track, tMs: LANDING - 3.5 * DAY_MS, landingMs: LANDING, site: s, horizon: delayed, lander }).toLanding.text).toBe('3 d 12 h');
+    expect(before.sunState.text).toBe(sunAt(delayed, SUMMER - 30 * HOUR_MS)!.above ? 'lit' : 'dark');
+    expect(liveSiteQuantities({ track: summerTrack, tMs: SUMMER - 3.5 * DAY_MS, landingMs: SUMMER, site: s, horizon: delayed, lander }).toLanding.text).toBe('3 d 12 h');
 
-    const after = at(LANDING);
+    const after = at(SUMMER);
     expect(after.beforeLanding).toBe(false);
     expect(after.phase.text).toBe('landed');
     expect(after.toLanding.text).toBe(DASH);
-    expect(at(LANDING, { landingMs: null }).phase.text).toBe(DASH);
+    expect(at(SUMMER, { landingMs: null }).phase.text).toBe(DASH);
   });
 
   it('every running readout is a Quantity with its own key', () => {
-    const live = at(LANDING + 3 * HOUR_MS);
+    const live = at(SUMMER + 3 * HOUR_MS);
     const keys = quantitiesOf(live).map((q) => q.key);
     expect(new Set(keys).size).toBe(keys.length);
     for (const key of ['utc', 'ltc', 'ltc_offset', 'since_landing', 'sun_az', 'sun_el', 'sun_state', 'next_change', 'earth_az', 'earth_el', 'earth_width', 'shadow_per_metre', 'shadow_lander', 'shadow_bearing', 'phase', 'to_landing']) {
@@ -905,37 +910,37 @@ describe('the hardware list', () => {
   it('one row for each item: the catalog’s name, the count and the model’s height', () => {
     const rows = hardwareQuantities(
       [
-        { id: 'hab', count: 1 },
-        { id: 'rover', count: 2 },
-        { id: 'solar', count: 4 },
-        { id: 'starship', count: 1 },
+        { id: 'surface_habitat', count: 1 },
+        { id: 'astrolab_clv1', count: 2 },
+        { id: 'vsat', count: 4 },
+        { id: 'starship_hls', count: 1 },
       ],
       MOCK_CATALOG,
-      { hab: model(7.8, 'NASA study'), rover: null, solar: model(10, 'our estimate'), starship: model(52, 'NASA figure, secondary source') },
+      { surface_habitat: model(7.8, 'NASA study'), astrolab_clv1: null, vsat: model(10, 'our estimate'), starship_hls: model(52, 'NASA figure, secondary source') },
     );
-    expect(rows.map((r) => r.name)).toEqual(['Hab unit', 'Rover 1', 'Solar panels', 'Starship lander']);
+    expect(rows.map((r) => r.name)).toEqual(['Surface Habitat', 'Astrolab CLV-1 crew rover', 'Solar array mast (VSAT)', 'Starship HLS']);
     expect(rows.map((r) => r.count.text)).toEqual(['× 1', '× 2', '× 4', '× 1']);
     expect(rows.map((r) => [r.height.key, r.height.text, r.height.unit])).toEqual([
-      ['hw_height:hab', '7.8', 'm tall'],
-      ['hw_height:rover', 'no model', ''],
-      ['hw_height:solar', '10', 'm tall'],
-      ['hw_height:starship', '52', 'm tall'],
+      ['hw_height:surface_habitat', '7.8', 'm tall'],
+      ['hw_height:astrolab_clv1', 'no model', ''],
+      ['hw_height:vsat', '10', 'm tall'],
+      ['hw_height:starship_hls', '52', 'm tall'],
     ]);
     expect(rows.map((r) => r.status)).toEqual(['NASA study', null, 'our estimate', 'NASA figure, secondary source']);
     expect(rows[1].height.value).toBeNull();
     expect(rows[3].height.value).toBe(52);
-    expect(rows[3].height.label).toBe('Starship lander');
+    expect(rows[3].height.label).toBe('Starship HLS');
   });
 
   it('says "no model" for the rover and for an id it does not know, and a dash while a description is being read', () => {
     const rows = hardwareQuantities(
       [
-        { id: 'rover', count: 1 },
+        { id: 'astrolab_clv1', count: 1 },
         { id: 'drill', count: 3 },
-        { id: 'starship', count: 1 },
+        { id: 'starship_hls', count: 1 },
       ],
       MOCK_CATALOG,
-      { rover: null, drill: null },
+      { astrolab_clv1: null, drill: null },
     );
     expect(rows[0].height.text).toBe('no model');
     expect(rows[1].height.text).toBe('no model');

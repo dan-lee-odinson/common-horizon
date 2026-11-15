@@ -10,16 +10,19 @@ import { Icon } from '../components/Icon';
 import { Glass } from '../hud/Glass';
 import { Readout } from '../hud/Readout';
 import { actions, appStore } from '../state/app';
-import { useData, type DataValue } from '../state/data';
+import { slopeContext, useData, type DataValue } from '../state/data';
 import { useStore } from '../state/store';
 import { formatLatLon } from '../util/geo';
 import { balanceWords, levelFromStatus } from '../util/power';
 import { siteQuantities } from '../util/quantities';
 import { movedText } from '../util/ranking';
+import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
 export function Spotlight() {
   const data = useData();
-  const { focus, focusRow, focusCheck, highlighted, updating } = data;
+  const { focus, focusRow, focusCheck, highlighted, updating, evaluation, landerSlopeLimitDeg } = data;
+  // A newer ranking failed while the previous one is still on screen: say so, in the backend's words.
+  const failedRefresh = evaluation.status === 'error' && focusRow !== null;
   const flight = useStore(appStore, (s) => s.flight);
   const saved = useStore(appStore, (s) => s.saved);
 
@@ -30,10 +33,13 @@ export function Spotlight() {
 
   // The planner's own check wins for power, once it is the check of this site and this ranking;
   // until then the row's own figure is shown.
-  const q = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck);
+  const q = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck, slopeContext(focus, landerSlopeLimitDeg));
   const words = focusCheck ? balanceWords(levelFromStatus(focusCheck.balance.status), focusCheck.balance.limiting) : null;
+  // The short window's one-line slope keeps its whole label, and the requirement's sentence, in its tooltip.
+  const slopeTitle = [q.slope.label, q.slopeDetail].filter(Boolean).join('. ');
   const isSaved = saved.some((s) => s.id === focus.id);
-  const fail = q.passes === false;
+  const fail = q.result === 'fail';
+  const smooth = terrainNotIncluded(focusRow?.evaluation);
   // Where the site stood with no delay, as a rank readout of its own ("10", "03").
   const moved = focusRow?.planned && focusRow.moved !== 0 ? { places: focusRow.moved, from: siteQuantities(focusRow.planned.rank, focusRow.evaluation).rank.text } : null;
 
@@ -103,12 +109,30 @@ export function Spotlight() {
         </div>
 
         <div className="flex min-h-9 items-center gap-2 max-md:flex-wrap">
-          {q.passes === null ? null : (
-            <span className={`tag ${fail ? 'tag-bad' : 'tag-good'} min-h-8 shrink-0 px-3 text-[13px]`} data-testid="spotlight-verdict">
+          {q.result === null ? null : (
+            <span
+              className={`tag ${fail ? 'tag-bad' : q.result === 'unknown' ? 'tag-warn' : 'tag-good'} min-h-8 shrink-0 px-3 text-[13px]`}
+              data-testid="spotlight-verdict"
+              data-result={q.result}
+            >
               {q.verdict.text}
             </span>
           )}
-          {focus.note ? (
+          {/* Beside the verdict: why the slope was not checked, and whether the terrain is included. The site's own note when neither applies. */}
+          {q.slopeNote || smooth ? (
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-[12px] leading-snug max-md:basis-40">
+              {q.slopeNote ? (
+                <span className="text-ink-2" data-testid="slope-note">
+                  {q.slopeNote}
+                </span>
+              ) : null}
+              {smooth ? (
+                <span data-tone="warn" data-testid="terrain-note">
+                  {TERRAIN_NOT_INCLUDED}
+                </span>
+              ) : null}
+            </span>
+          ) : focus.note ? (
             <span className="line-clamp-2 min-w-0 flex-1 text-[13px] leading-snug text-ink-2 max-md:basis-40" title={focus.note}>
               {focus.note}
             </span>
@@ -124,7 +148,20 @@ export function Spotlight() {
               {q.sunlightHours.value === null ? null : ' lit'}
             </span>
           </div>
-          <Readout q={q.score} size="xl" />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            {/* A score range ("85–100") is wider than one score: it is set a size smaller, and its "/ 100" may wrap, so it stays inside the panel. */}
+            <Readout q={q.score} size={q.score.value === null ? 'lg' : 'xl'} wrap={q.score.value === null} className="min-w-0" />
+            {/* In a short window the slope takes the score's second line, which costs no height: one line, the whole of it in the tooltip. */}
+            {q.slope.value === null ? null : (
+              <span className="hidden truncate text-[12px] leading-[1.125rem] text-ink-2 short:block" title={slopeTitle} data-testid="spotlight-slope-short">
+                <span className="num text-[13px] text-ink">
+                  {q.slope.text}
+                  {q.slope.unit}
+                </span>{' '}
+                {q.slope.label}
+              </span>
+            )}
+          </div>
           <Readout q={q.earthLink} />
           <div className="flex flex-col gap-0.5">
             <Readout q={q.powerMargin} />
@@ -133,8 +170,32 @@ export function Spotlight() {
               {words}
             </span>
           </div>
+          {/* The slope, one of the score's terms, when the answer has it: the figure, then what it is (the answer's own words), wrapping.
+              A short window has no room for a line of its own, so there it is the score's second line (above). */}
+          {q.slope.value === null ? null : (
+            <p className="col-span-2 m-0 break-words text-[12px] leading-snug text-ink-2 short:hidden" data-q="slope" title={q.slopeDetail ?? undefined} data-testid="spotlight-slope">
+              <span className="num text-[13px] text-ink" data-q-text>
+                {q.slope.text}
+              </span>
+              <span className="num text-[13px] text-ink" data-q-unit>
+                {q.slope.unit}
+              </span>{' '}
+              <span data-q-label>{q.slope.label}</span>
+            </p>
+          )}
         </div>
       </div>
+
+      {failedRefresh ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-[3px] border border-line-strong px-3 py-2 text-[13px] leading-snug" role="alert" data-testid="evaluation-error">
+          <p className="m-0 min-w-0 flex-1 break-words text-ink-2">
+            <span data-tone="bad">The ranking did not update.</span> {evaluation.error} <span>The figures shown are for the previous settings.</span>
+          </p>
+          <button type="button" className="btn shrink-0" onClick={evaluation.retry}>
+            Try again
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3.5 short:pt-3 max-md:pt-3">
         <button type="button" className="btn btn-primary btn-lg flex-1 whitespace-nowrap short:min-h-11" onClick={() => actions.zoomToSite(focus)} disabled={flight !== null} data-testid="zoom-to-site">

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../api/client';
 import { ApiError, isAbortError } from '../api/errors';
 import { configureMock } from '../api/mock';
-import { geometryAt, subearthPoint, subsolarPoint, TRANSIT_DAYS } from '../api/mock/model';
+import { geometryAt, MOCK_PROVENANCE, subearthPoint, subsolarPoint, TRANSIT_DAYS } from '../api/mock/model';
 import type { EvaluateRequest, EvaluateResponse } from '../api/types';
 import { wrap180 } from '../util/geo';
 import { DAY_MS, HOUR_MS, SYNODIC_MONTH_DAYS, toIsoUtc } from '../util/time';
@@ -18,7 +18,18 @@ const LANDING = LAUNCH + TRANSIT_DAYS * DAY_MS;
 /** What a healthy backend answers (the mock model's figures), with no delay. */
 function answerFor(req: EvaluateRequest): EvaluateResponse {
   const landingMs = Date.parse(req.launch_utc) + TRANSIT_DAYS * DAY_MS;
-  return { launch_utc: req.launch_utc, landing_utc: toIsoUtc(landingMs), slip_days: 0, stay_days: req.stay_days, geometry: geometryAt(landingMs), results: [] };
+  return {
+    launch_utc: req.launch_utc,
+    landing_utc: toIsoUtc(landingMs),
+    transit_days: TRANSIT_DAYS,
+    slip_days: 0,
+    stay_days: req.stay_days,
+    time_step_s: 3600,
+    geometry: geometryAt(landingMs),
+    results: [],
+    provenance: MOCK_PROVENANCE,
+    warnings: [],
+  };
 }
 
 /** A request that never answers: a stalled connection. */
@@ -269,7 +280,7 @@ describe('a failed or unreadable answer', () => {
 
     spy.mockImplementation((req) => {
       const answer = answerFor(req);
-      return Promise.resolve({ ...answer, geometry: { ...answer.geometry, subearth_lat: undefined as unknown as number } });
+      return Promise.resolve({ ...answer, geometry: { ...answer.geometry!, subearth_lat: undefined as unknown as number } });
     });
     const noValue = await outcomeOf(geometryForLaunch(LAUNCH));
     expect((noValue as ApiError).kind).toBe('parse');

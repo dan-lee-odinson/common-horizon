@@ -4,7 +4,7 @@
 // follows the planner module's day and night checks.
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import type { CatalogItem, CheckResponse, DayCheck, NightCheck } from '../api/types';
+import type { CatalogItem, CheckResponse, DayCheck, HardwareKind, NightCheck } from '../api/types';
 import { AsyncView, SkeletonLines } from '../components/AsyncView';
 import { HardwareGlyph } from '../components/HardwareGlyph';
 import { Icon } from '../components/Icon';
@@ -14,6 +14,7 @@ import { useData } from '../state/data';
 import { useStore } from '../state/store';
 import { balanceWords, formatAmount, formatKwh, formatMargin, levelFromStatus, storageToCover, type PowerLevel } from '../util/power';
 import { EARTH_LINK_TONE, EARTH_LINK_WORD } from '../util/quantities';
+import { catalogFigureRows, chosenCapacity, figureValue, KIND_HEADING } from '../util/catalog';
 import { readStorageEntry } from '../util/storage';
 import { parseDatetimeLocalUtc, toDatetimeLocalUtc } from '../util/time';
 
@@ -31,6 +32,7 @@ export function MissionSheet({ phone }: { phone: boolean }) {
 function PlannerBody() {
   const { catalog, check, hardwareChosen, focus, focusRow } = useData();
   const hardware = useStore(appStore, (s) => s.hardware);
+  const capacityPick = useStore(appStore, (s) => s.capacityPick);
   const stayDays = useStore(appStore, (s) => s.stayDays);
   const launchUtcMs = useStore(appStore, (s) => s.launchUtcMs);
   const slipDays = useStore(appStore, (s) => s.slipDays);
@@ -128,15 +130,25 @@ function PlannerBody() {
             // Battery storage sits with the power sources: after the last power row.
             const lastPower = data.items.map((i) => i.kind).lastIndexOf('power');
             const at = lastPower === -1 ? data.items.length : lastPower + 1;
+            // A heading wherever the kind changes: landers, payload, power sources, power loads.
+            const rows = (items: CatalogItem[], from: number) =>
+              items.map((item, i) => {
+                const before = data.items[from + i - 1];
+                return (
+                  <HardwareRow
+                    key={item.id}
+                    item={item}
+                    pick={hardware[item.id]}
+                    capacityOption={chosenCapacity(item, capacityPick)?.option ?? null}
+                    heading={before?.kind === item.kind ? null : item.kind}
+                  />
+                );
+              });
             return (
               <ul className="m-0 flex list-none flex-col gap-1 px-3 pb-3 pt-2">
-                {data.items.slice(0, at).map((item) => (
-                  <HardwareRow key={item.id} item={item} pick={hardware[item.id]} />
-                ))}
+                {rows(data.items.slice(0, at), 0)}
                 <StorageRow />
-                {data.items.slice(at).map((item) => (
-                  <HardwareRow key={item.id} item={item} pick={hardware[item.id]} />
-                ))}
+                {rows(data.items.slice(at), at)}
               </ul>
             );
           }}
@@ -147,9 +159,11 @@ function PlannerBody() {
         <PowerBalance
           check={check.refreshing && check.data?.balance.status === 'none' ? null : check.data}
           status={check.status}
+          error={check.error}
           hasHardware={hardwareChosen.length > 0}
           siteName={focus?.name ?? null}
           onRetry={check.retry}
+          pickedLabels={pickedCapacityLabels(catalog.data?.items ?? [], hardwareChosen.map((h) => h.id), capacityPick)}
         />
       </section>
 
@@ -167,48 +181,114 @@ function PlannerBody() {
   );
 }
 
-function HardwareRow({ item, pick }: { item: CatalogItem; pick: HardwarePick | undefined }) {
+/** The labels of the payload figures picked for the chosen landers: their lines in the fit check are marked. */
+function pickedCapacityLabels(items: readonly CatalogItem[], chosen: readonly string[], picks: Readonly<Record<string, string>>): string[] {
+  return items.filter((i) => i.kind === 'lander' && chosen.includes(i.id) && i.capacity_options.length > 1).flatMap((i) => {
+    const o = chosenCapacity(i, picks);
+    return o ? [o.label] : [];
+  });
+}
+
+function HardwareRow({ item, pick, capacityOption, heading }: { item: CatalogItem; pick: HardwarePick | undefined; capacityOption: string | null; heading: HardwareKind | null }) {
   const id = useId();
   const selected = pick?.selected ?? false;
   const count = pick?.count ?? item.default_count;
+  const figures = catalogFigureRows(item);
+  const options = item.capacity_options ?? [];
   return (
-    <li className={`flex items-center gap-3 rounded-[3px] border px-2 py-1.5 ${selected ? 'border-line bg-accent-soft' : 'border-transparent'}`} data-testid="hardware-row">
-      <div className="grid h-11 w-12 shrink-0 place-items-center rounded-[3px] border border-line text-ink-2" data-testid="picture-slot">
-        {item.picture ? <img src={item.picture} alt="" className="max-h-full max-w-full object-contain" /> : <HardwareGlyph id={item.id} kind={item.kind} />}
-      </div>
-      <label htmlFor={id} className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3">
-        <input id={id} type="checkbox" className="check" checked={selected} onChange={(e) => actions.toggleHardware(item.id, e.target.checked)} />
-        <span className="min-w-0">
-          <span className="block break-words text-[14px] leading-snug text-ink">{item.name}</span>
-          {item.note ? <span className="block break-words text-[13px] leading-snug text-ink-2">{item.note}</span> : null}
-        </span>
-      </label>
-      {item.countable ? (
-        <div className="flex shrink-0 items-center gap-1" role="group" aria-label={`${item.name} count`}>
-          <button
-            type="button"
-            className="btn btn-icon"
-            aria-label={`Fewer ${item.name}`}
-            disabled={!selected || count <= 1}
-            onClick={() => actions.setHardwareCount(item.id, count - 1, item.max_count)}
-          >
-            <Icon name="minus" size={14} />
-          </button>
-          <span className="num w-7 text-center text-[15px]" aria-live="polite" data-testid="hardware-count">
-            {count}
-          </span>
-          <button
-            type="button"
-            className="btn btn-icon"
-            aria-label={`More ${item.name}`}
-            disabled={!selected || count >= item.max_count}
-            onClick={() => actions.setHardwareCount(item.id, count + 1, item.max_count)}
-          >
-            <Icon name="plus" size={14} />
-          </button>
-        </div>
+    <>
+      {heading ? (
+        <li className="label px-2 pt-2" aria-hidden data-testid="kind-heading" data-kind={heading}>
+          {KIND_HEADING[heading]}
+        </li>
       ) : null}
-    </li>
+      <li className={`flex flex-col gap-1 rounded-[3px] border px-2 py-1.5 ${selected ? 'border-line bg-accent-soft' : 'border-transparent'}`} data-testid="hardware-row" data-id={item.id} data-kind={item.kind}>
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-12 shrink-0 place-items-center rounded-[3px] border border-line text-ink-2" data-testid="picture-slot">
+            {item.picture ? <img src={item.picture} alt="" className="max-h-full max-w-full object-contain" /> : <HardwareGlyph id={item.id} kind={item.kind} />}
+          </div>
+          <label htmlFor={id} className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3">
+            <input id={id} type="checkbox" className="check" checked={selected} onChange={(e) => actions.toggleHardware(item.id, e.target.checked)} />
+            <span className="min-w-0">
+              <span className="block break-words text-[14px] leading-snug text-ink">{item.name}</span>
+              {item.note ? <span className="block break-words text-[13px] leading-snug text-ink-2">{item.note}</span> : null}
+            </span>
+          </label>
+          {item.countable ? (
+            <div className="flex shrink-0 items-center gap-1" role="group" aria-label={`${item.name} count`}>
+              <button
+                type="button"
+                className="btn btn-icon"
+                aria-label={`Fewer ${item.name}`}
+                disabled={!selected || count <= 1}
+                onClick={() => actions.setHardwareCount(item.id, count - 1, item.max_count)}
+              >
+                <Icon name="minus" size={14} />
+              </button>
+              <span className="num w-7 text-center text-[15px]" aria-live="polite" data-testid="hardware-count">
+                {count}
+              </span>
+              <button
+                type="button"
+                className="btn btn-icon"
+                aria-label={`More ${item.name}`}
+                disabled={!selected || count >= item.max_count}
+                onClick={() => actions.setHardwareCount(item.id, count + 1, item.max_count)}
+              >
+                <Icon name="plus" size={14} />
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {figures.length > 0 ? (
+          <ul className="m-0 ml-[3.75rem] flex list-none flex-col gap-0.5 p-0 text-[12px] leading-snug" aria-label={`${item.name}: published figures`} data-testid="figures">
+            {figures.map((f) => (
+              <li key={f.key} className="flex flex-wrap items-baseline gap-x-1.5" data-testid="figure" data-published={f.published}>
+                <span className="text-ink-2">{f.label}:</span>
+                <span className={`num ${f.published ? 'text-ink' : 'text-muted'}`}>{f.value}</span>
+                {f.status.map((s) => (
+                  <span key={s} className="rounded-[2px] border border-line px-1 text-[12px] text-ink-2" data-testid="figure-status">
+                    {s}
+                  </span>
+                ))}
+                {f.source ? (
+                  <span className="text-muted" data-testid="figure-source">
+                    {f.source}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {options.length > 1 ? (
+          <fieldset className="m-0 ml-[3.75rem] min-w-0 border-0 p-0 text-[12px] leading-snug" data-testid="capacity-options">
+            <legend className="p-0 text-ink-2">Payload figure for the fit check (pick one):</legend>
+            {options.map((o) => (
+              <label key={o.option} className="flex min-h-8 cursor-pointer items-start gap-2 py-0.5">
+                <input
+                  type="radio"
+                  className="mt-0.5"
+                  name={`capacity-${item.id}`}
+                  value={o.option}
+                  checked={capacityOption === o.option}
+                  onChange={() => actions.pickCapacity(item.id, o.option)}
+                  data-testid="capacity-option"
+                />
+                <span className="min-w-0">
+                  <span className="text-ink">{o.label}</span> <span className="num text-ink">{figureValue(o.figure).text}</span>{' '}
+                  {o.figure.status.map((s) => (
+                    <span key={s} className="rounded-[2px] border border-line px-1 text-[12px] text-ink-2">
+                      {s}
+                    </span>
+                  ))}{' '}
+                  <span className="text-muted">{o.figure.source}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        ) : null}
+      </li>
+    </>
   );
 }
 
@@ -288,15 +368,19 @@ function StorageRow() {
 function PowerBalance({
   check,
   status,
+  error,
   hasHardware,
   siteName,
   onRetry,
+  pickedLabels,
 }: {
   check: CheckResponse | null;
   status: string;
+  error: string | null;
   hasHardware: boolean;
   siteName: string | null;
   onRetry: () => void;
+  pickedLabels: string[];
 }) {
   const [open, setOpen] = useState(false);
   const detailsId = useId();
@@ -316,6 +400,7 @@ function PowerBalance({
         <p className="label m-0">Power balance</p>
         <p className="m-0 mt-1 flex flex-wrap items-center gap-3 text-[14px] text-ink-2">
           <span data-tone="bad">Could not run the power check.</span>
+          {error ? <span data-testid="check-error">{error}</span> : null}
           <button type="button" className="btn" onClick={onRetry}>
             Try again
           </button>
@@ -421,10 +506,24 @@ function PowerBalance({
               {needed !== null ? <span className="text-ink-2">, {formatAmount(needed, 'kWh')} needed</span> : null}
             </dd>
           </div>
-          <div className="flex justify-between gap-3 border-t border-line pt-2">
-            <dt className="text-ink-2">Energy over the stay</dt>
-            <dd className="num m-0 text-ink">{formatKwh(check.energy_added_kwh)}</dd>
-          </div>
+          {typeof check.energy_added_kwh === 'number' ? (
+            <div className="flex justify-between gap-3 border-t border-line pt-2">
+              <dt className="text-ink-2">Energy over the stay</dt>
+              <dd className="num m-0 text-ink">{formatKwh(check.energy_added_kwh)}</dd>
+            </div>
+          ) : null}
+          {check.site_energy ? (
+            <div className="flex justify-between gap-3 border-t border-line pt-2" data-testid="site-energy">
+              <dt className="text-ink-2">Energy the darkness adds</dt>
+              <dd className="num m-0 text-right text-ink">
+                {formatKwh(check.site_energy.total_kwh)}
+                <span className="text-ink-2">
+                  {' '}
+                  ({formatAmount(check.site_energy.dark_hours, 'h')} dark, {check.site_energy.nights} {check.site_energy.nights === 1 ? 'night' : 'nights'})
+                </span>
+              </dd>
+            </div>
+          ) : null}
           {check.power_notes.map((n) => (
             <p key={n} className="m-0 text-ink-2">
               {n}
@@ -432,9 +531,24 @@ function PowerBalance({
           ))}
         </dl>
       ) : null}
-      <p className="m-0 mt-3 break-words text-[13px] leading-snug" data-tone={check.fits ? undefined : 'bad'} data-testid="fit-status">
-        {check.fits ? 'Hardware fits.' : `Does not fit: ${check.fit_notes.join(' ')}`}
-      </p>
+      <div className="mt-3 text-[13px] leading-snug" data-testid="fit-status" data-fits={check.fits === null ? 'unknown' : String(check.fits)}>
+        <p className="m-0 break-words" data-tone={check.fits === true ? undefined : check.fits === false ? 'bad' : 'warn'}>
+          {check.fits === true ? 'Hardware fits' : check.fits === false ? 'Does not fit' : 'Fit not known'}: {check.fit_verdict}.
+        </p>
+        {check.fit_notes.length > 0 ? (
+          <ul className="m-0 mt-1 flex list-none flex-col gap-0.5 p-0 text-ink-2" data-testid="fit-notes">
+            {check.fit_notes.map((n) => {
+              const mine = pickedLabels.some((label) => n.includes(label));
+              return (
+                <li key={n} className={`break-words ${mine ? 'text-ink' : ''}`} data-picked={mine || undefined}>
+                  {n}
+                  {mine ? <span className="text-accent"> (your pick)</span> : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+      </div>
     </div>
   );
 }

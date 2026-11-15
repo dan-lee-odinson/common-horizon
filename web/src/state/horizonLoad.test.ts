@@ -2,13 +2,18 @@
 // length of the window, so the lit and dark periods and the next sunrise or sunset are those of the
 // model for the longest stays too. Checked against the example (mock) model for every preset site.
 
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { api } from '../api/client';
 import sitesJson from '../api/examples/sites.json';
 import { configureMock } from '../api/mock';
-import { horizonFor, skylineFor, subsolarPoint, TRANSIT_DAYS } from '../api/mock/model';
-import type { HorizonResponse, SiteRef } from '../api/types';
+import { horizonFor, MOCK_PROVENANCE, skylineFor, subsolarPoint, TRANSIT_DAYS } from '../api/mock/model';
+import type { DataProvenance, HorizonResponse, SiteRef } from '../api/types';
 import { azElFromSubpoint, sampleProfile } from '../util/geo';
 import { litPeriods, nextSunChange, sunAt, sunPathTimes } from '../util/horizon';
+import { sunWidthDeg } from '../util/bodies';
+
+/** Half the Sun's apparent width: the answer's "above" is any part of the disc over the skyline. */
+const SUN_DISC_RADIUS_DEG = sunWidthDeg() / 2;
 import { DAY_MS, HOUR_MS } from '../util/time';
 import { horizonRequests, horizonStepHours, loadHorizon, MAX_SAMPLE_HOURS, mergeHorizon, STEPS_PER_REQUEST } from './horizonLoad';
 
@@ -28,7 +33,8 @@ function modelChanges(s: SiteRef, startMs: number, endMs: number): number[] {
   const above = (t: number) => {
     const p = subsolarPoint(t);
     const sun = azElFromSubpoint(s.lat, s.lon_east, p.lat, p.lonEast);
-    return sun.el > sampleProfile(skyline, sun.az);
+    // The answer's rule: any part of the disc above the skyline.
+    return sun.el + SUN_DISC_RADIUS_DEG > sampleProfile(skyline, sun.az);
   };
   const out: number[] = [];
   const dt = 3 * 60_000;
@@ -147,7 +153,7 @@ describe('joining the answers', () => {
   });
 
   it('an empty answer stays empty', () => {
-    const empty: HorizonResponse = { site_id: s.id, skyline: [], sun_path: [], earth_box: null };
+    const empty: HorizonResponse = { site_id: s.id, skyline: [], sun_path: [], earth_box: null, skyline_source: 'stored_profile', time_step_s: 0, provenance: MOCK_PROVENANCE, warnings: [] };
     expect(mergeHorizon([empty, empty])).toEqual(empty);
   });
 });
@@ -167,9 +173,12 @@ describe('shorter windows', () => {
   }
 
   // Shackleton ridge is the hard case: near the pole the Sun grazes the skyline.
-  it.each([14, 29.53, 90])('places each sunrise and sunset within 0.05 h of the mock model for a %s-day window (shown to 0.1 h)', async (days) => {
-    expect(await worstPlacementHours('shackleton-ridge', days)).toBeLessThan(0.05);
-    expect(await worstPlacementHours('apollo-11', days)).toBeLessThan(0.05);
+  // A change is placed midway between the two samples whose words differ (the nearest sample's word
+  // holds between samples), so it is within half the spacing of the model's own change.
+  it.each([14, 29.53, 90])('places each sunrise and sunset within half a sample spacing of the mock model for a %s-day window', async (days) => {
+    const half = horizonStepHours(PLANNED, PLANNED + days * DAY_MS) / 2 + 1e-6;
+    expect(await worstPlacementHours('shackleton-ridge', days)).toBeLessThanOrEqual(half);
+    expect(await worstPlacementHours('apollo-11', days)).toBeLessThanOrEqual(half);
   });
 });
 
@@ -187,38 +196,36 @@ describe.each([186, 365.25, 395.25])('a %s-day window, every preset site', (days
     for (let i = 1; i < times.length; i++) widest = Math.max(widest, times[i] - times[i - 1]);
     expect(widest).toBeLessThanOrEqual(MAX_SAMPLE_HOURS * HOUR_MS);
 
-    // The lit / dark timeline: the same changes as the model, one for one, each within a tenth of
-    // an hour or so. (The answer gives the Sun's height to a thousandth of a degree; where the Sun
-    // grazes a skyline almost parallel to its path, as at Shackleton ridge, that alone is worth
-    // several minutes.)
+    // The lit / dark timeline: the same changes as the model, one for one, each within half a
+    // sample spacing (half an hour here), where the nearest-sample rule places it.
     const real = modelChanges(s, PLANNED, end);
     const periods = litPeriods(horizon);
     const placed = periods.slice(1).map((p) => p.start);
     expect(placed).toHaveLength(real.length);
     let worst = 0;
     placed.forEach((t, i) => (worst = Math.max(worst, Math.abs(t - real[i]) / HOUR_MS)));
-    expect(worst).toBeLessThan(0.12);
-    if (s.id !== 'shackleton-ridge') expect(worst).toBeLessThan(0.05);
+    expect(worst).toBeLessThanOrEqual(MAX_SAMPLE_HOURS / 2 + 1e-6);
 
     // "Next sunrise / sunset", read just after each change and a third of the way to the next, is
     // the model's next change, of the right kind.
     const startsLit = sunAt(horizon, PLANNED)!.above;
     const askAt = [PLANNED, ...real.flatMap((r, i) => [r + 0.2 * HOUR_MS, r + ((real[i + 1] ?? end) - r) / 3])];
     for (const t of askAt) {
-      const next = real.findIndex((r) => r > t + 0.12 * HOUR_MS);
+      const next = real.findIndex((r) => r > t + 0.51 * HOUR_MS);
       const change = nextSunChange(horizon, t);
       if (next === -1) {
         // Nothing left in the window (or a change within minutes of the instant asked).
-        if (change) expect(real.some((r) => Math.abs(r - change.atMs) < 0.12 * HOUR_MS)).toBe(true);
+        if (change) expect(real.some((r) => Math.abs(r - change.atMs) < 0.51 * HOUR_MS)).toBe(true);
         continue;
       }
       expect(change).not.toBeNull();
       // The reader may still see the change the instant sits within minutes of; otherwise the next.
       const candidates = [real[next], real[next - 1]].filter((r) => r !== undefined);
-      expect(Math.min(...candidates.map((r) => Math.abs(change!.atMs - r))) / HOUR_MS).toBeLessThan(0.12);
+      expect(Math.min(...candidates.map((r) => Math.abs(change!.atMs - r))) / HOUR_MS).toBeLessThanOrEqual(0.5 + 1e-6);
       expect(change!.sampleGapHours).toBeLessThanOrEqual(MAX_SAMPLE_HOURS + 1e-9);
-      expect(change!.interpolated).toBe(true);
-      if (Math.abs(change!.atMs - real[next]) < 0.12 * HOUR_MS) {
+      // Placed by the nearest-sample rule, never read off a crossing.
+      expect(change!.interpolated).toBe(false);
+      if (Math.abs(change!.atMs - real[next]) <= 0.5 * HOUR_MS) {
         // Changes alternate, so the kind follows from how the window starts.
         expect(change!.kind).toBe((next % 2 === 0) === startsLit ? 'sunset' : 'sunrise');
       }
@@ -227,21 +234,66 @@ describe.each([186, 365.25, 395.25])('a %s-day window, every preset site', (days
 });
 
 describe('what the single coarse request used to miss', () => {
-  // Before the window was split, a 395.25-day window was one request with samples 4 hours apart.
-  // At Shackleton ridge the Sun slips behind a peak for under an hour at a time: spells like that
-  // fell between two samples, and the next sunset shown was the one after.
-  it('finds the short spells at Shackleton ridge that samples 4 hours apart step over', async () => {
+  // One coarse request over a long window steps over short spells: at Shackleton ridge the Sun's
+  // disc slips behind the terrain for about half a day at a time, and samples a day apart miss such
+  // spells. The joined answer, an hour apart at most, keeps every one.
+  it('finds the short spells at Shackleton ridge that samples a day apart step over', async () => {
     const s = site('shackleton-ridge');
     const end = PLANNED + 395.25 * DAY_MS;
     const real = modelChanges(s, PLANNED, end);
-    const coarse = horizonFor(s, PLANNED, end, 4);
+    const coarse = horizonFor(s, PLANNED, end, 24);
     const fine = await loadHorizon(s, PLANNED, end);
     expect(litPeriods(coarse).length - 1).toBeLessThan(real.length);
     expect(litPeriods(fine).length - 1).toBe(real.length);
-    // A spell shorter than four hours exists in the model, and the joined answer shows it.
+    // A spell shorter than a day exists in the model, and the joined answer shows it, to within a
+    // sample spacing (each end is placed within half of one).
     const shortest = Math.min(...real.slice(1).map((t, i) => t - real[i])) / HOUR_MS;
-    expect(shortest).toBeLessThan(4);
+    expect(shortest).toBeLessThan(24);
     const shownShortest = Math.min(...litPeriods(fine).slice(1, -1).map((p) => p.end - p.start)) / HOUR_MS;
-    expect(Math.abs(shownShortest - shortest)).toBeLessThan(0.12);
+    expect(Math.abs(shownShortest - shortest)).toBeLessThanOrEqual(MAX_SAMPLE_HOURS + 1e-6);
+  });
+});
+
+describe('a window that takes two requests keeps the answer’s added fields when joined', () => {
+  const s = site('apollo-11');
+  const end = PLANNED + 186 * DAY_MS;
+  const physics: DataProvenance = { ...MOCK_PROVENANCE, source: 'physics_engine', is_synthetic: false, engine_name: 'engine', notice: 'From the physics engine.' };
+
+  /** Loads the window with each part answered by the example model, then changed by `alter` (part 0, part 1). */
+  async function joined(alter: (part: HorizonResponse, i: number) => HorizonResponse): Promise<HorizonResponse> {
+    let i = 0;
+    const spy = vi.spyOn(api, 'horizon').mockImplementation(async (req) => alter(horizonFor(req.site, Date.parse(req.start_utc), Date.parse(req.end_utc), req.step_hours), i++));
+    try {
+      return await loadHorizon(s, PLANNED, end);
+    } finally {
+      spy.mockRestore();
+      expect(i).toBe(2);
+    }
+  }
+
+  it('needs two requests', () => {
+    expect(horizonRequests(PLANNED, end)).toHaveLength(2);
+  });
+
+  it('joins the warnings without repeats, keeps the largest step and the source that says less, and labels a mix synthetic', async () => {
+    const h = await joined((part, i) =>
+      i === 0
+        ? { ...part, provenance: physics, warnings: ['First.', 'Shared.'], time_step_s: 3600, skyline_source: 'stored_profile' }
+        : { ...part, provenance: MOCK_PROVENANCE, warnings: ['Shared.', 'Second.'], time_step_s: 3720, skyline_source: 'smooth_sphere' },
+    );
+    expect(h.warnings).toEqual(['First.', 'Shared.', 'Second.']);
+    expect(h.time_step_s).toBe(3720);
+    expect(h.skyline_source).toBe('smooth_sphere');
+    expect(h.provenance.is_synthetic).toBe(true);
+    expect(h.provenance).toEqual(MOCK_PROVENANCE);
+  });
+
+  it('keeps the provenance all the parts agree on', async () => {
+    const h = await joined((part) => ({ ...part, provenance: physics, warnings: [], time_step_s: 3600, skyline_source: 'stored_profile' }));
+    expect(h.provenance).toEqual(physics);
+    expect(h.provenance.is_synthetic).toBe(false);
+    expect(h.warnings).toEqual([]);
+    expect(h.time_step_s).toBe(3600);
+    expect(h.skyline_source).toBe('stored_profile');
   });
 });

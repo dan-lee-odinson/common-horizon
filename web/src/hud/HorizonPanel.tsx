@@ -28,6 +28,16 @@ export interface SunMark {
   elText?: string;
 }
 
+/**
+ * What the Sun marker says: lit, dark, unknown, or none (no direction to place it by). Lit or dark is
+ * the answer's own word (SunMark.lit), never the Sun's centre against the skyline, so the marker and
+ * the stay timeline (which draws the same answer's periods) cannot disagree.
+ */
+export function sunMarkerState(sun: SunMark | null): 'lit' | 'dark' | 'unknown' | 'none' {
+  if (sun === null || !Number.isFinite(sun.az) || !Number.isFinite(sun.el)) return 'none';
+  return sun.lit === null ? 'unknown' : sun.lit ? 'lit' : 'dark';
+}
+
 export type HorizonVariant = 'console' | 'hero' | 'compact';
 
 export interface HorizonPanelProps {
@@ -121,9 +131,8 @@ export function HorizonPanel({ data, fromMs, toMs, elRange = null, label, getSun
       const sunEl = sunRef.current;
       if (sunEl) {
         const sun = getSun?.() ?? null;
-        const ok = sun !== null && Number.isFinite(sun.az) && Number.isFinite(sun.el);
-        const p = ok ? place(sun.az, sun.el) : null;
-        const state = !ok ? 'none' : sun.lit === null ? 'unknown' : sun.lit ? 'lit' : 'dark';
+        const state = sunMarkerState(sun);
+        const p = sun !== null && state !== 'none' ? place(sun.az, sun.el) : null;
         const key = p ? `${p.x.toFixed(1)},${p.y.toFixed(1)},${p.below},${state},${sun?.azText ?? ''},${sun?.elText ?? ''}` : 'none';
         if (key !== written.current.sun) {
           written.current.sun = key;
@@ -134,8 +143,11 @@ export function HorizonPanel({ data, fromMs, toMs, elRange = null, label, getSun
             sunEl.dataset.below = String(p.below);
             sunEl.dataset.az = sun.azText ?? '';
             sunEl.dataset.el = sun.elText ?? '';
-            // Where the dot stands against the plotted skyline: the 3D scene can be checked against it.
-            sunEl.dataset.above = String(sun.el > sampleProfile(data.skyline, sun.az));
+            // Lit or dark is the answer's own word (any part of the disc above the terrain, nearest
+            // sample between samples): the same word the timeline and the readouts show. It is never
+            // worked out again here from the Sun's centre against the skyline.
+            if (sun.lit === null) delete sunEl.dataset.above;
+            else sunEl.dataset.above = String(sun.lit);
           }
         }
       }

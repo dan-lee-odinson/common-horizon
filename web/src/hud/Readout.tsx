@@ -10,13 +10,14 @@ import { useTicker } from './useTicker';
 
 export type ReadoutSize = 'sm' | 'md' | 'lg' | 'xl';
 
-export function Readout({ q, size = 'md', className = '', hideLabel = false }: { q: Quantity; size?: ReadoutSize; className?: string; hideLabel?: boolean }) {
+/** `wrap`: the unit may go to the next line when the value is too wide for its cell (a score range, say). */
+export function Readout({ q, size = 'md', className = '', hideLabel = false, wrap = false }: { q: Quantity; size?: ReadoutSize; className?: string; hideLabel?: boolean; wrap?: boolean }) {
   return (
     <div className={`readout ${className}`} data-q={q.key}>
       <span className={hideLabel ? 'sr-only' : 'label'} data-q-label>
         {q.label}
       </span>
-      <span className="readout-value" data-size={size} data-tone={q.tone ?? 'ink'}>
+      <span className={`readout-value${wrap ? ' whitespace-normal' : ''}`} data-size={size} data-tone={q.tone ?? 'ink'}>
         <span data-q-text>{q.text}</span>
         <span className="readout-unit" data-q-unit>
           {q.unit}

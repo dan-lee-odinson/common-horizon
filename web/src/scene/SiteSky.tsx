@@ -18,7 +18,7 @@ import { cssColor } from './colors';
 import { glowTexture } from './glow';
 import { EARTH_FRAGMENT, EARTH_VERTEX } from './shaders';
 import type { SiteNow } from './siteNow';
-import { domePoint, earthDiscRadius, SITE_VIEW, sunDiscRadius } from './siteView';
+import { bandAz, domePoint, earthDiscRadius, SITE_VIEW, sunDiscRadius } from './siteView';
 import { Stars } from './Stars';
 
 /** The Sun's glow is this many disc widths across, at this opacity while the site is lit. */
@@ -130,15 +130,17 @@ function SkylineBand({ profile }: { profile: readonly number[] }) {
     const bandPos: number[] = [];
     const edgePos: number[] = [];
     const index: number[] = [];
-    for (let az = 0; az <= 360; az++) {
-      const el = profile[az];
+    const steps = profile.length - 1;
+    for (let k = 0; k <= steps; k++) {
+      const az = bandAz(profile, k);
+      const el = profile[k];
       const base = domePoint(az, SITE_VIEW.bandFloorDeg);
       const top = domePoint(az, el);
       const over = domePoint(az, el + SITE_VIEW.edgeDeg);
       bandPos.push(base.x, base.y, base.z, top.x, top.y, top.z);
       edgePos.push(top.x, top.y, top.z, over.x, over.y, over.z);
-      if (az < 360) {
-        const a = az * 2;
+      if (k < steps) {
+        const a = k * 2;
         index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
       }
     }

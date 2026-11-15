@@ -81,7 +81,7 @@ test('stage 3: site', async ({ page }, info) => {
     await page.getByTestId('zoom-to-site').click();
     await page.getByTestId('site-hud').waitFor();
     // The reticle names the lander only when the camera has come to rest and the lander's shape is in.
-    await page.getByTestId('lander-reticle').locator('[data-marker-tag]').getByText('Starship lander').waitFor({ timeout: 60_000 });
+    await page.getByTestId('lander-reticle').locator('[data-marker-tag]').getByText('Starship HLS').waitFor({ timeout: 60_000 });
     await page.locator('[data-testid="site-scrub"]:not([disabled])').waitFor({ timeout: 60_000 });
     await page.mouse.move(view.width / 2, view.height / 2);
     await page.waitForTimeout(4000);

@@ -49,6 +49,11 @@ export const SITE_VIEW = {
    */
   pitchDeg: 9,
   pitchMinDeg: 3,
+  /**
+   * Lower still, down to this, but only when that brings a low Sun into the clear part of the
+   * window (a panel across the bottom, such as the Data checks band, leaves the picture less height).
+   */
+  pitchLowDeg: 1,
   /** How near and how far the visitor may zoom, metres from the point looked at. */
   minDistance: 8,
   maxDistance: 400,
@@ -163,21 +168,30 @@ export function skylineMinDeg(skyline: readonly { el: number }[]): number | null
 }
 
 /**
- * The top of the skyline band at each whole degree of azimuth, 0 to 360 inclusive (the last equals
- * the first): the data's skyline, resampled, with nothing clamped. The band is built from these
- * values and the scene asks them whether a body stands clear of the terrain, so the two agree.
+ * The top of the skyline band at evenly spaced azimuths from 0 to 360 inclusive (the last equals
+ * the first): the data's skyline at the spacing it arrives with (720 points for the backend's stored
+ * profiles, every 0.5 degrees), and never coarser than a degree, with nothing clamped. The band is
+ * built from these values and the scene asks them whether a body stands clear of the terrain, so
+ * the two agree.
  */
 export function bandProfile(skyline: readonly { az: number; el: number }[]): number[] {
+  const steps = Math.max(360, skyline.length);
   const out: number[] = [];
-  for (let az = 0; az <= 360; az++) out.push(sampleProfile(skyline, az % 360));
+  for (let i = 0; i <= steps; i++) out.push(sampleProfile(skyline, ((i * 360) / steps) % 360));
   return out;
 }
 
-/** The band's top at any azimuth, degrees: a straight line between the two whole degrees either side. */
+/** The azimuth of a band profile's point `i`, degrees. */
+export function bandAz(profile: readonly number[], i: number): number {
+  return (i * 360) / (profile.length - 1);
+}
+
+/** The band's top at any azimuth, degrees: a straight line between the two profile points either side. */
 export function bandTopAt(profile: readonly number[], azDeg: number): number {
   if (profile.length < 361) return 0;
-  const a = ((azDeg % 360) + 360) % 360;
-  const i = Math.floor(a);
+  const steps = profile.length - 1;
+  const a = ((((azDeg % 360) + 360) % 360) * steps) / 360;
+  const i = Math.min(steps - 1, Math.floor(a));
   const f = a - i;
   return profile[i] * (1 - f) + profile[i + 1] * f;
 }
@@ -237,7 +251,10 @@ export function orbitPosition(target: Vec3, distance: number, azDeg: number, pol
  */
 export function arrivalPitch(sun: { az: number; el: number } | null, clearUpDeg: number): number {
   if (!sun || !Number.isFinite(sun.el) || sun.el < -5 || sun.el >= 25 || !Number.isFinite(clearUpDeg)) return SITE_VIEW.pitchDeg;
-  return clampTo(clearUpDeg - sun.el, SITE_VIEW.pitchMinDeg, SITE_VIEW.pitchDeg);
+  const fit = clearUpDeg - sun.el;
+  // Below the usual least pitch only where the Sun then fits; a Sun too high to fit keeps the usual view.
+  if (fit < SITE_VIEW.pitchMinDeg && fit >= SITE_VIEW.pitchLowDeg) return fit;
+  return clampTo(fit, SITE_VIEW.pitchMinDeg, SITE_VIEW.pitchDeg);
 }
 
 /**
@@ -298,7 +315,7 @@ export function restPose(input: RestInput): SitePose {
   const span = Math.max(H / 0.72, 0.9 * Math.max(0, input.layoutRadius));
   const distance = clampTo(span / (2 * Math.tan((input.fovDeg * DEG) / 2) * share), 14, 260);
   const target = { x: 0, y: targetH, z: 0 };
-  const polarDeg = 90 - clampTo(input.pitchDeg ?? SITE_VIEW.pitchDeg, SITE_VIEW.pitchMinDeg, SITE_VIEW.pitchDeg);
+  const polarDeg = 90 - clampTo(input.pitchDeg ?? SITE_VIEW.pitchDeg, SITE_VIEW.pitchLowDeg, SITE_VIEW.pitchDeg);
   return { target, position: orbitPosition(target, distance, input.viewAzDeg, polarDeg), distance, azDeg: input.viewAzDeg, polarDeg };
 }
 

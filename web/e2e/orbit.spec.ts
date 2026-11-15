@@ -149,8 +149,9 @@ test('orbit: at 2027-02-17 12:00 UTC the part of Earth on screen is its night si
   await orbitAt(page, 45);
   await expect.poll(() => readout(page, 'utc')).toBe('2027-02-17 12:00:00');
   const g = { sunLat: await degrees(page, 'subsolar_lat'), sunLon: await degrees(page, 'subsolar_lon'), earthLat: await degrees(page, 'subearth_lat'), earthLon: await degrees(page, 'subearth_lon') };
-  expect(g.sunLon).toBeCloseTo(45.99, 1);
-  expect(g.earthLon).toBeCloseTo(352.93, 1);
+  // The example model's values, fitted to the physics engine's for February 2027 (src/scene/orbitEarth.test.ts says more).
+  expect(g.sunLon).toBeCloseTo(45.27, 1);
+  expect(g.earthLon).toBeCloseTo(357.21, 1);
   await expect(page.locator('[data-marker="earthLimb"]')).toHaveAttribute('data-visible', 'true');
   await page.waitForTimeout(1200);
 
@@ -170,7 +171,7 @@ test('orbit: at 2027-02-17 12:00 UTC the part of Earth on screen is its night si
   // No more than a few stray points (the leader line and Earth's own line cross the disc) are brighter.
   expect(dark.filter((b) => b > 0.12).length).toBeLessThan(face.length * 0.06);
 
-  // The whole Earth: about 30 to 40 percent of the disc is lit, on its left, the Sun's side.
+  // The whole Earth: about a quarter of the disc is lit, on its left, the Sun's side.
   await page.getByTestId('orbit-zoom').click();
   await expect(page.getByTestId('orbit-zoom')).toHaveAttribute('aria-pressed', 'true');
   await page.waitForTimeout(1500);

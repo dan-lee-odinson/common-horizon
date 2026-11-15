@@ -121,7 +121,9 @@ npx playwright install chromium
 `src/api/client.ts` is the only file that talks to the network.
 
 * **`VITE_API_BASE` unset or empty → mock mode.** Answers come from `src/api/examples/*.json`
-  and a small mock model in `src/api/mock/`. The top bar shows an "Example data" badge.
+  and a small mock model in `src/api/mock/`, in exactly the backend's shapes. The top bar says
+  **EXAMPLE DATA**. The hardware catalog is a copy of the backend's `GET /catalog` answer (the
+  planner's ids, figures, status labels and sources).
 * **`VITE_API_BASE` set → live mode.** Copy `.env.example` to `.env.local` and set the address:
 
   ```bash
@@ -131,7 +133,17 @@ npx playwright install chromium
   then edit `.env.local`, for example `VITE_API_BASE=http://localhost:8000`, and restart `npm run dev`.
 
   The backend must allow cross-origin requests (CORS) from the address the website is served
-  from, unless both are served from the same address.
+  from, unless both are served from the same address (on the backend: `CH_CORS_ORIGINS`, or
+  `CH_CORS_EXTRA_ORIGINS` to add one).
+
+  The top bar then says where the numbers come from: **TEST DATA** while the backend answers from
+  its synthetic test fixture (`provenance.is_synthetic` true), **LIVE: PHYSICS ENGINE** once it
+  answers from the physics engine. When `/health` says `assistant_available` is false, the assistant
+  bar says it is not available in this version and takes no input.
+
+  To run the main browser path against a backend: start it (for example from `backend/`,
+  `CH_CORS_EXTRA_ORIGINS=http://localhost:4174 uvicorn app.main:app --port 8000`), then
+  `npm run test:e2e:live` (another address: `CH_E2E_API_BASE=...`).
 
 The mock answers change with the slip (the Sun's position over each site moves through the lunar
 day), so the ranking visibly reorders. They are **not** real data: the geometry is simplified and the
@@ -147,11 +159,48 @@ To see the other states on purpose in mock mode, add one of these to the page ad
 | `?assistant=off` | the assistant's fifth state: unavailable |
 | `?webgl=off` | the flat 2D Moon used when a browser has no 3D (WebGL) |
 
-### API calls (provisional)
+### API calls
 
-The types in `src/api/types.ts` are hand-written and marked **provisional**: they will be
-regenerated from the backend's OpenAPI file. Sample answers the website expects are in
+The types in `src/api/types.ts` follow the backend's models (`backend/docs/WEBSITE_API.md`) field
+for field, and both modes use them. Sample answers of the example model are in
 `src/api/examples/*.sample.json` (kept in step with the mock by a test).
+
+* **Ranking.** The website keeps the backend's order (each result's `rank`: passing sites, then
+  unknown, then failing) and never re-sorts by score. A null score is shown as its range,
+  `score_min`–`score_max`. A verdict of `unknown` is shown as UNKNOWN with the requirement that
+  could not be checked, never as a pass, with one exception: when nothing failed and the landing
+  slope is the only requirement left unchecked, it shows as PASS with the reason beside it ("Slope
+  not checked: no published slope limit for this lander", or "... no slope data for this point" for
+  a custom point, or wherever the answer has no slope for a lander that publishes a limit). The site
+  keeps the backend's place in the order. `slope_deg`, when the answer has it, is shown with what it
+  is: the answer's `slope_source` when it gives one ("slope of the best-fit plane to LOLA heights
+  within 500 m (NASA Moon Trek)"), else the backend's name for its requirement ("Landing slope"); the
+  backend's sentence for it is its hover title, and in the Site stage's Data checks when no "not
+  checked" note stands in its place. Long labels and sentences wrap; a score range is set one size
+  smaller than a score so its "/ 100" stays inside the spotlight. In the spotlight the slope has a
+  line of its own; in a short window (820 px tall or less) it takes the score's second line instead,
+  cut to one line with the whole of it in the tooltip, so the ranked strip below keeps its rows.
+* **Data checks** (Site stage): the stored checks first ("Checked against NASA JPL Horizons", then
+  "Checked against NASA Moon Trek: Sun within ..." when `data/moon-trek-sun-check.json` is served and
+  has the site), "Compare now" in live mode, then the slope and terrain notes; the horizon answer's
+  warnings are listed on request. On a wide screen it is a band between the side panels, resting on
+  the console, and the 3D picture is framed above it; at 1440 x 900 all of it is in view. With less
+  height for the picture, the camera may arrive as low as 1° above level (3° before), but only when
+  that keeps a low Sun inside the clear part of the window, and it settles to that pitch when the
+  band is measured after arrival, unless the visitor has turned or zoomed the view. In a short
+  window the band would take too much of the picture: it is shown on request ("Data checks" beside
+  "Reset view") and put away with "Hide".
+* **Transit.** Every `POST /evaluate` carries `transit_days: 5` (our estimate, `src/util/transit.ts`),
+  shown as "Transit 5 days (our estimate)" beside the landing. The landing is always the answer's
+  own `landing_utc`.
+* **Hardware.** Catalog ids are the planner's. A figure the catalog does not have shows "not
+  published"; each figure's status labels and source are shown. A lander with several payload
+  figures (`capacity_options`) lets the visitor pick one (the first by default); the fit check's
+  line for that figure is marked. Which catalog item has which 3D model is one table,
+  `MODEL_FOR` in `src/state/models.ts`; an item with no model stands as a plain labelled marker.
+* **Terrain.** Where an answer says the terrain is not included for a site, its card and the Site
+  stage say "smooth Moon, terrain not included".
+* **Errors.** A 422 shows the backend's own message; a 503 says the physics engine is unavailable.
 
 | Call | Method and path | Purpose |
 | --- | --- | --- |
@@ -162,6 +211,9 @@ regenerated from the backend's OpenAPI file. Sample answers the website expects 
 | horizon | `POST /horizon` | Skyline, the Sun's path (above / hidden) and Earth's box for one site and time window. |
 | fit and power check | `POST /check` | Does the hardware fit; day and night power checks, with battery storage (kWh). |
 | ask the assistant | `POST /assistant` | Text answer only. The assistant never controls the interface. |
+| compare with JPL Horizons | `GET /api/v1/horizons/compare` | Live mode, Site stage, on "Compare now" only: the engine's and NASA JPL Horizons' directions to the Sun and Earth for the site and the clock's time. |
+| stored Horizons check | `data/horizons-check.json` (a file served with the website) | "Checked against NASA JPL Horizons" with the stored figures for the site; the line is hidden when the file or the site is not there. |
+| stored Moon Trek check | `data/moon-trek-sun-check.json` (a file served with the website, from the backend's Moon Trek work) | "Checked against NASA Moon Trek: Sun within ..." for the site; nothing is shown when the file or the site is not there. |
 
 Every call shows four states in the interface — waiting, answer, empty, error — and the assistant
 has a fifth: unavailable (the backend answers HTTP 503, or `/health` says so).
@@ -358,10 +410,11 @@ wheel turn during the descent hands the view over at once.
   hides anything, so the Sun goes behind it exactly when the data says the terrain hides the Sun
   (`src/scene/siteView.test.ts` checks this for every preset site through a stay). It has no
   distance, and the screen says so.
-* **The light** follows the answer's word. Lit: sunlight from the Sun's direction. Dark: the
-  terrain hides the Sun, only a dim fill is left and the stage says "dark". Close to a sunrise or
-  sunset the disc can sit a hair above or below the skyline while the word has already changed (or
-  not yet): the answer's samples are up to an hour apart.
+* **The light** follows the answer's word. Lit: some part of the Sun's disc is above the terrain
+  (the backend's rule for "above", the same rule `/evaluate` counts as sunlight). Dark: the
+  terrain hides the whole disc, only a dim fill is left and the stage says "dark". Between two
+  samples the word is the nearest sample's, so close to a sunrise or sunset the disc can sit a
+  hair above or below the skyline while the word has already changed (or not yet).
 * **The ground** is a level plane and an illustration (the data has no terrain near the site); the
   screen says so. It is never drawn above a cut-off below the lowest point of the skyline, so it
   cannot cover sky the data says is open. Its brightness follows the Sun's height by a display
@@ -373,7 +426,8 @@ wheel turn during the descent hands the view over at once.
   match is not drawn). Where each piece stands is an illustration, laid out so nothing overlaps
   (`src/scene/siteLayout.ts`). The shapes are loaded on demand with three.js's own `GLTFLoader`;
   while one is loading, or if its file fails, its row in the hardware list says so and the rest of
-  the scene carries on. The rover has no model: it is listed, never drawn.
+  the scene carries on. An item with no model (a rover, a power load, the Blue Moon landers) stands
+  as a plain labelled marker: a thin post with its name, in a row south-east of the landing point.
 * **Shadows** are flat projections on the level ground: each model is flattened onto the ground
   along the sunlight, so a shadow is height ÷ tan(Sun's elevation) long and points away from the
   Sun, the same figures as the shadow readouts. They are drawn while the site is lit and the Sun's
@@ -422,10 +476,15 @@ Earth's overhead point, which ignores parallax and is good to about 1 degree.
 come from the site's horizon answer (`POST /horizon`): the terrain skyline around the site and the
 Sun's path through the window, each sample marked above or hidden. The website asks for samples
 never more than one hour apart, however long the stay: a window longer than 150 days is asked for
-in several requests that meet end to end and are joined into one answer (`src/state/horizonLoad.ts`).
-A change is placed where the Sun, followed along a straight line between two samples, crosses the
-skyline as the answer gives it (`src/util/horizon.ts`); against the mock model that is within a
-tenth of an hour or so, which is how finely the time to the next change is shown.
+in several requests that meet end to end and are joined into one answer (`src/state/horizonLoad.ts`;
+the joined answer keeps the parts' warnings, the largest `time_step_s`, and is labelled synthetic if
+any part is). Lit or dark is the answer's own `state`, never worked out again from the Sun's
+centre: between two samples it is the nearest sample's, so a change is placed midway between the
+two samples whose words differ (`src/util/horizon.ts`). Its time is known to half their spacing
+(or of the answer's own `time_step_s`, if coarser), so the time to the next change is shown in
+whole hours, "about", unless the samples are six minutes apart or closer. Every lit or dark display
+(the readouts, the timeline, the plot's Sun marker, the scene's light) reads the same word
+(`src/hud/markerTimeline.test.ts`). The Site stage lists the horizon answer's warnings.
 
 **Time.** LTC (model value) = UTC + 56.02 microseconds for every day counted from the landing time.
 The rate is a published estimate (Ashby and Patla, 2024; see `SOURCES-web.md`). Counting from the
@@ -453,7 +512,7 @@ web/
   index.html               page shell
   src/main.tsx             start-up
   src/App.tsx              the 3D space, the HUD over it and the landing card
-  src/api/                 client.ts (network), types.ts (provisional), mock/, examples/
+  src/api/                 client.ts (network), types.ts (both modes), mock/, examples/
   src/state/               app state, data loading, the geometry track loader, the four-state hook,
                            assistant.ts (the assistant's conversation), horizonLoad.ts (a site's
                            horizon answer for a window of any length), models.ts (the hardware

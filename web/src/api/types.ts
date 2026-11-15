@@ -1,10 +1,9 @@
 /**
- * PROVISIONAL API TYPES — hand-written for the website's mock mode.
- *
- * These describe the answers the website expects from the Python backend (folder backend/).
- * They will be REPLACED by types generated from the backend's OpenAPI file once it exists;
- * until then, treat every name here as a proposal. Field names use snake_case because the
- * backend is Python. Units are in the field names where it matters (_kwh, _deg, _percent...).
+ * API TYPES — one set for both modes: the live backend (backend/, routes in
+ * backend/docs/WEBSITE_API.md) and the website's example mode (src/api/mock/), which answers in
+ * exactly these shapes. They follow the backend's pydantic models in backend/app/models/website.py
+ * and website_horizon.py field for field. Field names use snake_case because the backend is Python.
+ * Units are in the field names where it matters (_kwh, _deg, _percent...).
  *
  * Conventions: latitude in degrees (-90..90); longitude in degrees EAST (0..360);
  * azimuth clockwise from north (0..360); elevation above level (degrees);
@@ -17,8 +16,29 @@ export type IsoUtc = string;
 export interface HealthResponse {
   status: 'ok' | 'degraded';
   version: string;
-  /** False when the assistant (language model) is switched off or unreachable. */
+  /** False when the assistant (language model) is switched off or unreachable. The backend sends false: it has no assistant. */
   assistant_available: boolean;
+  /** Backend only (additive). */
+  service?: string;
+  contract_version?: string;
+  physics_engine?: { name: string; version: string; is_synthetic: boolean; available: boolean };
+}
+
+// ---------- provenance (on /evaluate, /check and /horizon answers) ----------
+
+/**
+ * Where an answer's numbers come from. `is_synthetic` true: placeholder fixtures (the backend's
+ * synthetic engine, or the website's example model), not physics results.
+ */
+export interface DataProvenance {
+  /** "synthetic" or "physics_engine" from the backend; "example" from the website's example model. */
+  source: string;
+  is_synthetic: boolean;
+  engine_name: string;
+  engine_version: string;
+  /** A sentence that says where the numbers come from. */
+  notice: string;
+  sources: string[];
 }
 
 // ---------- GET /sites ----------
@@ -68,28 +88,82 @@ export interface EvaluateRequest {
   hardware: HardwareChoice[];
   /** Battery storage in kWh; 0 = none. */
   storage_kwh: StorageKwh;
+  /**
+   * Launch to landing, days. The website always sends TRANSIT_DAYS (state/app.ts, our estimate).
+   * Left out, the backend counts it as 0 and says so in `warnings`.
+   */
+  transit_days?: number | null;
 }
 
 export type EarthLink = 'clear' | 'intermittent' | 'none';
 
+/**
+ * Requirements are checked in this order: "hardware fit", "night power", "day power",
+ * "landing slope", "Earth contact".
+ */
 export interface Verdict {
-  result: 'pass' | 'fail';
-  /** The requirement that broke, in plain words, when result is "fail". */
+  /** "unknown": nothing failed, but at least one requirement could not be checked. Never a pass. */
+  result: 'pass' | 'fail' | 'unknown';
+  /** fail: the first requirement that failed. unknown: the first that could not be checked. */
   requirement: string | null;
+  /** Every requirement that could not be checked, in order. */
+  unknown_requirements: string[];
+}
+
+/** One requirement's line: passed, failed, or null when it could not be checked. */
+export interface RequirementCheck {
+  requirement: string;
+  passed: boolean | null;
+  detail: string;
+}
+
+/** The four 0..100 terms of the score; null when the input is unknown. */
+export interface ScoreComponents {
+  sunlight: number;
+  darkness: number;
+  earth: number;
+  slope: number | null;
+}
+
+/** The planner's site_energy: the energy a site's darkness adds (night load plus heating). */
+export interface SiteEnergy {
+  dark_hours: number;
+  nights: number;
+  night_penalty_kwh: number;
+  heating_penalty_kwh: number;
+  total_kwh: number;
 }
 
 export interface SiteEvaluation {
   site_id: string;
-  /** 0..100, higher is better. */
-  score: number;
+  /** Position in this answer, 1 = best. The backend owns the order: the website never re-sorts. */
+  rank: number;
+  /** 0..100, higher is better. null when a term is unknown (today: slope): see score_min and score_max. */
+  score: number | null;
+  /** The score with every unknown term at its worst. */
+  score_min: number;
+  /** The score with every unknown term at its best. */
+  score_max: number;
+  score_components: ScoreComponents;
   sunlight_hours: number;
   sunlight_percent: number;
-  /** Share of the sky not blocked by terrain, 0..100. */
-  clear_sky_percent: number;
+  longest_darkness_hours: number;
+  earth_visible_percent: number;
+  /** Share of the sky not blocked by terrain, 0..100. null without a terrain skyline for the site. */
+  clear_sky_percent: number | null;
+  slope_deg: number | null;
+  /**
+   * What slope_deg is, when it is given (from the backend's Moon Trek slopes, feat/moon-trek-slope):
+   * for example "slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek)". Absent
+   * from backends without it, and null where there is no slope (a custom point). Shown as the slope's label.
+   */
+  slope_source?: string | null;
   earth_link: EarthLink;
-  hardware_fits: boolean;
-  /** Net energy over the stay (generation minus load). Negative means a deficit. */
-  energy_added_kwh: number;
+  /** null when the planner cannot decide (several capacity figures, a mass missing). */
+  hardware_fits: boolean | null;
+  /** Always null from the backend: the planner has no net generation-minus-load figure (see site_energy). */
+  energy_added_kwh: number | null;
+  site_energy: SiteEnergy | null;
   /**
    * The site's power balance margin: the worse of the day and night checks (the same number the
    * planner shows for this site). null when there is nothing to check, and also when nothing
@@ -99,6 +173,11 @@ export interface SiteEvaluation {
   /** Colour of the balance, as the planner module gives it. Colours the energy figure. */
   power_status: PowerStatus;
   verdict: Verdict;
+  requirements: RequirementCheck[];
+  elevation_m: number;
+  elevation_source: string;
+  /** About this site only, for example that its terrain is not included. */
+  warnings: string[];
 }
 
 /** Where the Sun and Earth are overhead on the Moon at the landing time. */
@@ -111,13 +190,20 @@ export interface Geometry {
 
 export interface EvaluateResponse {
   launch_utc: IsoUtc;
-  /** Launch + transit + slip. */
+  /** Launch + transit + slip. The website reads the landing from here only. */
   landing_utc: IsoUtc;
+  /** As sent; null means not stated (counted as 0, with a warning). */
+  transit_days: number | null;
   slip_days: number;
   stay_days: number;
-  geometry: Geometry;
-  /** Best first. */
+  /** Sampling step used for every site in this answer, seconds. */
+  time_step_s: number;
+  /** null only if the engine returned no positions. */
+  geometry: Geometry | null;
+  /** Best first, ranked by the backend (each result carries its `rank`). */
   results: SiteEvaluation[];
+  provenance: DataProvenance;
+  warnings: string[];
 }
 
 // ---------- POST /horizon ----------
@@ -125,7 +211,7 @@ export interface HorizonRequest {
   site: SiteRef;
   start_utc: IsoUtc;
   end_utc: IsoUtc;
-  /** Wanted spacing of sun_path samples; the backend may round it. */
+  /** Wanted spacing of sun_path samples. The backend rounds it to whole minutes and may coarsen it (see time_step_s). */
   step_hours: number;
 }
 
@@ -140,7 +226,10 @@ export interface SunPathPoint {
   t: IsoUtc;
   az: number;
   el: number;
-  /** "above" when the Sun's centre is above the terrain skyline at that azimuth. */
+  /**
+   * "above" when ANY PART of the Sun's disc is visible above the terrain skyline (the rule
+   * /evaluate counts as sunlight), otherwise "hidden". az and el are the Sun's centre. Used as given.
+   */
   state: SunState;
 }
 
@@ -152,18 +241,55 @@ export interface SkyBox {
   el_max: number;
 }
 
+/**
+ * stored_profile: the site's stored terrain horizon profile. smooth_sphere: no terrain, only the
+ * geometric dip of a sphere through the site (the answer's warnings say terrain is not included).
+ */
+export type SkylineSource = 'stored_profile' | 'smooth_sphere';
+
 export interface HorizonResponse {
   site_id: string;
-  /** Terrain skyline, sorted by azimuth, evenly spaced. */
+  /** Terrain skyline, sorted by azimuth, evenly spaced, at whatever spacing the source has (0.5 degrees for stored profiles). */
   skyline: SkyPoint[];
   sun_path: SunPathPoint[];
   /** null when Earth never rises above level during the window. */
   earth_box: SkyBox | null;
+  skyline_source: SkylineSource;
+  /** Spacing of sun_path actually used, seconds. */
+  time_step_s: number;
+  provenance: DataProvenance;
+  warnings: string[];
 }
 
 // ---------- GET /catalog ----------
-export type HardwareKind = 'lander' | 'cargo' | 'power';
+/** lander; cargo (payload mass); power (a power source); load (a power load). */
+export type HardwareKind = 'lander' | 'cargo' | 'power' | 'load';
 
+/** One figure exactly as the planner catalog stores it: its published unit, status labels and source. */
+export interface CatalogFigure {
+  /** A number, a published range [low, high], or null when not published. */
+  value: number | number[] | null;
+  unit: string;
+  /** Status labels, from the catalog's `status_labels` ("NASA figure", "our estimate", ...). */
+  status: string[];
+  source: string;
+  qualifier?: string | null;
+  note?: string | null;
+}
+
+/** One published payload figure of a lander. */
+export interface CapacityOption {
+  option: string;
+  label: string;
+  /** The value a fit check uses (the low end of a published range). */
+  capacity_kg: number;
+  figure: CatalogFigure;
+}
+
+/**
+ * A catalog row. Ids are the planner's (`griffin`, `starship_hls`, `fission_40kwe`, ...). A null
+ * figure is not published (or does not apply to the kind): the website shows "not published".
+ */
 export interface CatalogItem {
   id: string;
   name: string;
@@ -171,26 +297,35 @@ export interface CatalogItem {
   countable: boolean;
   default_count: number;
   max_count: number;
-  mass_kg: number;
-  /** Landers only: payload they can bring down. */
-  capacity_kg?: number;
-  /** Landers only: steepest ground they can land on. */
-  max_slope_deg?: number;
-  load_day_kw: number;
-  load_night_kw: number;
-  /** Energy used once per night, per unit, by an item that draws in darkness (for example rover keep-warm). */
-  energy_per_night_kwh?: number;
-  /** Power produced per unit. */
-  gen_kw: number;
-  /** True for solar: produces only while the Sun is up. */
-  gen_needs_sun: boolean;
+  /** Payload mass. null when not published, and for landers, sources and loads. */
+  mass_kg: number | null;
+  /** Landers only: payload they can bring down. null with several published figures: see capacity_options. */
+  capacity_kg?: number | null;
+  /** Landers: every published payload figure. The visitor picks one; the first is the default. */
+  capacity_options: CapacityOption[];
+  /** Landers only: steepest ground they can land on. null when none is published. */
+  max_slope_deg?: number | null;
+  /** Loads only: power drawn in sunlight. */
+  load_day_kw: number | null;
+  /** Loads only: power drawn in darkness. */
+  load_night_kw: number | null;
+  /** Energy used once per night, per unit (for example rover keep-warm). */
+  energy_per_night_kwh?: number | null;
+  /** Sources only: power produced per unit. */
+  gen_kw: number | null;
+  /** Sources only: true for solar, which produces only while the Sun is up. */
+  gen_needs_sun: boolean | null;
   /** Picture URL for the planner row, or null for the empty slot. */
   picture: string | null;
   note?: string | null;
+  /** The planner's figures behind the numbers above, by name, each with its status and source. */
+  figures: Record<string, CatalogFigure>;
 }
 
 export interface CatalogResponse {
   items: CatalogItem[];
+  /** Every status label a figure can carry, in the catalog's order. */
+  status_labels: string[];
 }
 
 // ---------- POST /check ----------
@@ -278,15 +413,26 @@ export interface PowerBalance {
   limiting: 'day' | 'night' | 'day and night' | null;
 }
 
+export type FitVerdict = 'fits' | 'does not fit' | 'depends on capacity figure' | 'mass needed' | 'no lander' | 'nothing to fit';
+
 export interface CheckResponse {
-  fits: boolean;
+  /** null when the planner cannot decide (several capacity figures disagree, a mass is missing). */
+  fits: boolean | null;
+  fit_verdict: FitVerdict;
+  /** One line for each capacity figure of the lander, then any other notes. */
   fit_notes: string[];
   day: DayCheck;
   night: NightCheck;
   balance: PowerBalance;
   /** What the power check could not count, in plain words. */
   power_notes: string[];
-  energy_added_kwh: number;
+  /** Always null from the backend (see site_energy). */
+  energy_added_kwh: number | null;
+  /** null when no site is given (no darkness length). */
+  site_energy: SiteEnergy | null;
+  /** Where the darkness length came from. null without a site. */
+  provenance: DataProvenance | null;
+  warnings: string[];
 }
 
 // ---------- POST /assistant ----------
@@ -306,4 +452,72 @@ export interface AskResponse {
   answer: string;
   /** True for the built-in example answers in mock mode. */
   example?: boolean;
+}
+
+// ---------- GET /api/v1/horizons/compare (live mode only) ----------
+// The physics engine's and NASA JPL Horizons' directions to the Sun and the Earth for one place and
+// one minute (backend/docs/HORIZONS-CHECK.md). 502 with `error: "horizons_unavailable"` when
+// Horizons does not answer.
+
+export interface AzEl {
+  azimuth_deg: number;
+  elevation_deg: number;
+}
+
+export interface BodyComparison {
+  horizons: AzEl;
+  /** null when the engine could not run; see engine_unavailable_reason. */
+  engine: AzEl | null;
+  /** Angle on the sky between the two directions, degrees. */
+  angle_between_deg: number | null;
+}
+
+export interface HorizonsCompareResponse {
+  site: { latitude_deg: number; longitude_deg: number; site_height_m: number; observer_height_m: number };
+  requested_time_utc: IsoUtc;
+  /** The requested time rounded to the minute; both sides use it. */
+  time_utc: IsoUtc;
+  sun: BodyComparison;
+  earth: BodyComparison;
+  engine_unavailable_reason: string | null;
+  provenance: { horizons: { service: string; url: string; api_url: string; api_version: string | null; retrieved_utc: IsoUtc; from_cache: boolean } & Record<string, unknown> } & Record<string, unknown>;
+}
+
+// ---------- /data/moon-trek-sun-check.json (a static file served with the website) ----------
+// The same layout as horizons-check.json, for the Sun only: the physics engine against NASA Moon
+// Trek's Sun angle service (backend/scripts/validate_against_moon_trek.py).
+
+export interface MoonTrekCheckSite {
+  sun_max_angle_deg: number;
+  samples?: number;
+  period?: { start_utc: string; stop_utc: string; step_minutes: number };
+  retrieved_utc?: string;
+  moon_trek_url?: string;
+}
+
+export interface MoonTrekCheckFile {
+  format: string;
+  format_version: number;
+  what?: string;
+  source?: string;
+  sites: Record<string, MoonTrekCheckSite>;
+}
+
+// ---------- /data/horizons-check.json (a static file served with the website) ----------
+
+export interface HorizonsCheckSite {
+  sun_max_angle_deg: number;
+  earth_max_angle_deg: number;
+  samples: { sun: number; earth: number };
+  period: { start_utc: string; stop_utc: string; step_minutes: number };
+  retrieved_utc: string;
+  horizons_url: string;
+}
+
+export interface HorizonsCheckFile {
+  format: string;
+  format_version: number;
+  what?: string;
+  source?: string;
+  sites: Record<string, HorizonsCheckSite>;
 }

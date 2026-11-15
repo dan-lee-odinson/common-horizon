@@ -167,7 +167,9 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
     if (url.origin !== 'http://localhost:4173') foreign.push(r.url());
   });
   await enterMission(page);
-  const name = (await page.getByTestId('spotlight-name').textContent())!;
+  // A site with the Sun up, low in the east, at the landing (the best site's Sun has not yet risen).
+  await spotlight(page, 'Apollo 14');
+  const name = 'Apollo 14';
   // One 3D space throughout: the same single canvas before the dive and at the site.
   await expect(page.locator('canvas')).toHaveCount(1);
   await zoomIn(page);
@@ -200,11 +202,11 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
   await expect(rings.locator('[data-q="ground_ring_minor"]')).toHaveText(/^10\s?m$/);
   await expect(rings.locator('[data-q="ground_ring_major"]')).toHaveText(/^100\s?m$/);
 
-  // The hardware of the example mission, with each model's height (the rover has no model).
+  // The hardware of the example mission, with each model's height (the crewed habitat's power load has no model).
   await expect(page.getByTestId('hardware-row')).toHaveCount(4);
-  await expect.poll(() => readout(page, 'hw_height:starship')).toBe('52');
-  expect(await readout(page, 'hw_height:rover')).toBe('no model');
-  expect(await readout(page, 'hw_count:solar')).toBe('× 4');
+  await expect.poll(() => readout(page, 'hw_height:starship_hls')).toBe('52');
+  expect(await readout(page, 'hw_height:hab_crewed')).toBe('no model');
+  expect(await readout(page, 'hw_count:vsat')).toBe('× 4');
   // It is drawn at true scale, and its place is said to be an illustration. Every shape has loaded:
   // no row says its item is missing from the picture.
   await expect(page.getByTestId('site-illustration')).toContainText('true scale');
@@ -215,7 +217,7 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
   const reticle = page.getByTestId('lander-reticle');
   await expect(reticle).toHaveAttribute('data-visible', 'true');
   await expect(reticle).toHaveAttribute('data-follows', 'lander');
-  await expect(reticle.locator('[data-marker-tag]')).toHaveText('Starship lander');
+  await expect(reticle.locator('[data-marker-tag]')).toHaveText('Starship HLS');
   // The Sun is up at this landing: its tag is in the picture too, with the readout's own elevation.
   const sunTag = page.getByTestId('body-label-sun');
   await expect(sunTag).toHaveAttribute('data-visible', 'true');
@@ -484,7 +486,7 @@ test('site: with a launch delay the timeline shows the planned landing, the dela
   const world = page.getByTestId('world');
   const reticleName = page.getByTestId('lander-reticle').locator('[data-marker-tag]');
   await expect(world).toHaveAttribute('data-site-hardware', 'shown');
-  await expect(reticleName).toHaveText('Starship lander');
+  await expect(reticleName).toHaveText('Starship HLS');
 
   // Scrubbing into the delay: the stage says it is before the landing, and how long until it.
   await scrub.focus();
@@ -532,7 +534,7 @@ test('site: with a launch delay the timeline shows the planned landing, the dela
   await expect.poll(() => hours(page)).toBe(0);
   await expect(hud).toHaveAttribute('data-phase', 'stay');
   await expect(world).toHaveAttribute('data-site-hardware', 'shown');
-  await expect(reticleName).toHaveText('Starship lander');
+  await expect(reticleName).toHaveText('Starship HLS');
 });
 
 test('site: down and back twice, to two different sites: one canvas throughout, and the camera returns to where it was', async ({ page }) => {
@@ -711,7 +713,7 @@ test('site: "Back" pressed during the descent, and "Zoom in" again straight afte
   await zoomIn(page);
   await expect(page.getByTestId('scene-title')).toHaveText(name);
   await expect(page.locator('canvas')).toHaveCount(1);
-  await expect(page.getByTestId('lander-reticle').locator('[data-marker-tag]')).toHaveText('Starship lander');
+  await expect(page.getByTestId('lander-reticle').locator('[data-marker-tag]')).toHaveText('Starship HLS');
   await expect.poll(async () => (await sceneSays(page)).sun).toMatch(/above|below/);
   expect(errors).toEqual([]);
 });
@@ -835,7 +837,7 @@ test('site: without WebGL the instrument still works over the flat fallback', as
   await expect(page.getByTestId('true-size')).toHaveCount(0);
   expect(await readout(page, 'sun_width')).toBe('0.53');
   expect(await readout(page, 'earth_width')).toMatch(/^1\.9[01]$/);
-  await expect.poll(() => readout(page, 'hw_height:starship')).toBe('52');
+  await expect.poll(() => readout(page, 'hw_height:starship_hls')).toBe('52');
   // No panel covers another, the fallback sentence included.
   const sentence = (await page.getByTestId('site-scene-fallback').boundingBox())!;
   const boxes = await panels(page);
@@ -940,4 +942,26 @@ test('site on a phone: zoom in, play, the sheet, and back, with nothing scrollin
   await expect(page.getByTestId('site-play')).toHaveAttribute('aria-pressed', 'false');
   expect(await hours(page)).toBe(0);
   expect(errors).toEqual([]);
+});
+
+test('site: with the Data checks band measured after arrival (reduced motion), a low Sun stays in the picture above it', async ({ page }) => {
+  test.skip(isPhone(page), 'the band is a desktop layout');
+  // With reduced motion the camera is placed at once, before the band below it has been measured:
+  // it then settles to the lower pitch the smaller picture needs, so the Sun, four degrees up, stays in view.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await enterMission(page);
+  await spotlight(page, 'Apollo 14');
+  await zoomIn(page);
+  const band = page.getByTestId('site-checks-panel');
+  await expect(band).toBeVisible();
+  const sunTag = page.getByTestId('body-label-sun');
+  await expect(sunTag).toHaveAttribute('data-visible', 'true', { timeout: 30_000 });
+  // The picture is framed above the band: the reticle and both tags are clear of it.
+  const reticle = page.getByTestId('lander-reticle');
+  await expect(reticle).toHaveAttribute('data-visible', 'true');
+  const b = (await band.boundingBox())!;
+  for (const mark of [reticle.locator('svg'), reticle.locator('[data-marker-tag]'), sunTag.locator('[data-marker-tag]')]) {
+    const m = (await mark.boundingBox())!;
+    expect(m.y + m.height).toBeLessThanOrEqual(b.y);
+  }
 });

@@ -255,6 +255,16 @@ async function enterMission(page: Page) {
   await expect(page.getByTestId('spotlight-name')).not.toHaveText('', { timeout: 30_000 });
 }
 
+/** Spotlight a preset site by name, through the site drawer. */
+async function spotlightSite(page: Page, name: string) {
+  await page.getByTestId('drawer-toggle').click();
+  await page.getByTestId('preset-search').fill(name);
+  await page.getByTestId('preset').first().click();
+  await expect(page.getByTestId('spotlight-name')).toHaveText(name, { timeout: 15_000 });
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('site-drawer')).toHaveAttribute('data-open', 'false');
+}
+
 async function stripNames(page: Page): Promise<string[]> {
   return page.getByTestId('row-name').allTextContents();
 }
@@ -345,7 +355,8 @@ test('mission select: one site in the spotlight, a short strip, and the delay re
   await expect(page.getByTestId('spotlight-rank')).toHaveText('01');
   const best = (await page.getByTestId('spotlight-name').textContent())!;
   expect(best.length).toBeGreaterThan(2);
-  await expect(page.getByTestId('spotlight-verdict')).toHaveText(/^(pass|fail: .+)$/);
+  // Pass, fail with the requirement, or UNKNOWN with the requirement that could not be checked.
+  await expect(page.getByTestId('spotlight-verdict')).toHaveText(/^(pass|fail: .+|UNKNOWN: .+)$/);
   expect(await readout(page, 'sunlight_percent')).toMatch(/^\d{1,3}\.\d$/);
   expect(await readout(page, 'sunlight_hours')).toMatch(/^[\d,]+$/);
   expect(await readout(page, 'score')).toMatch(/^\d{1,3}$/);
@@ -381,7 +392,7 @@ test('mission select: one site in the spotlight, a short strip, and the delay re
   await expect(page.getByTestId('site-drawer')).toHaveAttribute('data-open', 'false');
   await expect(page.getByTestId('preset').first()).toBeHidden();
   await expect(rows.first().getByTestId('row-name')).toHaveText(best);
-  await expect(rows.first().getByTestId('verdict')).toHaveText(/pass|fail/);
+  await expect(rows.first().getByTestId('verdict')).toHaveText(/pass|fail|unknown/);
 
   // Rows slide only when the ranking reorders.
   await watchRows(page);
@@ -394,14 +405,21 @@ test('mission select: one site in the spotlight, a short strip, and the delay re
   await expect(page.getByTestId('spotlight-name')).toHaveText(before[1]);
   await page.keyboard.press('ArrowUp');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('01');
-  // Further down, the strip moves its window to keep the spotlight in the middle.
+  // Further down, the strip moves its window to keep the spotlight in the middle. How many rows it
+  // shows depends on the room under the spotlight (four or five at 1440 x 900: the spotlight's slope
+  // line takes one when it has a line of its own).
+  const shown = await rows.count();
+  expect(shown).toBeGreaterThanOrEqual(4);
+  expect(shown).toBeLessThanOrEqual(5);
+  const two = (n: number) => String(n).padStart(2, '0');
   for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('04');
-  await expect(page.getByTestId('strip-range')).toHaveText('02 to 06 of 17');
+  const from = 4 - Math.floor(shown / 2);
+  await expect(page.getByTestId('strip-range')).toHaveText(`${two(from)} to ${two(from + shown - 1)} of 17`);
   // End and Home jump to the last and the first site.
   await page.keyboard.press('End');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('17');
-  await expect(page.getByTestId('strip-range')).toHaveText('13 to 17 of 17');
+  await expect(page.getByTestId('strip-range')).toHaveText(`${two(18 - shown)} to 17 of 17`);
   await expect(page.locator('[data-testid="ranked-row"][aria-selected="true"] [data-testid="row-rank"]')).toHaveText('17');
   await page.keyboard.press('Home');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('01');
@@ -610,9 +628,9 @@ test('mission select: the spotlight site’s marker and its tag stay clear of th
   expect((await missionPanels(page)).map((p) => p.id).sort()).toEqual(['assistant', 'drawer-toggle', 'mission-bar', 'rank-strip', 'spotlight']);
   await clear('a site near the equator');
 
-  // Two weeks' delay puts a site at the south pole in the spotlight: low on the Moon, with a long name.
+  // A site at the south pole in the spotlight, two weeks late: low on the Moon, with a long name.
   await page.getByTestId('slip').fill('14');
-  await expect(page.getByTestId('spotlight-name')).toHaveText('Shackleton Connecting Ridge', { timeout: 15_000 });
+  await spotlightSite(page, 'Shackleton Connecting Ridge');
   await clear('a site at the south pole');
 
   // The drawer opens beside it: the tag steps to the other side.
@@ -635,7 +653,7 @@ test('mission select: the spotlight site’s marker and its tag stay clear of th
 
   // The assistant's history rises over the lower part of the scene: the picture moves up out of its way.
   await page.getByTestId('follow-best').click();
-  await expect(page.getByTestId('spotlight-name')).toHaveText('Shackleton Connecting Ridge');
+  await expect(page.getByTestId('spotlight-rank')).toHaveText('01');
   const input = page.getByTestId('chat-input');
   for (const [i, q] of ['Why does the delay matter?', 'What about power at night and batteries?', 'How does Earth contact work?'].entries()) {
     await input.fill(q);
@@ -659,9 +677,9 @@ for (const [width, height, rowsAtLeast] of [
     // the pointer (the entrance is a plain fade), so every panel is in its place from the start.
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await enterMission(page);
-    // Two weeks' delay: the Earth link reads "intermittent", the longest word a readout shows.
+    // Two weeks' delay and the polar site with the long name: the Earth link reads "intermittent", the longest word a readout shows.
     await page.getByTestId('slip').fill('14');
-    await expect(page.getByTestId('spotlight-name')).toHaveText('Shackleton Connecting Ridge', { timeout: 15_000 });
+    await spotlightSite(page, 'Shackleton Connecting Ridge');
     await expect(page.locator('[data-q="earth_link"] [data-q-text]')).toHaveText('intermittent');
 
     const layout = await page.evaluate(() => {
@@ -768,7 +786,7 @@ test('mission select: the drawer holds the presets and the coordinate entry', as
 test('mission select: edit the mission, and the battery box always agrees with the checks', async ({ page }) => {
   test.skip(isPhone(page), 'the phone layout of mission select is covered by the phone test');
   await enterMission(page);
-  await expect(page.getByTestId('mission-summary')).toContainText('Starship lander, Hab unit, Rover 1, Solar panels × 4, 2,000 kWh, 14 days.');
+  await expect(page.getByTestId('mission-summary')).toContainText('Starship HLS, Surface Habitat, Solar array mast (VSAT) × 4, Habitat, crewed, 2,000 kWh, 14 days.');
 
   await page.getByTestId('edit-mission').click();
   const planner = page.getByTestId('planner');
@@ -808,11 +826,11 @@ test('mission select: edit the mission, and the battery box always agrees with t
   await expect(page.getByTestId('night-advice')).toHaveCount(0);
 
   // Hardware and stay change the one-line summary behind the sheet.
-  await page.getByLabel('Nuclear generator').check();
+  await page.getByRole('checkbox', { name: /^Fission 40 kWe/ }).check();
   await page.keyboard.press('Escape');
   await expect(planner).toHaveAttribute('data-open', 'false');
   await expect(page.getByTestId('edit-mission')).toBeFocused();
-  await expect(page.getByTestId('mission-summary')).toContainText('Nuclear generator');
+  await expect(page.getByTestId('mission-summary')).toContainText('Fission 40 kWe');
   await expect(page.getByTestId('mission-summary')).toContainText('30 days.');
 });
 

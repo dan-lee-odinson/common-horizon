@@ -6,7 +6,7 @@ import { HorizonPanel, type SunMark } from '../hud/HorizonPanel';
 import { Sheet } from '../hud/Sheet';
 import { StayTimeline, type StayState } from '../hud/StayTimeline';
 import { actions, appStore, simClock } from '../state/app';
-import { useData, useHorizonFor } from '../state/data';
+import { slopeContext, useData, useHorizonFor } from '../state/data';
 import { useStore } from '../state/store';
 import { formatLatLon } from '../util/geo';
 import { litPeriods, naturalElRange } from '../util/horizon';
@@ -57,15 +57,16 @@ export function ComparePanel({ phone }: { phone: boolean }) {
 }
 
 function CompareColumn({ site, elRange, onRange }: { site: SiteRef; elRange: { min: number; max: number } | null; onRange: (id: string, r: { min: number; max: number }) => void }) {
-  const { evaluation, rows, landingMs, windowStartMs, windowEndMs } = useData();
+  const { evaluation, rows, landingMs, windowStartMs, windowEndMs, siteById, landerSlopeLimitDeg } = useData();
   const horizon = useHorizonFor(site, windowStartMs, windowEndMs);
   const row = rows.find((r) => r.siteId === site.id);
   useEffect(() => {
     if (horizon.data && horizon.data.skyline.length) onRange(site.id, naturalElRange(horizon.data));
   }, [horizon.data, onRange, site.id]);
-  const q = siteQuantities(row?.rank ?? null, row?.evaluation ?? null);
+  const ctx = slopeContext(siteById.get(site.id) ?? site, landerSlopeLimitDeg);
+  const q = siteQuantities(row?.rank ?? null, row?.evaluation ?? null, null, ctx);
   // Where the site stood with no delay, as the same kind of readout.
-  const planned = row?.planned ? siteQuantities(row.planned.rank, { ...row.evaluation, score: row.planned.score }) : null;
+  const planned = row?.planned ? siteQuantities(row.planned.rank, row.planned.evaluation, null, ctx) : null;
   return (
     <li className="flex w-[300px] shrink-0 flex-col gap-3 rounded-[4px] border border-line p-3" data-testid="compare-column">
       <div className="flex items-start gap-2">
@@ -102,16 +103,30 @@ function CompareColumn({ site, elRange, onRange }: { site: SiteRef; elRange: { m
             {q.earthLink.text}
           </dd>
           <dt className="text-ink-2">Hardware</dt>
-          <dd className="m-0 text-right" data-tone={row.evaluation.hardware_fits ? undefined : 'bad'}>
-            {row.evaluation.hardware_fits ? 'fits' : 'does not fit'}
+          <dd className="m-0 text-right" data-tone={row.evaluation.hardware_fits === null ? 'warn' : row.evaluation.hardware_fits ? undefined : 'bad'}>
+            {row.evaluation.hardware_fits === null ? 'not known' : row.evaluation.hardware_fits ? 'fits' : 'does not fit'}
           </dd>
-          <dt className="text-ink-2">Energy, stay</dt>
+          <dt className="text-ink-2">{q.energy.label}</dt>
           <dd className="m-0 text-right" data-tone={q.energy.tone}>
             {q.energy.text} {q.energy.unit}
           </dd>
+          {q.slope.value !== null ? (
+            <>
+              <dt className="text-ink-2">{q.slope.label}</dt>
+              <dd className="m-0 text-right text-ink" title={q.slopeDetail ?? undefined}>
+                {q.slope.text}
+                {q.slope.unit}
+              </dd>
+            </>
+          ) : null}
           <dt className="text-ink-2">Result</dt>
           <dd className="m-0 text-right font-sans" data-tone={q.verdict.tone}>
             {q.verdict.text}
+            {q.slopeNote ? (
+              <span className="block text-[12px] text-ink-2" data-testid="compare-slope-note">
+                {q.slopeNote}
+              </span>
+            ) : null}
           </dd>
         </dl>
       ) : (
