@@ -2,6 +2,7 @@
   "id": "habitat-unit",
   "name": "Habitat unit (inflatable and metal sections)",
   "file": "habitat-unit.glb",
+  "kind": "code-built",
   "status": "NASA study",
   "note": "illustrative shape, built with SI/AI-written code",
   "units": "meters",

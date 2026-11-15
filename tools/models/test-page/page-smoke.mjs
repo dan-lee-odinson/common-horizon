@@ -5,7 +5,7 @@
 //
 // It starts the preview server, opens the page with the local copy of three.js, and checks:
 //   - the page reaches its "ready" state with no errors in the browser console;
-//   - the summary table and the cards list all five models;
+//   - the summary table and the cards list every model in the folder;
 //   - every 3D view drew something (not just background);
 //   - the size measured by three.js in the browser matches each model's JSON within 1 percent,
 //     and the browser counts the same number of triangles.

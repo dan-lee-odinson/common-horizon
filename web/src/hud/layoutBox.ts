@@ -1,5 +1,5 @@
-// Where an element sits inside an ancestor, from layout alone: transforms (an entrance, the pointer
-// parallax, a sliding drawer) do not count. Used to measure the part of the window the panels leave
+// Where an element sits inside an ancestor, from layout alone: transforms (an entrance, a sliding
+// drawer) do not count. Used to measure the part of the window the panels leave
 // free for the scene.
 
 export interface LayoutBox {

@@ -9,12 +9,12 @@ import { AsyncView, SkeletonLines } from '../components/AsyncView';
 import { HardwareGlyph } from '../components/HardwareGlyph';
 import { Icon } from '../components/Icon';
 import { Sheet } from '../hud/Sheet';
-import { actions, appStore, MAX_SLIP_DAYS, MAX_STAY_DAYS, MIN_STAY_DAYS, type HardwarePick } from '../state/app';
+import { actions, appStore, hardwareLink, MAX_SLIP_DAYS, MAX_STAY_DAYS, MIN_STAY_DAYS, type HardwarePick } from '../state/app';
 import { useData } from '../state/data';
 import { useStore } from '../state/store';
 import { balanceWords, formatAmount, formatKwh, formatMargin, levelFromStatus, storageToCover, type PowerLevel } from '../util/power';
 import { EARTH_LINK_TONE, EARTH_LINK_WORD } from '../util/quantities';
-import { catalogFigureRows, chosenCapacity, figureValue, KIND_HEADING } from '../util/catalog';
+import { catalogFigureRows, chosenCapacity, figureValue, KIND_HEADING, PAYLOAD_HEADING_NOTE } from '../util/catalog';
 import { readStorageEntry } from '../util/storage';
 import { parseDatetimeLocalUtc, toDatetimeLocalUtc } from '../util/time';
 
@@ -195,11 +195,17 @@ function HardwareRow({ item, pick, capacityOption, heading }: { item: CatalogIte
   const count = pick?.count ?? item.default_count;
   const figures = catalogFigureRows(item);
   const options = item.capacity_options ?? [];
+  const link = hardwareLink(item.id);
   return (
     <>
       {heading ? (
         <li className="label px-2 pt-2" aria-hidden data-testid="kind-heading" data-kind={heading}>
           {KIND_HEADING[heading]}
+        </li>
+      ) : null}
+      {heading === 'cargo' ? (
+        <li className="px-2 text-[12px] leading-snug text-ink-2" data-testid="payload-heading-note">
+          {PAYLOAD_HEADING_NOTE}
         </li>
       ) : null}
       <li className={`flex flex-col gap-1 rounded-[3px] border px-2 py-1.5 ${selected ? 'border-line bg-accent-soft' : 'border-transparent'}`} data-testid="hardware-row" data-id={item.id} data-kind={item.kind}>
@@ -240,6 +246,11 @@ function HardwareRow({ item, pick, capacityOption, heading }: { item: CatalogIte
             </div>
           ) : null}
         </div>
+        {link ? (
+          <p className="m-0 ml-[3.75rem] text-[12px] leading-snug text-ink-2" data-testid="linked-note" data-partner={link.partner}>
+            {link.note}
+          </p>
+        ) : null}
         {figures.length > 0 ? (
           <ul className="m-0 ml-[3.75rem] flex list-none flex-col gap-0.5 p-0 text-[12px] leading-snug" aria-label={`${item.name}: published figures`} data-testid="figures">
             {figures.map((f) => (

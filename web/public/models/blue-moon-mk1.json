@@ -1,0 +1,83 @@
+{
+  "id": "blue-moon-mk1",
+  "name": "Blue Moon Mark 1 cargo lander",
+  "file": "blue-moon-mk1.glb",
+  "kind": "imported",
+  "status": "company figure, secondary source",
+  "note": "illustrative shape from a community CAD model; not the manufacturer's data",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 4.741,
+    "height_y": 8.05,
+    "depth_z": 4.741
+  },
+  "dimension_sources": [
+    {
+      "dimension": "width_x",
+      "value_m": 4.741,
+      "meaning": "overall width (X) of the finished shape, set by the rim of the top deck; the landing legs span 4.30 m foot pad to foot pad",
+      "source": "the community CAD model, scaled evenly to the published height; we found no published figure for the deck or the legs",
+      "status": "our estimate"
+    },
+    {
+      "dimension": "height_y",
+      "value_m": 8.05,
+      "meaning": "overall height (\"8.05 meters tall with a diameter of 3.08 meters\")",
+      "source": "SpaceNews, \"NASA payload to fly on first Blue Origin lunar lander mission\" (Jeff Foust, 12 August 2024), reporting the maker's FCC filing",
+      "link": "https://spacenews.com/nasa-payload-to-fly-on-first-blue-origin-lunar-lander-mission/",
+      "status": "company figure, secondary source"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 4.741,
+      "meaning": "overall depth (Z) of the finished shape, set by the rim of the top deck; the landing legs span 4.30 m foot pad to foot pad",
+      "source": "the community CAD model, scaled evenly to the published height; we found no published figure for the deck or the legs",
+      "status": "our estimate"
+    }
+  ],
+  "source": {
+    "title": "Blue Moon (Onshape public document), assembly \"Blue Moon Mk1\"",
+    "author": "David Nagy",
+    "url": "https://cad.onshape.com/documents/cc88aa273c89627a864e4c71/w/ae9127fe16876b483f50c07c/e/a0b9d18a7b5130719bd45a0d",
+    "terms": "Onshape Terms of Use (effective 15 July 2020), section 1, item 7 \"Intellectual Property\", the paragraph on public documents owned by Free Plan users: a worldwide, royalty-free, non-exclusive licence to use, copy, modify, publish and distribute. Onshape's public record of the document shows it public, owned and created by David Nagy on 26 July 2025 and not enterprise-owned; whether the owner is on the Free Plan, which the clause requires, could not be confirmed. No LICENSE tab was seen on 15 November 2026.",
+    "terms_url": "https://www.onshape.com/en/legal/terms-of-use",
+    "exported": "2026-11-15",
+    "changes": [
+      "exported from Onshape as GLB (1,515,782 triangles, 15 plain colours, no textures); the fairing and payload adapter are not part of the export",
+      "the maker's name, mark and lettering recoloured to the surrounding surface, then every colour removed",
+      "reduced to 18,978 triangles in Blender 5.3 (planar dissolve, then edge collapse) and turned Y up",
+      "scaled evenly to the published 8.05 m height and stood on the origin with one plain grey material, by finish-model.mjs"
+    ]
+  },
+  "triangles": 18978,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "The shape is a community CAD model by David Nagy, not the maker's data; we have not compared it with the maker's drawings.",
+    "Scaled evenly from the CAD file's 8.005 m to the published 8.05 m (about 0.6 percent).",
+    "Width and depth come from the CAD model, scaled: 4.74 m at the rim of the top deck, 4.30 m across the landing leg foot pads; no published figure for either was found.",
+    "At the published 8.05 m height the CAD body is about 3.8 to 4.0 m across, wider than the published 3.08 m diameter: the community model's proportions differ from the published figures.",
+    "Fairing and payload adapter not included; detail reduced to keep under 20,000 triangles.",
+    "All colours removed; no names, marks or lettering; one plain grey material."
+  ],
+  "finishing": {
+    "rotate_deg": [
+      0,
+      0,
+      0
+    ],
+    "drop_loose_parts_below": 0,
+    "flatten_below": 0,
+    "flattened_vertices": 0,
+    "input_file": "blue-moon-mk1.glb",
+    "input_sha256": "c5c8b493c2d258b8d06aa271b8ed51d720e23c8b27970d0422865631f0316a96",
+    "input_triangles": 18978,
+    "removed_loose_parts": {
+      "pieces": 0,
+      "triangles": 0
+    },
+    "scale_factor": 1.005583,
+    "material": "one neutral material; every texture, image, UV coordinate, per-vertex colour and original material removed"
+  },
+  "built_by": "tools/models/finish-model.mjs"
+}

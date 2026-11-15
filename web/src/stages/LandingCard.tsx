@@ -6,7 +6,6 @@ import { useLayoutEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { isMockMode } from '../api/client';
 import { useLayer } from '../hud/focus';
-import { requestTiltAccess } from '../hud/parallax';
 import { actions, appStore } from '../state/app';
 import { useStore } from '../state/store';
 
@@ -84,10 +83,7 @@ export function LandingCard() {
             type="button"
             className="btn btn-primary btn-lg min-w-[9.5rem]"
             data-begin
-            onClick={() => {
-              requestTiltAccess();
-              actions.closeCard();
-            }}
+            onClick={() => actions.closeCard()}
             data-testid="begin"
           >
             Begin

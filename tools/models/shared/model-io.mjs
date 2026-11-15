@@ -48,6 +48,7 @@ export function describeModel(spec, triangles) {
     id: spec.id,
     name: spec.name,
     file: `${spec.id}.glb`,
+    kind: 'code-built',
     status: spec.status,
     note: SI_AI_NOTE,
     units: 'meters',
