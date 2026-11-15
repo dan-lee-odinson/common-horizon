@@ -28,6 +28,8 @@ read the source's own license or terms, it says "to check".
 | Blue Moon Mark 1 cargo lander (imported) | Overall height | 8.05 m ("8.05 meters tall with a diameter of 3.08 meters") | SpaceNews, "NASA payload to fly on first Blue Origin lunar lander mission", Jeff Foust, 12 August 2024, reporting the maker's FCC filing | company figure, secondary source | News article, publisher's terms; cited figure only | https://spacenews.com/nasa-payload-to-fly-on-first-blue-origin-lunar-lander-mission/ |
 | VIPER rover (generated) | Overall height | 2.5 m (5 by 5 by 8 feet, 1.5 by 1.5 by 2.5 m) | NASA Science, VIPER In Depth (page updated 19 March 2024) | NASA figure | NASA web page; cited figure only | https://science.nasa.gov/mission/viper/in-depth |
 | VIPER rover (generated) | Footprint, for comparison only | 1.7 m by 1.7 m | Bluethmann, VIPER Rover Overview and Mobility and Hardware, 14 November 2024, NASA Technical Reports Server 20240013903 | NASA figure | NTRS record terms; cited figure only | https://ntrs.nasa.gov/api/citations/20240013903/downloads/LSIC_2024-Tech%20Infusion_Panel-VIPER_Mob-HW.pdf |
+| Crew rover (generated) | Overall height, to the top of the antenna | about 2.6 m | Maker's news page, "NASA Selects Astrolab to Provide Lunar Rover for Artemis Astronauts' Return to the Moon", 26 May 2026 | company figure (maker's own page) | Company web page, site terms; cited figure only | https://astrolab.space/2026/05/26/nasa-selects-astrolab-to-provide-lunar-rover-for-artemis-astronauts-return-to-the-moon/ |
+| Crew rover (generated) | Length and width, for comparison only | about 4 m and 2.3 m | Same page | company figure (maker's own page) | Same as above | https://astrolab.space/2026/05/26/nasa-selects-astrolab-to-provide-lunar-rover-for-artemis-astronauts-return-to-the-moon/ |
 
 ### Our own estimates and illustrations (not from any source)
 
@@ -47,7 +49,8 @@ These are listed in each model's JSON under `simplifications` as well.
   is scaled evenly to it, and its width and depth are measured from the scaled shape (status
   "our estimate"). Blue Moon: 4.741 m across the landing legs, from the community CAD model (no
   published figure across the legs; the published 3.08 m is the body diameter). VIPER: 1.714 m
-  wide and 1.802 m long, from the generated shape, against NASA's 1.7 m by 1.7 m.
+  wide and 1.802 m long, from the generated shape, against NASA's 1.7 m by 1.7 m. Crew rover:
+  2.535 m wide and 3.375 m long, against the maker's 2.3 m and 4 m.
 
 ## Imported and generated models
 
@@ -60,12 +63,14 @@ the raw file's SHA-256, and generated models record the request id.
 |---|---|---|---|---|---|---|---|
 | Blue Moon Mark 1 cargo lander (`blue-moon-mk1`) | imported | Onshape public document "Blue Moon", assembly "Blue Moon Mk1" (https://cad.onshape.com/documents/cc88aa273c89627a864e4c71/w/ae9127fe16876b483f50c07c/e/a0b9d18a7b5130719bd45a0d), exported as GLB on 15 November 2026 | **David Nagy** (author shown in the document's version history) | Onshape Terms of Use, section 1(g)(ii), public documents: worldwide, royalty-free, non-exclusive licence to use, copy, modify, publish and distribute (https://www.onshape.com/en/legal/terms-of-use). No LICENSE tab seen in the document on 15 November 2026; the owner's plan, which decides whether that clause applies, could not be confirmed from outside. | Onshape export; Blender 5.3 (reduced from 1,515,782 to 18,978 triangles; the maker's name, mark and lettering recoloured to the surface around them); `finish-model.mjs` | not applicable; exported 15 November 2026 | "illustrative shape from a community CAD model; not the manufacturer's data" |
 | VIPER rover (`viper-rover`) | generated | NASA illustration ACD20-0047, "VIPER Drill" (2019 design), cropped to the rover | **Daniel Rutter, NASA Ames Research Center** | NASA image; NASA's media usage guidelines (no NASA insignia in our model) | TRELLIS.2 (`fal-ai/trellis-2`, Microsoft, MIT) on fal.ai, direct run, seed 42, resolution 1024, decimation target 18,000; `finish-model.mjs` | 01a1e06f-bb95-7f42-bc41-27cc7c445683, 15 November 2026 | "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data" |
+| Crew rover (`crew-rover`) | generated | A team member's own photo of a full-size display mockup of the rover (front view, exhibition, 8 November 2026); everything outside the vehicle painted white and the maker's name, flag decals and NASA insignia covered before sending | **Dan Lee-Odinson** (team member's own photo) | The team member's own photo, used with the photographer's permission; the photo is not published | TRELLIS.2 (`fal-ai/trellis-2`, Microsoft, MIT) on fal.ai, direct run, seed 42, resolution 1024, decimation target 18,000; `finish-model.mjs` | 01a1e07b-f7d0-7c83-84df-fbbd69871994, 15 November 2026 | "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data" |
 
 ### Input pictures (none of them is in the repository)
 
 | Picture | Used for | Credit | Source | What was sent, and where |
 |---|---|---|---|---|
 | `viper-rover-2.jpg` (1920 by 1080), NASA image ACD20-0047, an illustration | VIPER rover | Daniel Rutter, NASA Ames Research Center | https://science.nasa.gov/image-detail/amf-acd20-0047/ | A 654 by 805 crop of the rover only, with metadata removed, to TRELLIS.2 on fal.ai, 15 November 2026 |
+| `astrolab-1.jpg` (3072 by 4080), a team member's own phone photo | Crew rover | Dan Lee-Odinson | Own photo, exhibition, 8 November 2026; not published | A 1512 by 1392 crop of the vehicle only, everything else painted white, markings on the vehicle covered, location and all other metadata removed, to TRELLIS.2 on fal.ai, 15 November 2026 |
 
 ## Libraries, tools and services
 

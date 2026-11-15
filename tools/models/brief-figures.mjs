@@ -80,4 +80,10 @@ export const BRIEF = Object.freeze({
     dimensions_m: { height_y: 2.5 }, // 1.5 m by 1.5 m by 2.5 m (NASA Science, VIPER In Depth)
     picture_credit: 'Daniel Rutter, NASA Ames Research Center', // NASA image ACD20-0047
   },
+  'crew-rover': {
+    kind: 'generated',
+    status: STATUS_LABELS.companyFigure,
+    dimensions_m: { height_y: 2.6 }, // "about 2.6 meters to the top of its antenna" (maker's news page, 26 May 2026)
+    picture_credit: 'Dan Lee-Odinson', // team member's own photo
+  },
 });
