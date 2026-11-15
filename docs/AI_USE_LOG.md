@@ -1,6 +1,6 @@
 # SI/AI use log: website, planner, hardware models, stored skylines and the Horizons check
 
-A record of the AI tools used on Dan's parts of Common Horizon, for the project's SI/AI
+A record of the AI tools used on Dan's parts of Common Horizon and in mission planning, for the project's SI/AI
 disclosure. The backend service has its own log in `backend/docs/AI_USE_LOG.md`. No session
 transcripts or credentials are stored here. The commit history is the detailed record: each
 commit message carries an `SI/AI:` line naming the tool and model.
@@ -23,6 +23,7 @@ commit message carries an `SI/AI:` line naming the tool and model.
 | Claude Code (Anthropic), on the team owner's computer | Claude Opus 5.5 | The deployment workflow, the 17-site JPL Horizons check, the live comparison route, and the second and third batches of hardware models (Sunday 15 November) |
 | TRELLIS.2 (Microsoft), run on fal.ai | TRELLIS.2 | Generating five hardware model shapes from pictures (VIPER, crew rover, pressurized rover, habitation module, fission surface power unit), 15 November; each request id is in the model's JSON |
 | Claude (Anthropic), in the Claude app | Claude Fable 5.2 | Planning, the written instructions given to each coding session, review of pull requests, the first JPL Horizons check, preparation of the Moon textures, and drafts of the README and the submission text |
+| Muse (Meta) | Muse Spark 1.3 | Mission planning (Cam): cross-checking the sources and figures in the research notes, translation between English and French and reading support, and review of each revision of the mission plan. The mission ideas and decisions are the planner's and the team's |
 | Design skills loaded into Claude Code | Impeccable; Emil Kowalski's design engineering skills; the GSAP skills | Review of layout, type and motion in the website. Each website commit names the skills it used |
 
 ## What was made with AI assistance, by part
