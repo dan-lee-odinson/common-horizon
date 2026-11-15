@@ -1,0 +1,203 @@
+@import 'tailwindcss';
+@import './theme.css';
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  /* Motion tokens: strong ease-out for things entering or responding, ease-in-out for things
+     moving on screen, and an iOS-like curve for drawers. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --breakpoint-md: 48rem;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--ch-bg);
+    color: var(--ch-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  .btn:disabled {
+    opacity: 0.45;
+  }
+  input,
+  textarea {
+    caret-color: var(--ch-accent);
+  }
+  * {
+    scrollbar-color: var(--ch-line-strong) transparent;
+    scrollbar-width: thin;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ch-focus);
+    outline-offset: 2px;
+  }
+  input[type='range'] {
+    accent-color: var(--ch-accent);
+  }
+  input[type='checkbox'] {
+    accent-color: var(--ch-accent);
+  }
+  ::selection {
+    background: var(--ch-accent-soft);
+  }
+}
+
+@layer components {
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .panel {
+    background: var(--ch-surface);
+    border: 1px solid var(--ch-line);
+  }
+  .glass {
+    background: var(--ch-glass);
+    border: 1px solid var(--ch-line);
+    -webkit-backdrop-filter: blur(10px) saturate(1.1);
+    backdrop-filter: blur(10px) saturate(1.1);
+    box-shadow: 0 12px 32px var(--ch-shadow);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 2rem;
+    padding: 0 0.7rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--ch-line-strong);
+    background: var(--ch-surface-2);
+    color: var(--ch-ink);
+    font-size: 13px;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      transform 160ms var(--ease-out);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled) {
+      background: var(--ch-surface-3);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--ch-focus);
+    }
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .btn-primary {
+    background: var(--ch-accent);
+    border-color: var(--ch-accent);
+    color: var(--ch-accent-ink);
+    font-weight: 600;
+  }
+  .btn-icon {
+    width: 2rem;
+    padding: 0;
+  }
+  .field {
+    min-height: 2rem;
+    padding: 0 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--ch-line-strong);
+    background: var(--ch-surface-2);
+  }
+  .label {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ch-muted);
+  }
+  /* The assistant's conversation: floats over the workspace, never pushes it. At most about 40 % of
+     the window height; with content, at least six lines tall (13 px text, 1.45 line height). */
+  .chat-panel {
+    max-height: 40vh;
+    max-height: 40dvh;
+    background: var(--ch-glass-strong);
+    -webkit-backdrop-filter: blur(12px) saturate(1.1);
+    backdrop-filter: blur(12px) saturate(1.1);
+    box-shadow: 0 -12px 32px var(--ch-shadow);
+  }
+  /* The log is a flex item: this explicit minimum (no min-h-0 utility on it, which would win over a
+     component rule) lets it shrink to six lines and scroll beyond that. */
+  .chat-log {
+    line-height: 1.45;
+    min-height: calc(6 * 1.45em + 1rem);
+  }
+  /* Panels and scenes that appear: a short fade with a small lift. */
+  .enter {
+    animation: ch-enter 220ms var(--ease-out) both;
+  }
+  .enter-fade {
+    animation: ch-fade 240ms var(--ease-out) both;
+  }
+  .skeleton {
+    background: linear-gradient(90deg, var(--ch-surface-2), var(--ch-surface-3), var(--ch-surface-2));
+    background-size: 200% 100%;
+    animation: ch-shimmer 1.4s linear infinite;
+    border-radius: 0.375rem;
+  }
+}
+
+@keyframes ch-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes ch-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes ch-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: drop movement, keep gentle fades and colour changes. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+  .enter {
+    animation-name: ch-fade;
+  }
+  [data-motion='slide'] {
+    transition-property: visibility !important;
+  }
+}

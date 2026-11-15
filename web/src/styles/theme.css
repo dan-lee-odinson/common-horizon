@@ -1,0 +1,85 @@
+/*
+ * ALL colours used by the website live in this file, as CSS variables.
+ * Brand colours are set later: change the values here and every screen follows,
+ * including the 3D scenes (they read these variables at start-up).
+ * Tailwind is limited to these colours on purpose (its default palette is switched off).
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces: dark and calm */
+  --ch-bg: #0a0d12;
+  --ch-space: #06080c;
+  --ch-surface: #11161e;
+  --ch-surface-2: #171e29;
+  --ch-surface-3: #1e2734;
+  --ch-glass: rgb(17 22 30 / 0.74);
+  /* The assistant's conversation panel: semi-opaque, a little denser than glass so text stays readable */
+  --ch-glass-strong: rgb(17 22 30 / 0.86);
+  --ch-scrim: rgb(4 6 9 / 0.62);
+  --ch-line: #232d3b;
+  --ch-line-strong: #34425a;
+  --ch-shadow: rgb(0 0 0 / 0.5);
+
+  /* Text */
+  --ch-ink: #e7ecf2;
+  --ch-ink-2: #b9c3cf;
+  --ch-muted: #8693a4;
+
+  /* Interaction (placeholder until brand colours are chosen) */
+  --ch-accent: #84c7d8;
+  --ch-accent-ink: #062029;
+  --ch-accent-soft: rgb(132 199 216 / 0.14);
+  --ch-focus: #a9dcff;
+
+  /* Meaning */
+  --ch-sun: #f7cc4a;
+  --ch-sun-soft: rgb(247 204 74 / 0.18);
+  --ch-earth: #4f9dff;
+  --ch-earth-soft: rgb(79 157 255 / 0.16);
+  --ch-good: #3fbf78;
+  --ch-warn: #e2b23f;
+  --ch-bad: #f0605d;
+
+  /* 3D placeholders and the horizon plot */
+  --ch-moon: #8e9095;
+  --ch-moon-dark: #2b2d31;
+  --ch-ground: #75777c;
+  --ch-terrain: #2c3644;
+  --ch-terrain-edge: #5d6b80;
+  --ch-dark-period: #1a2130;
+  --ch-marker: #e7ecf2;
+  --ch-marker-saved: #f7cc4a;
+  --ch-marker-active: #84c7d8;
+}
+
+/* Tailwind theme: names only, every value points at a variable above. */
+@theme inline {
+  --color-*: initial;
+  --color-bg: var(--ch-bg);
+  --color-space: var(--ch-space);
+  --color-surface: var(--ch-surface);
+  --color-surface-2: var(--ch-surface-2);
+  --color-surface-3: var(--ch-surface-3);
+  --color-glass: var(--ch-glass);
+  --color-scrim: var(--ch-scrim);
+  --color-line: var(--ch-line);
+  --color-line-strong: var(--ch-line-strong);
+  --color-ink: var(--ch-ink);
+  --color-ink-2: var(--ch-ink-2);
+  --color-muted: var(--ch-muted);
+  --color-accent: var(--ch-accent);
+  --color-accent-ink: var(--ch-accent-ink);
+  --color-accent-soft: var(--ch-accent-soft);
+  --color-focus: var(--ch-focus);
+  --color-sun: var(--ch-sun);
+  --color-sun-soft: var(--ch-sun-soft);
+  --color-earth: var(--ch-earth);
+  --color-earth-soft: var(--ch-earth-soft);
+  --color-good: var(--ch-good);
+  --color-warn: var(--ch-warn);
+  --color-bad: var(--ch-bad);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+}

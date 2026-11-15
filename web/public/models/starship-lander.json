@@ -1,0 +1,45 @@
+{
+  "id": "starship-lander",
+  "name": "Starship lander (stand-in)",
+  "file": "starship-lander.glb",
+  "status": "NASA figure, secondary source",
+  "note": "illustrative shape, built with SI/AI-written code",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 9,
+    "height_y": 52,
+    "depth_z": 9
+  },
+  "dimension_sources": [
+    {
+      "dimension": "height_y",
+      "value_m": 52,
+      "meaning": "overall height, ground to nose tip",
+      "source": "NASA paper at IAC 2025 (Creech), as tabulated in Wikipedia's Starship HLS article (secondary source; link to add)",
+      "status": "NASA figure, secondary source"
+    },
+    {
+      "dimension": "width_x",
+      "value_m": 9,
+      "meaning": "hull diameter",
+      "source": "NASA paper at IAC 2025 (Creech), as tabulated in Wikipedia's Starship HLS article (secondary source; link to add)",
+      "status": "NASA figure, secondary source"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 9,
+      "meaning": "hull diameter (round hull)",
+      "source": "NASA paper at IAC 2025 (Creech), as tabulated in Wikipedia's Starship HLS article (secondary source; link to add)",
+      "status": "NASA figure, secondary source"
+    }
+  ],
+  "triangles": 9248,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "Stand-in shape until a detailed model replaces it.",
+    "Only the overall height and diameter come from the source. The nose length (14 m), the 2 m gap under the hull, the six legs, their 0.5 m foot pads and the six engine bells are our illustration, sized to stay inside the 9 m diameter.",
+    "No flaps, windows, thrusters, markings or lettering."
+  ],
+  "built_by": "tools/models/starship-lander.mjs"
+}

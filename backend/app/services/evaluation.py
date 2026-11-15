@@ -7,14 +7,26 @@ from pydantic import ValidationError
 from app.config import CONTRACT_VERSION
 from app.models.mission import MissionInput
 from app.models.results import DataProvenance, DataSource, LaunchDelayCase, MissionEvaluation
-from app.physics.interface import EngineContractError, PhysicsEngine, SimulationRequest, SimulationResult
+from app.physics.interface import (
+    EngineContractError,
+    EvaluationCache,
+    PhysicsEngine,
+    SimulationRequest,
+    SimulationResult,
+)
 from app.physics.synthetic import SYNTHETIC_NOTICE
 from app.services.requirements import check_requirements, overall_pass
 
 PHYSICS_NOTICE = "Values computed by the Common Horizon physics engine."
 
 
-def _run(engine: PhysicsEngine, mission: MissionInput, delay_days: int, include_timeseries: bool) -> SimulationResult:
+def _run(
+    engine: PhysicsEngine,
+    mission: MissionInput,
+    delay_days: int,
+    include_timeseries: bool,
+    cache: EvaluationCache,
+) -> SimulationResult:
     request = SimulationRequest(
         latitude_deg=mission.landing_site.latitude_deg,
         longitude_deg=mission.landing_site.longitude_deg,
@@ -24,6 +36,7 @@ def _run(engine: PhysicsEngine, mission: MissionInput, delay_days: int, include_
         duration_s=mission.stay_duration_s,
         time_step_s=mission.time_step_s,
         include_timeseries=include_timeseries,
+        sample_cache=cache,
     )
     try:
         result = engine.simulate(request)
@@ -42,7 +55,9 @@ def _run(engine: PhysicsEngine, mission: MissionInput, delay_days: int, include_
 
 
 def evaluate_mission(mission: MissionInput, engine: PhysicsEngine) -> MissionEvaluation:
-    base = _run(engine, mission, delay_days=0, include_timeseries=True)
+    # One cache per evaluation, a local: it is dropped when this function returns or raises.
+    cache = EvaluationCache()
+    base = _run(engine, mission, delay_days=0, include_timeseries=True, cache=cache)
     if base.timeseries is None:
         raise EngineContractError(f"Physics engine '{engine.info.name}' returned no time series.")
 
@@ -50,7 +65,7 @@ def evaluate_mission(mission: MissionInput, engine: PhysicsEngine) -> MissionEva
 
     delay_cases = []
     for delay in mission.launch_delays():
-        result = base if delay == 0 else _run(engine, mission, delay_days=delay, include_timeseries=False)
+        result = base if delay == 0 else _run(engine, mission, delay_days=delay, include_timeseries=False, cache=cache)
         delay_cases.append(
             LaunchDelayCase(
                 launch_delay_days=delay,
@@ -69,6 +84,7 @@ def evaluate_mission(mission: MissionInput, engine: PhysicsEngine) -> MissionEva
         engine_name=info.name,
         engine_version=info.version,
         notice=SYNTHETIC_NOTICE if info.is_synthetic else PHYSICS_NOTICE,
+        sources=base.sources,
     )
     return MissionEvaluation(
         contract_version=CONTRACT_VERSION,

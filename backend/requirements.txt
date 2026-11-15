@@ -9,16 +9,27 @@ fastapi==0.162.7
 pydantic==2.14.3
 uvicorn==0.54.0
 
+# Physics engine (SPICE ephemerides, array maths) and terrain tools (rasterio imports in
+# app/physics/engine/horizon.py, terrain.py and check_lola_*.py; the adapter itself does not load
+# rasterio, which brings its own GDAL and PROJ in the wheel)
+spiceypy==6.0.0
+numpy==2.5.4
+rasterio==1.5.2
+
 # Transitive
+affine==3.0.1                  # rasterio
 annotated-doc==0.0.6           # fastapi
 annotated-types==0.8.0         # pydantic
 anyio==4.16.0                  # starlette
-click==8.5.1                   # uvicorn
+attrs==26.1.0                  # rasterio, affine
+certifi==2026.10.23            # rasterio
+click==8.5.1                   # uvicorn, rasterio
 colorama==0.4.6 ; sys_platform == "win32"  # click, Windows development only
 h11==0.16.0                    # uvicorn
 idna==3.20                     # anyio
 opentelemetry-api==1.45.2      # fastapi
 pydantic-core==2.50.4          # pydantic
+pyparsing==3.3.3               # rasterio
 starlette==1.10.0              # fastapi
 typing-extensions==4.16.0      # pydantic, fastapi, starlette
 typing-inspection==0.4.5       # pydantic

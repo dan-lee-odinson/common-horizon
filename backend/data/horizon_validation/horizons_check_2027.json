@@ -1,0 +1,775 @@
+{
+ "format": "common-horizon/horizons-check",
+ "format_version": 1,
+ "what": "Angle between the direction the physics engine gives for the Sun and the Earth and the direction NASA's JPL Horizons System gives, for the same site and hour.",
+ "service": {
+  "name": "JPL Horizons System",
+  "url": "https://ssd.jpl.nasa.gov/horizons/",
+  "api": "https://ssd.jpl.nasa.gov/api/horizons.api",
+  "retrieved_utc": "2026-11-15T13:33Z",
+  "signature": {
+   "api_version": "API VERSION: 1.2",
+   "ephemeris_line": "Ephemeris / API_USER Sun Nov 15 05:33:55 2026 Pasadena, USA      / Horizons",
+   "center_line": "Center body name: Moon (301)                      {source: DE441}",
+   "site_frame_lines": [
+    "Target pole/equ : IAU_SUN                         {East-longitude positive}",
+    "Center geodetic : 196.739, -89.684, 1.72865       {E-lon(deg),Lat(deg),Alt(km)}",
+    "Center cylindric: 196.739, 9.59166, -1739.1       {E-lon(deg),Dxy(km),Dz(km)}",
+    "Center pole/equ : MEAN_ME (high precision)        {East-longitude positive}"
+   ]
+  }
+ },
+ "engine": {
+  "positions": "app.physics.engine.positions (MOON_ME, km, geometric, aberration correction NONE)",
+  "angles": "app.physics.engine.frames.get_azimuth_elevation",
+  "kernels": [
+   "naif0012.tls",
+   "de440s.bsp",
+   "moon_pa_de440_200625.bpc",
+   "moon_de440_250416.tf"
+  ]
+ },
+ "window": {
+  "start_utc": "2027-02-15T00:00Z",
+  "days": 30,
+  "step_minutes": 60
+ },
+ "expected_differences": "Horizons corrects for light time and stellar aberration and the engine's positions are geometric; Horizons uses its own lunar body-fixed frame. Small differences are expected. Terrain is not part of this check.",
+ "sites": {
+  "shackleton-ridge": {
+   "site": {
+    "id": "shackleton-ridge",
+    "latitude_deg": -89.684,
+    "longitude_deg": 196.739,
+    "site_height_m": 1726.649,
+    "observer_height_m": 2.0
+   },
+   "bodies": {
+    "sun": {
+     "samples": 721,
+     "angle_between_directions": {
+      "max_deg": 0.00596,
+      "p95_deg": 0.00596,
+      "mean_deg": 0.00574
+     },
+     "elevation_difference": {
+      "max_deg": 0.00019,
+      "p95_deg": 0.00019,
+      "mean_deg": 0.00014
+     },
+     "every_120th_sample": [
+      {
+       "utc": "2027-02-15T00:00Z",
+       "engine_az_el_deg": [
+        238.8566,
+        -0.28
+       ],
+       "horizons_az_el_deg": [
+        238.8508,
+        -0.2798
+       ],
+       "separation_deg": 0.0058
+      },
+      {
+       "utc": "2027-02-20T00:00Z",
+       "engine_az_el_deg": [
+        178.1302,
+        -0.6156
+       ],
+       "horizons_az_el_deg": [
+        178.1242,
+        -0.6154
+       ],
+       "separation_deg": 0.00596
+      },
+      {
+       "utc": "2027-02-25T00:00Z",
+       "engine_az_el_deg": [
+        117.4292,
+        -0.6188
+       ],
+       "horizons_az_el_deg": [
+        117.4233,
+        -0.6186
+       ],
+       "separation_deg": 0.00588
+      },
+      {
+       "utc": "2027-03-02T00:00Z",
+       "engine_az_el_deg": [
+        56.5969,
+        -0.4158
+       ],
+       "horizons_az_el_deg": [
+        56.5912,
+        -0.4157
+       ],
+       "separation_deg": 0.00569
+      },
+      {
+       "utc": "2027-03-07T00:00Z",
+       "engine_az_el_deg": [
+        355.62,
+        -0.3659
+       ],
+       "horizons_az_el_deg": [
+        355.6144,
+        -0.3657
+       ],
+       "separation_deg": 0.00556
+      },
+      {
+       "utc": "2027-03-12T00:00Z",
+       "engine_az_el_deg": [
+        294.5965,
+        -0.6488
+       ],
+       "horizons_az_el_deg": [
+        294.5909,
+        -0.6487
+       ],
+       "separation_deg": 0.00559
+      },
+      {
+       "utc": "2027-03-17T00:00Z",
+       "engine_az_el_deg": [
+        233.6686,
+        -1.0946
+       ],
+       "horizons_az_el_deg": [
+        233.6628,
+        -1.0945
+       ],
+       "separation_deg": 0.00579
+      }
+     ],
+     "horizons_parameters": {
+      "format": "text",
+      "COMMAND": "10",
+      "OBJ_DATA": "NO",
+      "MAKE_EPHEM": "YES",
+      "EPHEM_TYPE": "OBSERVER",
+      "CENTER": "coord@301",
+      "COORD_TYPE": "GEODETIC",
+      "SITE_COORD": "196.739000,-89.684000,1.728649",
+      "START_TIME": "2027-02-15 00:00",
+      "STOP_TIME": "2027-03-17 00:00",
+      "STEP_SIZE": "60 m",
+      "QUANTITIES": "4",
+      "APPARENT": "AIRLESS",
+      "ANG_FORMAT": "DEG",
+      "CSV_FORMAT": "YES",
+      "TIME_DIGITS": "MINUTES"
+     }
+    },
+    "earth": {
+     "samples": 721,
+     "angle_between_directions": {
+      "max_deg": 0.00021,
+      "p95_deg": 0.00021,
+      "mean_deg": 0.0002
+     },
+     "elevation_difference": {
+      "max_deg": 3e-05,
+      "p95_deg": 2e-05,
+      "mean_deg": 1e-05
+     },
+     "every_120th_sample": [
+      {
+       "utc": "2027-02-15T00:00Z",
+       "engine_az_el_deg": [
+        157.6369,
+        6.0552
+       ],
+       "horizons_az_el_deg": [
+        157.6367,
+        6.0552
+       ],
+       "separation_deg": 0.0002
+      },
+      {
+       "utc": "2027-02-20T00:00Z",
+       "engine_az_el_deg": [
+        164.7227,
+        -0.2586
+       ],
+       "horizons_az_el_deg": [
+        164.7225,
+        -0.2586
+       ],
+       "separation_deg": 0.00021
+      },
+      {
+       "utc": "2027-02-25T00:00Z",
+       "engine_az_el_deg": [
+        169.7854,
+        -6.9194
+       ],
+       "horizons_az_el_deg": [
+        169.7852,
+        -6.9194
+       ],
+       "separation_deg": 0.0002
+      },
+      {
+       "utc": "2027-03-02T00:00Z",
+       "engine_az_el_deg": [
+        166.056,
+        -5.7575
+       ],
+       "horizons_az_el_deg": [
+        166.0558,
+        -5.7575
+       ],
+       "separation_deg": 0.00018
+      },
+      {
+       "utc": "2027-03-07T00:00Z",
+       "engine_az_el_deg": [
+        159.6653,
+        0.6207
+       ],
+       "horizons_az_el_deg": [
+        159.6651,
+        0.6206
+       ],
+       "separation_deg": 0.00019
+      },
+      {
+       "utc": "2027-03-12T00:00Z",
+       "engine_az_el_deg": [
+        157.7773,
+        5.9324
+       ],
+       "horizons_az_el_deg": [
+        157.7771,
+        5.9324
+       ],
+       "separation_deg": 0.0002
+      },
+      {
+       "utc": "2027-03-17T00:00Z",
+       "engine_az_el_deg": [
+        161.2044,
+        3.4156
+       ],
+       "horizons_az_el_deg": [
+        161.2042,
+        3.4157
+       ],
+       "separation_deg": 0.0002
+      }
+     ],
+     "horizons_parameters": {
+      "format": "text",
+      "COMMAND": "399",
+      "OBJ_DATA": "NO",
+      "MAKE_EPHEM": "YES",
+      "EPHEM_TYPE": "OBSERVER",
+      "CENTER": "coord@301",
+      "COORD_TYPE": "GEODETIC",
+      "SITE_COORD": "196.739000,-89.684000,1.728649",
+      "START_TIME": "2027-02-15 00:00",
+      "STOP_TIME": "2027-03-17 00:00",
+      "STEP_SIZE": "60 m",
+      "QUANTITIES": "4",
+      "APPARENT": "AIRLESS",
+      "ANG_FORMAT": "DEG",
+      "CSV_FORMAT": "YES",
+      "TIME_DIGITS": "MINUTES"
+     }
+    }
+   }
+  },
+  "nobile": {
+   "site": {
+    "id": "nobile",
+    "latitude_deg": -85.42088,
+    "longitude_deg": 31.6218,
+    "site_height_m": 6416.081,
+    "observer_height_m": 2.0
+   },
+   "bodies": {
+    "sun": {
+     "samples": 721,
+     "angle_between_directions": {
+      "max_deg": 0.00596,
+      "p95_deg": 0.00596,
+      "mean_deg": 0.00574
+     },
+     "elevation_difference": {
+      "max_deg": 0.00058,
+      "p95_deg": 0.00057,
+      "mean_deg": 0.0003
+     },
+     "every_120th_sample": [
+      {
+       "utc": "2027-02-15T00:00Z",
+       "engine_az_el_deg": [
+        44.058,
+        3.1774
+       ],
+       "horizons_az_el_deg": [
+        44.0522,
+        3.1779
+       ],
+       "separation_deg": 0.0058
+      },
+      {
+       "utc": "2027-02-20T00:00Z",
+       "engine_az_el_deg": [
+        343.2038,
+        4.0847
+       ],
+       "horizons_az_el_deg": [
+        343.1978,
+        4.0847
+       ],
+       "separation_deg": 0.00596
+      },
+      {
+       "utc": "2027-02-25T00:00Z",
+       "engine_az_el_deg": [
+        282.5471,
+        0.5221
+       ],
+       "horizons_az_el_deg": [
+        282.5412,
+        0.5218
+       ],
+       "separation_deg": 0.00588
+      },
+      {
+       "utc": "2027-03-02T00:00Z",
+       "engine_az_el_deg": [
+        221.8388,
+        -4.0054
+       ],
+       "horizons_az_el_deg": [
+        221.8331,
+        -4.0056
+       ],
+       "separation_deg": 0.00569
+      },
+      {
+       "utc": "2027-03-07T00:00Z",
+       "engine_az_el_deg": [
+        160.6618,
+        -5.0029
+       ],
+       "horizons_az_el_deg": [
+        160.6563,
+        -5.0027
+       ],
+       "separation_deg": 0.00556
+      },
+      {
+       "utc": "2027-03-12T00:00Z",
+       "engine_az_el_deg": [
+        99.6183,
+        -1.5494
+       ],
+       "horizons_az_el_deg": [
+        99.6128,
+        -1.5489
+       ],
+       "separation_deg": 0.00559
+      },
+      {
+       "utc": "2027-03-17T00:00Z",
+       "engine_az_el_deg": [
+        38.8254,
+        2.6619
+       ],
+       "horizons_az_el_deg": [
+        38.8196,
+        2.6623
+       ],
+       "separation_deg": 0.00578
+      }
+     ],
+     "horizons_parameters": {
+      "format": "text",
+      "COMMAND": "10",
+      "OBJ_DATA": "NO",
+      "MAKE_EPHEM": "YES",
+      "EPHEM_TYPE": "OBSERVER",
+      "CENTER": "coord@301",
+      "COORD_TYPE": "GEODETIC",
+      "SITE_COORD": "31.621800,-85.420880,6.418081",
+      "START_TIME": "2027-02-15 00:00",
+      "STOP_TIME": "2027-03-17 00:00",
+      "STEP_SIZE": "60 m",
+      "QUANTITIES": "4",
+      "APPARENT": "AIRLESS",
+      "ANG_FORMAT": "DEG",
+      "CSV_FORMAT": "YES",
+      "TIME_DIGITS": "MINUTES"
+     }
+    },
+    "earth": {
+     "samples": 721,
+     "angle_between_directions": {
+      "max_deg": 0.00021,
+      "p95_deg": 0.00021,
+      "mean_deg": 0.0002
+     },
+     "elevation_difference": {
+      "max_deg": 3e-05,
+      "p95_deg": 3e-05,
+      "mean_deg": 2e-05
+     },
+     "every_120th_sample": [
+      {
+       "utc": "2027-02-15T00:00Z",
+       "engine_az_el_deg": [
+        322.3274,
+        9.9845
+       ],
+       "horizons_az_el_deg": [
+        322.3272,
+        9.9845
+       ],
+       "separation_deg": 0.0002
+      },
+      {
+       "utc": "2027-02-20T00:00Z",
+       "engine_az_el_deg": [
+        329.7471,
+        4.004
+       ],
+       "horizons_az_el_deg": [
+        329.7469,
+        4.004
+       ],
+       "separation_deg": 0.00021
+      },
+      {
+       "utc": "2027-02-25T00:00Z",
+       "engine_az_el_deg": [
+        335.0538,
+        -2.4609
+       ],
+       "horizons_az_el_deg": [
+        335.0536,
+        -2.4609
+       ],
+       "separation_deg": 0.00019
+      },
+      {
+       "utc": "2027-03-02T00:00Z",
+       "engine_az_el_deg": [
+        331.3035,
+        -1.4378
+       ],
+       "horizons_az_el_deg": [
+        331.3034,
+        -1.4378
+       ],
+       "separation_deg": 0.00018
+      },
+      {
+       "utc": "2027-03-07T00:00Z",
+       "engine_az_el_deg": [
+        324.6401,
+        4.6554
+       ],
+       "horizons_az_el_deg": [
+        324.64,
+        4.6554
+       ],
+       "separation_deg": 0.00019
+      },
+      {
+       "utc": "2027-03-12T00:00Z",
+       "engine_az_el_deg": [
+        322.4757,
+        9.869
+       ],
+       "horizons_az_el_deg": [
+        322.4755,
+        9.8689
+       ],
+       "separation_deg": 0.0002
+      },
+      {
+       "utc": "2027-03-17T00:00Z",
+       "engine_az_el_deg": [
+        326.0518,
+        7.521
+       ],
+       "horizons_az_el_deg": [
+        326.0516,
+        7.521
+       ],
+       "separation_deg": 0.0002
+      }
+     ],
+     "horizons_parameters": {
+      "format": "text",
+      "COMMAND": "399",
+      "OBJ_DATA": "NO",
+      "MAKE_EPHEM": "YES",
+      "EPHEM_TYPE": "OBSERVER",
+      "CENTER": "coord@301",
+      "COORD_TYPE": "GEODETIC",
+      "SITE_COORD": "31.621800,-85.420880,6.418081",
+      "START_TIME": "2027-02-15 00:00",
+      "STOP_TIME": "2027-03-17 00:00",
+      "STEP_SIZE": "60 m",
+      "QUANTITIES": "4",
+      "APPARENT": "AIRLESS",
+      "ANG_FORMAT": "DEG",
+      "CSV_FORMAT": "YES",
+      "TIME_DIGITS": "MINUTES"
+     }
+    }
+   }
+  },
+  "apollo-11": {
+   "site": {
+    "id": "apollo-11",
+    "latitude_deg": 0.67416,
+    "longitude_deg": 23.47314,
+    "site_height_m": 0.0,
+    "observer_height_m": 2.0
+   },
+   "bodies": {
+    "sun": {
+     "samples": 721,
+     "angle_between_directions": {
+      "max_deg": 0.00596,
+      "p95_deg": 0.00596,
+      "mean_deg": 0.00574
+     },
+     "elevation_difference": {
+      "max_deg": 0.00596,
+      "p95_deg": 0.00596,
+      "mean_deg": 0.00569
+     },
+     "every_120th_sample": [
+      {
+       "utc": "2027-02-15T00:00Z",
+       "engine_az_el_deg": [
+        90.3776,
+        37.8765
+       ],
+       "horizons_az_el_deg": [
+        90.3779,
+        37.8823
+       ],
+       "separation_deg": 0.0058
+      },
+      {
+       "utc": "2027-02-20T00:00Z",
+       "engine_az_el_deg": [
+        267.545,
+        81.3882
+       ],
+       "horizons_az_el_deg": [
+        267.5456,
+        81.3822
+       ],
+       "separation_deg": 0.00596
+      },
+      {
+       "utc": "2027-02-25T00:00Z",
+       "engine_az_el_deg": [
+        270.2504,
+        20.7008
+       ],
+       "horizons_az_el_deg": [
+        270.2503,
+        20.6949
+       ],
+       "separation_deg": 0.00588
+      },
+      {
+       "utc": "2027-03-02T00:00Z",
+       "engine_az_el_deg": [
+        271.3387,
+        -40.1205
+       ],
+       "horizons_az_el_deg": [
+        271.3387,
+        -40.1262
+       ],
+       "separation_deg": 0.00569
+      },
+      {
+       "utc": "2027-03-07T00:00Z",
+       "engine_az_el_deg": [
+        83.0735,
+        -78.8038
+       ],
+       "horizons_az_el_deg": [
+        83.0776,
+        -78.7983
+       ],
+       "separation_deg": 0.00556
+      },
+      {
+       "utc": "2027-03-12T00:00Z",
+       "engine_az_el_deg": [
+        88.9638,
+        -17.8468
+       ],
+       "horizons_az_el_deg": [
+        88.964,
+        -17.8412
+       ],
+       "separation_deg": 0.00559
+      },
+      {
+       "utc": "2027-03-17T00:00Z",
+       "engine_az_el_deg": [
+        89.3891,
+        43.0737
+       ],
+       "horizons_az_el_deg": [
+        89.3892,
+        43.0795
+       ],
+       "separation_deg": 0.00578
+      }
+     ],
+     "horizons_parameters": {
+      "format": "text",
+      "COMMAND": "10",
+      "OBJ_DATA": "NO",
+      "MAKE_EPHEM": "YES",
+      "EPHEM_TYPE": "OBSERVER",
+      "CENTER": "coord@301",
+      "COORD_TYPE": "GEODETIC",
+      "SITE_COORD": "23.473140,0.674160,0.002000",
+      "START_TIME": "2027-02-15 00:00",
+      "STOP_TIME": "2027-03-17 00:00",
+      "STEP_SIZE": "60 m",
+      "QUANTITIES": "4",
+      "APPARENT": "AIRLESS",
+      "ANG_FORMAT": "DEG",
+      "CSV_FORMAT": "YES",
+      "TIME_DIGITS": "MINUTES"
+     }
+    },
+    "earth": {
+     "samples": 721,
+     "angle_between_directions": {
+      "max_deg": 0.00021,
+      "p95_deg": 0.00021,
+      "mean_deg": 0.00019
+     },
+     "elevation_difference": {
+      "max_deg": 0.00021,
+      "p95_deg": 0.00021,
+      "mean_deg": 0.00019
+     },
+     "every_120th_sample": [
+      {
+       "utc": "2027-02-15T00:00Z",
+       "engine_az_el_deg": [
+        255.4566,
+        59.915
+       ],
+       "horizons_az_el_deg": [
+        255.4567,
+        59.9148
+       ],
+       "separation_deg": 0.0002
+      },
+      {
+       "utc": "2027-02-20T00:00Z",
+       "engine_az_el_deg": [
+        267.4752,
+        67.8624
+       ],
+       "horizons_az_el_deg": [
+        267.4752,
+        67.8622
+       ],
+       "separation_deg": 0.00021
+      },
+      {
+       "utc": "2027-02-25T00:00Z",
+       "engine_az_el_deg": [
+        288.9448,
+        72.0893
+       ],
+       "horizons_az_el_deg": [
+        288.9446,
+        72.0891
+       ],
+       "separation_deg": 0.00019
+      },
+      {
+       "utc": "2027-03-02T00:00Z",
+       "engine_az_el_deg": [
+        282.7832,
+        68.7812
+       ],
+       "horizons_az_el_deg": [
+        282.7831,
+        68.7811
+       ],
+       "separation_deg": 0.00018
+      },
+      {
+       "utc": "2027-03-07T00:00Z",
+       "engine_az_el_deg": [
+        266.1227,
+        62.7538
+       ],
+       "horizons_az_el_deg": [
+        266.1228,
+        62.7536
+       ],
+       "separation_deg": 0.00019
+      },
+      {
+       "utc": "2027-03-12T00:00Z",
+       "engine_az_el_deg": [
+        255.6465,
+        60.0842
+       ],
+       "horizons_az_el_deg": [
+        255.6466,
+        60.084
+       ],
+       "separation_deg": 0.0002
+      },
+      {
+       "utc": "2027-03-17T00:00Z",
+       "engine_az_el_deg": [
+        259.4523,
+        63.9409
+       ],
+       "horizons_az_el_deg": [
+        259.4524,
+        63.9407
+       ],
+       "separation_deg": 0.0002
+      }
+     ],
+     "horizons_parameters": {
+      "format": "text",
+      "COMMAND": "399",
+      "OBJ_DATA": "NO",
+      "MAKE_EPHEM": "YES",
+      "EPHEM_TYPE": "OBSERVER",
+      "CENTER": "coord@301",
+      "COORD_TYPE": "GEODETIC",
+      "SITE_COORD": "23.473140,0.674160,0.002000",
+      "START_TIME": "2027-02-15 00:00",
+      "STOP_TIME": "2027-03-17 00:00",
+      "STEP_SIZE": "60 m",
+      "QUANTITIES": "4",
+      "APPARENT": "AIRLESS",
+      "ANG_FORMAT": "DEG",
+      "CSV_FORMAT": "YES",
+      "TIME_DIGITS": "MINUTES"
+     }
+    }
+   }
+  }
+ }
+}

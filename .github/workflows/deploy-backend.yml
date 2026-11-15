@@ -1,0 +1,171 @@
+# Deploy the backend container to AWS.
+#
+# Runs on a push to main (a merged pull request lands on main as a push), but
+# only when the push changes backend/**, planner/** or this file. Merges that
+# touch none of these paths (for example website-only ones, which Amplify
+# deploys) do not start this workflow.
+# First it runs the backend and planner pytest suites; if any test fails,
+# nothing is deployed. Then it signs in to AWS through GitHub OIDC (no stored
+# keys), builds the image from backend/Dockerfile, pushes it to the ECR
+# repository and, if the Lambda function already exists, points the function
+# at the new image. If the function does not exist yet, the run still
+# succeeds and says so.
+#
+# The AWS role it assumes (common-horizon-deploy) trusts only the main branch
+# of this repository and may only push to the one ECR repository, update the
+# code of the one Lambda function named below, and read that one function's
+# configuration (to wait for the update to finish).
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'planner/**'
+      - '.github/workflows/deploy-backend.yml'
+
+# One run (tests and deploy) at a time. A newer push waits for the running one
+# to finish instead of cancelling it half way through. GitHub keeps only one
+# waiting run per group, so if several pushes arrive, the newest one is tested
+# and, only if its tests pass, deployed.
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+# What the GitHub token may do: by default only read the code. The deploy job
+# below adds id-token: write, so only that job can request the OIDC token
+# that AWS exchanges for short-lived credentials (it cannot write to the repo).
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ROLE_ARN: arn:aws:iam::506318770232:role/common-horizon-deploy
+  ECR_REPOSITORY: common-horizon-backend
+  LAMBDA_FUNCTION: common-horizon-backend
+
+jobs:
+  test:
+    name: Backend and planner tests
+    # Skip in forks, like the deploy job.
+    if: github.repository == 'dan-lee-odinson/common-horizon'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # No AWS access and no OIDC token in this job.
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Python 3.12 is the version in the backend's Docker image.
+      - name: Set up Python 3.12
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Install the backend's pinned test requirements
+        run: python -m pip install --disable-pip-version-check -r backend/requirements-dev.txt
+
+      # The planner's tests need only pytest, which the line above installs.
+      - name: Run pytest (backend, then planner)
+        run: |
+          (cd backend && python -m pytest -q)
+          (cd planner && python -m pytest -q)
+
+  deploy:
+    name: Build, push, update Lambda
+    # Runs only after every test passed. Do not add always(), !cancelled() or
+    # failure() to the if: below; that would let a deploy run after failed tests.
+    needs: test
+    # Skip in forks: their OIDC token would not match the AWS role anyway.
+    if: github.repository == 'dan-lee-odinson/common-horizon'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # contents: read  - check out the code
+    # id-token: write - request the OIDC token for the AWS sign-in
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # Third-party actions are pinned to full commit SHAs (tag in the comment)
+      # so a moved tag cannot change what runs with AWS credentials.
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Sign in to AWS through OIDC
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: gh-deploy-${{ github.run_id }}-${{ github.run_attempt }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Sign in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+        with:
+          mask-password: true
+
+      - name: Set the image name
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: echo "IMAGE=${REGISTRY}/${ECR_REPOSITORY}:${COMMIT_SHA}" >> "$GITHUB_ENV"
+
+      # Lambda accepts a single-platform image only, so build for linux/amd64
+      # (Lambda's default x86_64) and do not attach provenance or SBOM
+      # attestations, which would turn the image into a multi-manifest index.
+      - name: Build the image from backend/Dockerfile
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --sbom=false \
+            --file backend/Dockerfile \
+            --tag "$IMAGE" \
+            backend
+
+      - name: Push the image to ECR
+        run: docker push "$IMAGE"
+
+      # Only a "function not found" error is treated as success; any other
+      # error (for example access denied) fails the run. The --query keeps the
+      # output to three fields so the function's settings never reach this
+      # public log. Lambda applies the new image in the background, so after
+      # starting the update the step waits (up to 5 minutes, polling
+      # GetFunctionConfiguration) until Lambda reports it finished, and fails
+      # if Lambda reports the update failed.
+      - name: Update the Lambda function if it exists
+        run: |
+          set -uo pipefail
+          if out=$(aws lambda update-function-code \
+                --function-name "$LAMBDA_FUNCTION" \
+                --image-uri "$IMAGE" \
+                --query '{State:State,LastUpdateStatus:LastUpdateStatus,CodeSha256:CodeSha256}' \
+                --output json 2>&1); then
+            echo "Update of $LAMBDA_FUNCTION to the new image has started:"
+            echo "$out"
+            echo "Waiting for Lambda to finish applying it (up to 5 minutes)..."
+            if aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION"; then
+              echo "Done: $LAMBDA_FUNCTION now runs the new image."
+            else
+              aws lambda get-function-configuration \
+                --function-name "$LAMBDA_FUNCTION" \
+                --query '{LastUpdateStatus:LastUpdateStatus,LastUpdateStatusReason:LastUpdateStatusReason}' \
+                --output json >&2 || true
+              echo "::error title=Lambda update did not finish::The update of $LAMBDA_FUNCTION failed or did not finish within 5 minutes; see the status above."
+              exit 1
+            fi
+          elif grep -q 'ResourceNotFoundException' <<<"$out"; then
+            echo "::notice title=Lambda not created yet::$LAMBDA_FUNCTION does not exist yet, so only the image was pushed. This is expected until the function is created."
+          else
+            echo "$out" >&2
+            echo "::error title=Lambda update failed::Updating $LAMBDA_FUNCTION failed; see the message above."
+            exit 1
+          fi

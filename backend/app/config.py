@@ -77,10 +77,17 @@ def parse_cors_origins(origins: str | None, extra_origins: str | None) -> tuple[
 class Settings:
     physics_engine: str
     cors_origins: tuple[str, ...]
+    # Data folders of the real engine. None: the engine's defaults (see app/physics/engine_adapter.py).
+    spice_kernel_dir: str | None = None
+    horizon_profile_dir: str | None = None
 
     def __post_init__(self) -> None:
         # Settings built in code (tests, create_app callers) get the same normalisation and wildcard ban.
         object.__setattr__(self, "cors_origins", _normalize_all(self.cors_origins))
+
+
+def _optional_path(raw: str | None) -> str | None:
+    return raw.strip() if raw and raw.strip() else None
 
 
 @lru_cache
@@ -89,4 +96,8 @@ def get_settings() -> Settings:
         # "synthetic" (default until real results exist) or "physics" (real engine adapter).
         physics_engine=os.getenv("CH_PHYSICS_ENGINE", "synthetic").strip().lower(),
         cors_origins=parse_cors_origins(os.getenv("CH_CORS_ORIGINS"), os.getenv("CH_CORS_EXTRA_ORIGINS")),
+        # Folder holding the four NAIF kernels (naif0012.tls, de440s.bsp, moon_pa_de440_200625.bpc,
+        # moon_de440_250416.tf) and folder of the stored horizon profiles (backend/data/horizon).
+        spice_kernel_dir=_optional_path(os.getenv("CH_SPICE_KERNEL_DIR")),
+        horizon_profile_dir=_optional_path(os.getenv("CH_HORIZON_PROFILE_DIR")),
     )
