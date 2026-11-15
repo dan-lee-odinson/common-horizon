@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import gsap from 'gsap';
 import * as THREE from 'three';
-import { appStore } from '../state/app';
+import { actions, appStore } from '../state/app';
 import { useStore } from '../state/store';
 import { vec3ToLatLon } from '../util/geo';
 import { DAY_MS, SYNODIC_MONTH_DAYS } from '../util/time';
@@ -26,7 +26,7 @@ import { MISSION_VIEW } from './missionView';
 import { ORBIT_VIEW, ringRadii } from './orbitView';
 import { geometryNow, sceneTimeMs, toVector, type SceneData } from './sceneData';
 import { DISC_FRAGMENT, DISC_VERTEX, ATMOSPHERE_FRAGMENT, EARTH_FRAGMENT, EARTH_VERTEX, MOON_FRAGMENT, MOON_VERTEX, RETICLE_FRAGMENT, RETICLE_VERTEX } from './shaders';
-import { MOON_TEXTURE } from './textures';
+import { MOON_MAPS, MOON_RELIEF_STRENGTH } from './textures';
 
 const SUN_BODY_RADIUS = 0.085;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -78,7 +78,9 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
       uTerminator: { value: 1 },
       uLit: { value: 0 },
       uMap: { value: blank as THREE.Texture },
+      uNormalMap: { value: blank as THREE.Texture },
       uUseMap: { value: 0 },
+      uRelief: { value: MOON_RELIEF_STRENGTH },
     }),
     [colors, blank],
   );
@@ -104,20 +106,52 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
   // The atmosphere shares the Sun's direction with the planet (the same vector object), so the two cannot disagree.
   const atmosphereUniforms = useMemo(() => ({ uSunDir: earthUniforms.uSunDir, uColor: { value: colors.earth.clone().lerp(new THREE.Color('#ffffff'), 0.35) } }), [colors, earthUniforms]);
 
-  // The optional Moon colour map (see textures.ts). Off by default: the surface is generated.
+  const gl = useThree((st) => st.gl);
+  // The Moon's real surface (see textures.ts): the larger pair of maps on desktop, the smaller on
+  // phones and on any device whose largest texture is under 4096. They load in the background from
+  // the app's own files; the drawn surface shows until both are ready and stays if either fails.
   useEffect(() => {
-    if (!MOON_TEXTURE.enabled) return;
+    const set = data.isPhone || gl.capabilities.maxTextureSize < 4096 ? MOON_MAPS.small : MOON_MAPS.large;
+    const loader = new THREE.TextureLoader();
+    const made: THREE.Texture[] = [];
     let alive = true;
-    new THREE.TextureLoader().load(data.isPhone ? MOON_TEXTURE.phone : MOON_TEXTURE.desktop, (t) => {
-      if (!alive) return;
-      t.colorSpace = THREE.SRGBColorSpace;
-      moonUniforms.uMap.value = t;
-      moonUniforms.uUseMap.value = 1;
-    });
+    const load = (path: string, isColor: boolean) =>
+      new Promise<THREE.Texture>((resolve, reject) => {
+        loader.load(
+          `${import.meta.env.BASE_URL}${path}`,
+          (t) => {
+            made.push(t);
+            // The color map is an ordinary picture; the relief map is numbers, not colors.
+            t.colorSpace = isColor ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+            t.wrapS = THREE.RepeatWrapping;
+            t.anisotropy = Math.min(4, gl.capabilities.getMaxAnisotropy());
+            t.needsUpdate = true;
+            resolve(t);
+          },
+          undefined,
+          reject,
+        );
+      });
+    Promise.all([load(set.color, true), load(set.normal, false)])
+      .then(([color, normal]) => {
+        const m = moon.current;
+        if (!alive || !m) return;
+        m.uniforms.uMap.value = color;
+        m.uniforms.uNormalMap.value = normal;
+        m.uniforms.uUseMap.value = 1;
+        actions.setMoonSurface('map');
+      })
+      .catch(() => {
+        // The drawn surface stays, and the caption keeps saying it is an illustration.
+      });
     return () => {
       alive = false;
+      const m = moon.current;
+      if (m) m.uniforms.uUseMap.value = 0;
+      actions.setMoonSurface('drawn');
+      for (const t of made) t.dispose();
     };
-  }, [data.isPhone, moonUniforms]);
+  }, [data.isPhone, gl]);
 
   // The rings, the bodies and the surface marks belong to the Orbit stage: they fade out on the
   // way to mission select, where nothing may stand between the camera and the sites.

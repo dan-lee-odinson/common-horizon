@@ -31,6 +31,7 @@ export function OrbitHud({ revealed }: { revealed: boolean }) {
   const slipDays = useStore(appStore, (s) => s.slipDays);
   const playing = useStore(appStore, (s) => s.previewPlaying);
   const zoomedOut = useStore(appStore, (s) => s.orbitZoom > 0.5);
+  const moonSurface = useStore(appStore, (s) => s.moonSurface);
   const isPhone = useIsPhone();
   // Earth stands on one side of the Moon (see scene/orbitView.ts); the panels arrange around it.
   const earthSide = orbitEarthSide(landingGeometry);
@@ -302,7 +303,10 @@ export function OrbitHud({ revealed }: { revealed: boolean }) {
             </button>
           </div>
           <p className="m-0 max-w-[36rem] text-balance text-center text-[13px] leading-snug text-ink-2" data-testid="not-to-scale">
-            Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only. The Moon’s surface pattern is an illustration, not a map.
+            Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only.{' '}
+            <span data-testid="moon-surface-note" data-surface={moonSurface}>
+              {moonSurface === 'map' ? 'The Moon’s surface is NASA’s CGI Moon Kit color map, made for visual use.' : 'The Moon’s surface pattern is an illustration, not a map.'}
+            </span>
           </p>
         </div>
         </div>

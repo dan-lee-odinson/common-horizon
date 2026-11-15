@@ -1,9 +1,11 @@
 // GLSL for the Moon world: the Moon's surface, the ring system around it, Earth and the site
-// reticle. Everything is drawn in code; no image files are used.
+// reticle.
 //
-// Honest drawing: the Moon's surface pattern (craters, darker patches) is a generated illustration,
-// not a map. What IS data: the direction of the sunlight, the day and night line, the rings' scales
-// and the marks for the Sun's and Earth's overhead points.
+// The Moon's surface is NASA's CGI Moon Kit color map with its relief (web/public/textures/moon/),
+// lit from the Sun's real direction. Until those maps have loaded, and if they cannot be, a drawn
+// surface stands in: a generated illustration, not a map, and the screen says which is showing.
+// Everything else is drawn in code. What IS data: the direction of the sunlight, the day and night
+// line, the rings' scales and the marks for the Sun's and Earth's overhead points.
 
 const NOISE = /* glsl */ `
 vec3 hash33(vec3 p) {
@@ -61,8 +63,10 @@ uniform float uGrid;      // strength of the latitude / longitude lines
 uniform float uMarks;     // strength of the overhead-point marks
 uniform float uTerminator; // strength of the day-night line
 uniform float uLit;       // 0 until the Sun's direction is known
-uniform sampler2D uMap;
-uniform float uUseMap;
+uniform sampler2D uMap;       // the real surface's color map (NASA's CGI Moon Kit), when it has loaded
+uniform sampler2D uNormalMap; // its relief as a normal map: red east, green north, blue outward
+uniform float uUseMap;        // 0 while the drawn surface stands in, 1 once both maps are ready
+uniform float uRelief;        // how strongly the relief bends the light
 ${NOISE}
 
 // One layer of generated craters: adds the surface slope (a tangent vector) and a shade.
@@ -94,35 +98,58 @@ void main() {
   vec3 n = normalize(vPos);
   vec3 view = normalize(cameraPosition - vWorld);
 
-  // ---- surface (illustration) ----
-  vec3 slope = vec3(0.0);
-  float shade = 0.0;
-  float albedo;
+  // East and north on the surface at this point (the same frame the relief map is written in).
+  vec3 east = normalize(vec3(n.z, 0.0, -n.x) + 1e-6);
+  vec3 north = cross(n, east);
+
+  // ---- surface ----
+  vec3 surface;
+  vec3 bumped;
   if (uUseMap > 0.5) {
+    // The real surface. The maps are laid out with 0 degrees longitude at the centre column, east
+    // to the right and north up (see textures.ts, which does this same sum and is tested).
     vec2 uv = vec2(atan(-n.z, n.x) / 6.2831853 + 0.5, asin(clamp(n.y, -1.0, 1.0)) / 3.14159265 + 0.5);
-    albedo = dot(texture2D(uMap, uv).rgb, vec3(0.3333)) * 1.6;
+    // Along the 180 degree meridian the map coordinate jumps from one edge to the other. Measured
+    // there, a pixel would seem to span the whole map and the picture would smear into a seam; so
+    // the pixel's size is taken from a second coordinate whose jump is on the other side of the Moon.
+    vec2 ddx = dFdx(uv);
+    vec2 ddy = dFdy(uv);
+    float uAlt = fract(uv.x + 0.5);
+    float altX = dFdx(uAlt);
+    float altY = dFdy(uAlt);
+    if (abs(ddx.x) + abs(ddy.x) > abs(altX) + abs(altY)) {
+      ddx.x = altX;
+      ddy.x = altY;
+    }
+    surface = textureGrad(uMap, uv, ddx, ddy).rgb * 1.9;
+    vec3 tilt = textureGrad(uNormalMap, uv, ddx, ddy).rgb * 2.0 - 1.0;
+    bumped = normalize(n * max(tilt.z, 0.05) + (east * tilt.x + north * tilt.y) * uRelief);
   } else {
+    // The drawn surface (an illustration): it stands in until the maps have loaded, and stays if they cannot.
+    vec3 slope = vec3(0.0);
+    float shade = 0.0;
     craters(n, 3.6, 1.0, slope, shade);
     craters(n, 8.5, 0.8, slope, shade);
     craters(n, 21.0, 0.55, slope, shade);
     float seas = smoothstep(0.46, 0.6, fbm(n * 1.7 + 11.0));
-    albedo = (0.82 + 0.36 * fbm(n * 9.0)) * mix(1.0, 0.56, seas) + shade;
+    surface = uAlbedo * ((0.82 + 0.36 * fbm(n * 9.0)) * mix(1.0, 0.56, seas) + shade);
+    bumped = normalize(n - (slope - dot(slope, n) * n) * 5.5);
   }
-  vec3 bumped = normalize(n - (slope - dot(slope, n) * n) * 5.5);
 
   // ---- light (data: the Sun's direction) ----
   float sun = max(dot(bumped, uSunDir), 0.0);
   // The Moon's dusty surface reflects almost evenly across its lit face; soften the falloff.
   float lit = pow(sun, 0.72) * smoothstep(-0.02, 0.06, dot(n, uSunDir)) * uLit;
   float earthshine = max(dot(n, uEarthDir), 0.0) * 0.035 * uLit;
-  vec3 color = uAlbedo * albedo * (uSunColor * lit * 1.05 + uEarthColor * earthshine + vec3(0.012, 0.016, 0.022));
+  vec3 color = surface * (uSunColor * lit * 1.05 + uEarthColor * earthshine + vec3(0.012, 0.016, 0.022));
+  // Ease the brightest ground down (the rays of young craters under a high Sun) so it never reaches
+  // plain white: the cyan line work and the reticle are added light and would vanish on white.
+  color = color / (1.0 + 0.45 * color);
 
   // ---- line work ----
   float lat = degrees(asin(clamp(n.y, -1.0, 1.0)));
   float lon = degrees(atan(-n.z, n.x));
   // Pixel footprints along north and east, continuous across the longitude seam.
-  vec3 east = normalize(vec3(n.z, 0.0, -n.x) + 1e-6);
-  vec3 north = cross(n, east);
   vec3 dx = dFdx(n);
   vec3 dy = dFdy(n);
   float fwN = degrees(length(vec2(dot(dx, north), dot(dy, north))));

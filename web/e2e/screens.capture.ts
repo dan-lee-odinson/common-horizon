@@ -98,3 +98,29 @@ test('stage 3: site', async ({ page }, info) => {
   await down();
   await page.screenshot({ path: `${DIR}/stage-3-site-low-sun-${size}.png` });
 });
+
+// The Moon's maps sit on the site markers' coordinates: the app's own marker, put on two craters
+// by their published coordinates, lands on each crater in the picture.
+for (const crater of [
+  { name: 'tycho', lat: '-43.3', lon: '348.6' },
+  { name: 'copernicus', lat: '9.6', lon: '339.9' },
+]) {
+  test(`moon alignment: the marker on ${crater.name}`, async ({ page }, info) => {
+    const size = info.project.name;
+    test.skip(size !== '1440x900', 'one size is enough for this proof');
+    await page.goto('/');
+    await page.getByTestId('begin').click();
+    await page.getByTestId('enter-mission').click();
+    await page.getByTestId('spotlight-name').waitFor();
+    // A week's delay puts the Sun high over this part of the near side, so the craters and their rays show.
+    await page.getByTestId('slip').fill('7');
+    await page.getByTestId('drawer-toggle').click();
+    await page.getByTestId('mode-custom').click();
+    await page.getByTestId('lat-input').fill(crater.lat);
+    await page.getByTestId('lon-input').fill(crater.lon);
+    await page.getByTestId('go-coordinate').click();
+    await page.getByTestId('site-drawer-close').click();
+    await page.waitForTimeout(7000);
+    await page.screenshot({ path: `${DIR}/moon-alignment-${crater.name}-${size}.png` });
+  });
+}

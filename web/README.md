@@ -12,9 +12,15 @@ the website runs on **example answers** (mock mode) so it can be shown and teste
 The interface is one continuous 3D space in three stages. These pictures are taken from the running
 app on example data (`npm run screens`), at 1440 x 900.
 
-**Stage 1, Orbit.** The Moon with the Sun and Earth riding their rings, and the readouts running.
+**Stage 1, Orbit.** The Moon with the Sun riding its ring and the readouts running; Earth's limb,
+to scale beside the Moon, fills the top-left corner.
 
-![Stage 1, Orbit: the Moon inside a tilted ring system, with glass panels of Sun and Earth readouts](docs/screens/stage-1-orbit-1440x900.png)
+![Stage 1, Orbit: the Moon inside a tilted ring system, Earth's limb in the top-left corner, with glass panels of Sun and Earth readouts](docs/screens/stage-1-orbit-1440x900.png)
+
+Zoomed all the way out with **Show whole Earth**: Earth and the Moon at their true sizes beside
+each other (their distance apart is not to scale).
+
+![Orbit zoomed out: the whole Earth, much larger than the Moon and its rings](docs/screens/stage-1-orbit-whole-earth-1440x900.png)
 
 The landing card that opens over it on first load:
 
@@ -28,6 +34,16 @@ launch-delay scrubber, here with a delay of one week: the ranking has reordered.
 The site drawer, slid in from its handle and open on the preset list:
 
 ![The site drawer open at the right of mission select, listing the preset sites with their ranks](docs/screens/stage-2-drawer-1440x900.png)
+
+**The Moon's maps sit where the coordinates say.** The app's own marker, put on two craters by
+their published coordinates through the custom-coordinates entry, lands on each crater: Tycho
+(43.3 S, 348.6 E), the bright centre of the great ray system in the south, and Copernicus
+(9.6 N, 339.9 E), with Kepler's rays to its west. (`src/scene/textures.test.ts` checks the same
+arithmetic.)
+
+![The marker on Tycho: a bright crater with rays running out across the southern highlands](docs/screens/moon-alignment-tycho-1440x900.png)
+
+![The marker on Copernicus: a bright rayed crater on dark mare ground](docs/screens/moon-alignment-copernicus-1440x900.png)
 
 **Stage 3, Site.** Down at the site: the mission's hardware at true scale on level ground, the
 terrain skyline from the data along the horizon, and the instrument around it. Here the Sun is about
@@ -229,8 +245,13 @@ never changes the launch date. Four panels read out, once per frame:
   it for a one-line explanation.
 
 "The selected site" is the site you picked, or else the best-ranked site, or else the first preset.
-The one action here is **Enter mission select**. The Moon's surface pattern is a generated
-illustration, not a map; a line on screen says so.
+The main action here is **Enter mission select**. The Moon's surface is **NASA's CGI Moon Kit
+color map**, made for visual use, with its relief shading the terrain under the Sun's real
+direction (the relief shading is strengthened three times so craters read on a globe this small;
+the surface itself is not moved). The maps sit on the same coordinates as the site markers:
+0 degrees longitude at the centre of the map, east to the right, north up. Until the maps have
+loaded, and if they cannot be, a drawn surface stands in and the line on screen says it is an
+illustration, not a map.
 
 **Stage 2, Mission select.** The camera turns the Moon to one site and marks it with a reticle and a
 name tag. That site is the **spotlight**: the panel at the left gives its rank as a large numeral,
@@ -412,7 +433,7 @@ web/
   e2e/site.spec.ts         the browser tests: the site stage
   e2e/screens.capture.ts   takes the pictures in docs/screens/
   docs/screens/            pictures of the app
-  public/textures/         slot for the Moon colour map (see its README)
+  public/textures/moon/    the Moon's surface maps, made from NASA's CGI Moon Kit (see its README)
 ```
 
 `public/models/` belongs to another part of the team; this folder does not touch it.
