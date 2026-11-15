@@ -23,11 +23,14 @@ SITES = {
     "Apollo 16": (-8.9734, 15.5011),
     "Apollo 17": (20.1911, 30.7723),
     "Blue Ghost Mission 1": (18.562, 61.810),
+    "IM-3 Reiner Gamma": (7.585, 301.275),
+    "Blue Ghost Mission 2": (-24.9, 177.4),
+    "Blue Ghost Mission 3": (36.56, 319.28),
+    "Draper CP-12": (-75.0, 132.4),
     "SLIM": (-13.3160, 25.2510),
 }
 
-# Preferred DEM order:
-# 80 m polar, 240 m polar, then 118 m global fallback.git statusgit status
+# 80 m polar, 240 m polar, then 118 m global fallback.
 DEM_FILES = [
     ("80 m polar", "LDEM_80S_80MPP_ADJ.tiff"),
     ("240 m polar", "LDEM_60S_240MPP_ADJ.tiff"),

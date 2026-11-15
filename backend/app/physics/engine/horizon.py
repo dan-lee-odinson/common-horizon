@@ -21,19 +21,33 @@ class HorizonConfig:
 
     azimuth_step_deg: float = 1.0
     sample_step_m: float = 80.0
-    max_distance_m: float = 30_000.0
+    coarse_start_m: float = 30_000.0
+    coarse_sample_step_m: float = 1_000.0
+    max_distance_m: float = 250_000.0
     observer_height_m: float = 1.5
     moon_radius_m: float = MOON_RADIUS_M
 
     def __post_init__(self):
         if not 0 < self.azimuth_step_deg <= 360:
             raise ValueError("Azimuth step must be in (0, 360].")
+
         if self.sample_step_m <= 0:
-            raise ValueError("Sample step must be positive.")
-        if self.max_distance_m <= 0:
-            raise ValueError("Maximum distance must be positive.")
+            raise ValueError("Fine sampling step must be positive.")
+
+        if self.coarse_start_m <= 0:
+            raise ValueError("Coarse sampling start must be positive.")
+
+        if self.coarse_sample_step_m <= 0:
+            raise ValueError("Coarse sampling step must be positive.")
+
+        if self.max_distance_m <= self.coarse_start_m:
+            raise ValueError(
+                "Maximum distance must exceed coarse sampling start."
+            )
+
         if self.observer_height_m < 0:
             raise ValueError("Observer height cannot be negative.")
+
         if self.moon_radius_m <= 0:
             raise ValueError("Moon radius must be positive.")
 
@@ -151,6 +165,84 @@ def _get_elevation_from_open_dems(
 
     return None
 
+def _get_elevations_from_open_dems(
+    latitudes: np.ndarray,
+    longitudes: np.ndarray,
+    datasets: list,
+) -> list[tuple[float, str] | None]:
+    """Batch terrain lookup for multiple coordinates using open DEMs."""
+
+    results = [None] * len(latitudes)
+
+    for dem_name, dem in datasets:
+        # Transform all points into this DEM's coordinate system at once.
+        xs, ys = transform(
+            dem.crs.geodetic_crs,
+            dem.crs,
+            longitudes.tolist(),
+            latitudes.tolist(),
+        )
+
+        # Only sample points not already covered by a higher-priority DEM.
+        indices = [
+            i for i, (x, y) in enumerate(zip(xs, ys))
+            if results[i] is None
+            and dem.bounds.left <= x < dem.bounds.right
+            and dem.bounds.bottom < y <= dem.bounds.top
+        ]
+
+        if not indices:
+            continue
+
+        coordinates = [(xs[i], ys[i]) for i in indices]
+
+        # Submit all eligible points in one sampling operation.
+        samples = dem.sample(coordinates, masked=True)
+
+        for i, value in zip(indices, samples):
+            raw_elevation = value[0]
+
+            if np.ma.is_masked(raw_elevation):
+                continue
+
+            raw_elevation = float(raw_elevation)
+
+            if not math.isfinite(raw_elevation):
+                continue
+
+            elevation = (
+                raw_elevation * dem.scales[0]
+                + dem.offsets[0]
+            )
+
+            results[i] = (float(elevation), dem_name)
+
+    return results
+
+def _generate_sampling_distances(
+    config: HorizonConfig,
+) -> np.ndarray:
+    """Generate fine near-field and coarse far-field sample distances."""
+
+    fine_distances = np.arange(
+        config.sample_step_m,
+        config.coarse_start_m,
+        config.sample_step_m,
+    )
+
+    coarse_distances = np.arange(
+        config.coarse_start_m,
+        config.max_distance_m,
+        config.coarse_sample_step_m,
+    )
+
+    distances = np.concatenate([
+        fine_distances,
+        coarse_distances,
+        np.array([config.max_distance_m]),
+    ])
+
+    return np.unique(distances)
 
 def compute_horizon_profile(
     latitude_deg: float,
@@ -172,6 +264,7 @@ def compute_horizon_profile(
 
     if not -90 <= latitude_deg <= 90:
         raise ValueError("Latitude must be between -90 and 90.")
+
     if not math.isfinite(longitude_deg):
         raise ValueError("Longitude must be finite.")
 
@@ -206,8 +299,12 @@ def compute_horizon_profile(
         observer_elevation_m, observer_dem = observer
 
         profile = []
+        azimuth_count = math.ceil(
+            360.0 / config.azimuth_step_deg
+        )
 
-        azimuth_count = math.ceil(360.0 / config.azimuth_step_deg)
+        # Generate the sampling distances once.
+        distances = _generate_sampling_distances(config)
 
         for index in range(azimuth_count):
             azimuth = (
@@ -219,27 +316,37 @@ def compute_horizon_profile(
             maximum_terrain = None
             maximum_dem = None
 
-            sample_count = math.ceil(
-                config.max_distance_m / config.sample_step_m
-            )
-
-            for sample_index in range(1, sample_count + 1):
-                distance = min(
-                    sample_index * config.sample_step_m,
-                    config.max_distance_m,
-                )
-
-                sample_lat, sample_lon = destination_point(
+            # Generate all coordinates along this azimuth.
+            sample_points = [
+                destination_point(
                     latitude_deg,
                     longitude_deg,
                     azimuth,
-                    distance,
+                    float(distance),
                     config.moon_radius_m,
                 )
+                for distance in distances
+            ]
 
-                terrain = _get_elevation_from_open_dems(
-                    sample_lat, sample_lon, datasets
-                )
+            sample_latitudes = np.array(
+                [point[0] for point in sample_points]
+            )
+
+            sample_longitudes = np.array(
+                [point[1] for point in sample_points]
+            )
+
+            # Batch-transform and sample all terrain points.
+            terrain_results = _get_elevations_from_open_dems(
+                sample_latitudes,
+                sample_longitudes,
+                datasets,
+            )
+
+            for distance, terrain in zip(
+                distances, terrain_results
+            ):
+                distance = float(distance)
 
                 if terrain is None:
                     continue
@@ -260,6 +367,7 @@ def compute_horizon_profile(
                     maximum_terrain = terrain_elevation_m
                     maximum_dem = dem_name
 
+            # Append exactly one result per azimuth.
             profile.append({
                 "azimuth_deg": float(azimuth),
                 "elevation_angle_deg": maximum_angle,
