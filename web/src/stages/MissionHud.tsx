@@ -54,44 +54,63 @@ export function MissionHud() {
       <h2 className="sr-only">Mission select</h2>
       {tagName && !isPhone ? <AnchorTag anchor="site" label={tagName} tone="cyan" toward={placement.toward} gap={MISSION_VIEW.tagGap} /> : null}
 
-      {/* Left wing: the spotlight, and the short ranked strip under it. */}
-      <div className="hud-layer" data-depth="0.9">
-        <div ref={wingRef} className="wing-l absolute left-5 top-[4.75rem] flex w-[25rem] flex-col gap-3.5 short:gap-2.5 max-md:hidden" data-enter="left">
-          <Spotlight />
-          <RankStrip rows={stripRows} />
-        </div>
-      </div>
-
-      {/* Across the top: the mission line and the launch delay. It stops short of the drawer's place. */}
-      <div className="hud-layer" data-depth="0.6">
-        <div className={`absolute left-[27.5rem] top-[4.75rem] max-lg:right-5 max-md:left-3 max-md:right-3 max-md:top-[4.25rem] ${drawerOpen ? 'right-[25rem]' : 'right-[18.5rem]'}`} data-enter="lead">
-          <MissionBar />
-          {/* Phones have no spotlight panel: the way down to the site sits under the mission bar. */}
-          {focus ? (
-            <button type="button" className="btn btn-primary btn-lg mt-2 w-full md:hidden" onClick={() => actions.zoomToSite(focus)} disabled={flight !== null} data-testid="zoom-to-site-phone">
-              <Icon name="zoom-in" size={16} />
-              Zoom in to this site
+      {isPhone ? (
+        /* On a phone the stage is one column that scrolls: the mission line and the launch delay,
+           the spotlight with the way down to the site, the ranked strip, and the way into the
+           presets and coordinates. It ends above the assistant's question row. */
+        <div className="hud-layer" data-depth="0.6">
+          <div className="absolute inset-x-3 bottom-[5.25rem] top-[4.25rem] flex flex-col gap-2.5 overflow-y-auto overscroll-contain pb-1" data-enter="lead" data-testid="mission-phone-column">
+            <MissionBar />
+            <Spotlight />
+            <RankStrip rows={STRIP_ROWS} />
+            <button
+              type="button"
+              className="btn btn-glass w-full shrink-0"
+              aria-expanded={drawerOpen}
+              aria-controls="site-drawer"
+              onClick={() => actions.setDrawerOpen(!drawerOpen)}
+              data-testid="drawer-toggle"
+            >
+              <Icon name="sites" size={15} />
+              Presets and coordinates
             </button>
-          ) : null}
+          </div>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Left wing: the spotlight, and the short ranked strip under it. */}
+          <div className="hud-layer" data-depth="0.9">
+            <div ref={wingRef} className="wing-l absolute left-5 top-[4.75rem] flex w-[25rem] flex-col gap-3.5 short:gap-2.5" data-enter="left">
+              <Spotlight />
+              <RankStrip rows={stripRows} />
+            </div>
+          </div>
 
-      {/* The drawer's handle. */}
-      <div className="hud-layer" data-depth="0.6">
-        <button
-          type="button"
-          className="btn btn-glass absolute right-5 top-[4.75rem] max-lg:top-[13.5rem] max-md:hidden"
-          aria-expanded={drawerOpen}
-          aria-controls="site-drawer"
-          onClick={() => actions.setDrawerOpen(!drawerOpen)}
-          style={{ visibility: drawerOpen ? 'hidden' : 'visible' }}
-          data-enter="fade"
-          data-testid="drawer-toggle"
-        >
-          <Icon name="sites" size={15} />
-          Presets and coordinates
-        </button>
-      </div>
+          {/* Across the top: the mission line and the launch delay. It stops short of the drawer's place. */}
+          <div className="hud-layer" data-depth="0.6">
+            <div className={`absolute left-[27.5rem] top-[4.75rem] max-lg:right-5 ${drawerOpen ? 'right-[25rem]' : 'right-[18.5rem]'}`} data-enter="lead">
+              <MissionBar />
+            </div>
+          </div>
+
+          {/* The drawer's handle. */}
+          <div className="hud-layer" data-depth="0.6">
+            <button
+              type="button"
+              className="btn btn-glass absolute right-5 top-[4.75rem] max-lg:top-[13.5rem]"
+              aria-expanded={drawerOpen}
+              aria-controls="site-drawer"
+              onClick={() => actions.setDrawerOpen(!drawerOpen)}
+              style={{ visibility: drawerOpen ? 'hidden' : 'visible' }}
+              data-enter="fade"
+              data-testid="drawer-toggle"
+            >
+              <Icon name="sites" size={15} />
+              Presets and coordinates
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Along the bottom: the Mission Assistant, beside the spotlight column and clear of the drawer. */}
       <div className="hud-layer" data-depth="0.4">

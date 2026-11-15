@@ -35,6 +35,15 @@ The site drawer, slid in from its handle and open on the preset list:
 
 ![The site drawer open at the right of mission select, listing the preset sites with their ranks](docs/screens/stage-2-drawer-1440x900.png)
 
+**On a phone** (390 x 844) the same three stages are simplified: Orbit keeps the Moon, two short
+cards and the main action; Mission select is one column that scrolls (the mission line and launch
+delay, the spotlight, the ranked strip, then the way into the presets and coordinates); Site keeps
+its status card, the timeline and the play controls, with the horizon plot in a sheet.
+
+| Orbit | Mission select | Site |
+| --- | --- | --- |
+| ![Orbit on a phone](docs/screens/stage-1-orbit-390x844.png) | ![Mission select on a phone](docs/screens/stage-2-mission-select-390x844.png) | ![Site on a phone](docs/screens/stage-3-site-390x844.png) |
+
 **The Moon's maps sit where the coordinates say.** The app's own marker, put on two craters by
 their published coordinates through the custom-coordinates entry, lands on each crater: Tycho
 (43.3 S, 348.6 E), the bright centre of the great ray system in the south, and Copernicus

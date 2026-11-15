@@ -59,7 +59,7 @@ test('stage 3: site', async ({ page }, info) => {
 
   /** Down to the spotlight site; resolves once the camera is at rest and every model is drawn. */
   const down = async () => {
-    await page.getByTestId(wide ? 'zoom-to-site' : 'zoom-to-site-phone').click();
+    await page.getByTestId('zoom-to-site').click();
     await page.getByTestId('site-hud').waitFor();
     // The reticle names the lander only when the camera has come to rest and the lander's shape is in.
     await page.getByTestId('lander-reticle').locator('[data-marker-tag]').getByText('Starship lander').waitFor({ timeout: 60_000 });

@@ -33,7 +33,7 @@ async function spotlight(page: Page, name: string) {
 
 /** "Zoom in to this site", and wait for the stage and its data. */
 async function zoomIn(page: Page) {
-  await page.getByTestId(isPhone(page) ? 'zoom-to-site-phone' : 'zoom-to-site').click();
+  await page.getByTestId('zoom-to-site').click();
   await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'site', { timeout: 15_000 });
   await expect(page.getByTestId('site-hud')).toBeVisible();
   // The horizon answer for this site: the scrubber is live once it is in.
@@ -934,7 +934,7 @@ test('site on a phone: zoom in, play, the sheet, and back, with nothing scrollin
   // Back to mission select, and down again to the same site.
   await page.getByTestId('back-to-mission').click();
   await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'mission');
-  await expect(page.getByTestId('zoom-to-site-phone')).toBeEnabled({ timeout: 15_000 });
+  await expect(page.getByTestId('zoom-to-site')).toBeEnabled({ timeout: 15_000 });
   await zoomIn(page);
   await expect(page.getByTestId('scene-title')).toHaveText(title);
   await expect(page.getByTestId('site-play')).toHaveAttribute('aria-pressed', 'false');
