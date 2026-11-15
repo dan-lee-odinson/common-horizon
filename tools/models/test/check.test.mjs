@@ -280,3 +280,32 @@ test('check: the brief fixes the kind, the author, the picture credit and a fixe
   assert.deepEqual(checkAgainstBrief(generatedJson(), genBrief).problems, []);
   assert.match(checkAgainstBrief(generatedJson({ picture: { credit: 'Someone else' } }), genBrief).problems.join('\n'), /picture credit should name A\. Photographer/);
 });
+
+test('check: the source address must be a real https address and the date a real date', () => {
+  for (const url of ['https://[', 'https:///', 'https://"><x>', 'https://%%', 'https://localhost', 'http://example.org/x', 'https://exa mple.org']) {
+    assert.match(checkDescription(importedJson({ source: { author: 'A', url, terms: 't' } })).join('\n'), /source\.url/, url);
+  }
+  assert.deepEqual(checkDescription(importedJson({ source: { author: 'A', url: 'https://cad.example.org/documents/1', terms: 't' } })), []);
+  for (const date of ['2026-99-99', '0000-00-00', '2026-02-30']) {
+    assert.match(checkDescription(generatedJson({ date })).join('\n'), /generation\.date/, date);
+  }
+});
+
+test('check: a published figure beside a size needs a number, a source, a status and the difference', () => {
+  const json = sampleJson();
+  json.dimension_sources[0].published = { value_m: 2, source: 's', status: 't' };
+  json.dimension_sources[0].difference_percent = 0;
+  assert.deepEqual(checkDescription(json), []);
+  json.dimension_sources[0].published = { value_m: '2', source: 's', status: 't' };
+  assert.match(checkDescription(json).join('\n'), /published figure beside width_x/);
+  json.dimension_sources[0].published = { value_m: 2, source: 's', status: 't' };
+  delete json.dimension_sources[0].difference_percent;
+  assert.match(checkDescription(json).join('\n'), /no difference_percent/);
+});
+
+test('check: the brief\'s author and picture credit must start the field, not just appear in it', () => {
+  const brief = { kind: 'imported', status: 'test', author: 'A. Author' };
+  assert.match(checkAgainstBrief(importedJson({ source: { author: 'not A. Author', url: 'https://x.org', terms: 't' } }), brief).problems.join('\n'), /author should be A\. Author/);
+  const genBrief = { kind: 'generated', status: 'test', picture_credit: 'A. Photographer' };
+  assert.deepEqual(checkAgainstBrief(generatedJson({ picture: { credit: 'A. Photographer (own photo)' } }), genBrief).problems, []);
+});

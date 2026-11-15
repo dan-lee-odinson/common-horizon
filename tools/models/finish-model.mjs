@@ -7,21 +7,29 @@
 //   1. reads every triangle of the raw .glb (with each node's transform applied) and keeps only
 //      the shape: positions and surface directions (normals). Textures, images, UV coordinates,
 //      per-vertex colours and all materials are dropped;
-//   2. turns the shape by finishing.rotate_deg ([x, y, z] in degrees, applied X, then Y, then Z)
-//      so that Y is up and the front of the vehicle faces +Z;
+//   2. turns the shape by finishing.rotate_deg ([x, y, z] in degrees) so that Y is up and the
+//      front of the vehicle faces +Z. The turns are about the shape's own axes: X first, then
+//      the new Y, then the new Z (three.js Euler order 'XYZ'; the same as Z, then Y, then X about
+//      the fixed axes). With one non-zero angle the order does not matter;
 //   3. optionally drops loose pieces smaller than finishing.drop_loose_parts_below (a share of
 //      all triangles; generated shapes sometimes carry small floating bits);
-//   4. scales it evenly (same factor on every axis) so its height matches the published figure in
+//   4. optionally flattens anything that hangs below the wheels: finishing.flatten_below (a share
+//      of the height) raises every point lower than that, measured from the lowest point, to that
+//      level, so a shape that rests on a lowered tool or a stray spike stands on its wheels;
+//   5. scales it evenly (same factor on every axis) so its height matches the published figure in
 //      the spec's height_y entry, then moves it so it stands on the ground (lowest point y = 0)
 //      with the centre of its footprint on the origin;
-//   5. gives it one neutral material and writes <id>.glb and <id>.json into the output folder
+//   6. gives it one neutral material and writes <id>.glb and <id>.json into the output folder
 //      (default web/public/models/). Sizes, triangle count and the finishing record in the JSON
-//      are measured from the finished shape; everything else is copied from the spec.
+//      are measured from the finished shape. Copied from the spec: id, name, kind, status, the
+//      size entries (including any extra keys in them), the source (imported) or generation
+//      record (generated), the simplifications and the finishing settings. Other top-level keys
+//      in the spec are not carried over.
 //
 // The spec has the same layout as the finished JSON, without the measured fields, so a finished
 // JSON can be passed back in as --spec to repeat the step: same raw file, same bytes out.
-// It refuses to write a model with 20,000 triangles or more. Check the result with
-// `node check-models.mjs <id>`.
+// It refuses to write a model with 20,000 triangles or more, an empty shape or a flat one.
+// Check the result with `node check-models.mjs <id>`.
 
 import './shared/node-shims.mjs';
 import crypto from 'node:crypto';
@@ -194,12 +202,21 @@ export function readSpec(spec) {
   if (!Array.isArray(rotate) || rotate.length !== 3 || !rotate.every(Number.isFinite)) problems.push('"finishing.rotate_deg" must be [x, y, z] in degrees');
   const dropBelow = spec.finishing?.drop_loose_parts_below ?? 0;
   if (!(dropBelow >= 0 && dropBelow < 0.5)) problems.push('"finishing.drop_loose_parts_below" must be a share between 0 and 0.5');
+  const flattenBelow = spec.finishing?.flatten_below ?? 0;
+  if (!(flattenBelow >= 0 && flattenBelow < 0.1)) problems.push('"finishing.flatten_below" must be a share of the height between 0 and 0.1');
+  for (const s of sources) {
+    if (s.published === undefined) continue;
+    const p = s.published;
+    if (!(typeof p?.value_m === 'number' && p.value_m > 0) || typeof p?.source !== 'string' || typeof p?.status !== 'string') {
+      problems.push(`the published figure for ${s.dimension} needs value_m (a positive number), source and status`);
+    }
+  }
   if (problems.length > 0) throw new Error(`spec: ${problems.join('; ')}`);
-  return { targetHeight: height.value_m, rotate, dropBelow };
+  return { targetHeight: height.value_m, rotate, dropBelow, flattenBelow };
 }
 
-/** Steps 2 to 4: turn, drop loose bits, scale to the published height, stand on the origin. */
-export function finishShape(raw, { targetHeight, rotate, dropBelow }) {
+/** Steps 2 to 5: turn, drop loose bits, flatten what hangs below, scale, stand on the origin. */
+export function finishShape(raw, { targetHeight, rotate, dropBelow, flattenBelow = 0 }) {
   let shape = { ...raw, positions: [...raw.positions], normals: raw.normals ? [...raw.normals] : null };
 
   const turn = new THREE.Matrix4().makeRotationFromEuler(
@@ -223,14 +240,29 @@ export function finishShape(raw, { targetHeight, rotate, dropBelow }) {
   } else {
     shape = compact(shape, () => true);
   }
+  if (shape.indices.length === 0) throw new Error('nothing is left of the shape (every piece was dropped)');
+
+  let flattened = 0;
+  if (flattenBelow > 0) {
+    const raw0 = boundsOf(shape.positions);
+    const level = raw0.min[1] + flattenBelow * raw0.size[1];
+    for (let i = 1; i < shape.positions.length; i += 3) {
+      if (shape.positions[i] < level) {
+        shape.positions[i] = level;
+        flattened++;
+      }
+    }
+  }
 
   const before = boundsOf(shape.positions);
+  if (!(before.size[1] > 0)) throw new Error('the shape has no height after turning; check rotate_deg');
   const scale = targetHeight / before.size[1];
+  if (!Number.isFinite(scale)) throw new Error('the scale factor is not a finite number');
   const shift = [-(before.min[0] + before.max[0]) / 2, -before.min[1], -(before.min[2] + before.max[2]) / 2];
   for (let i = 0; i < shape.positions.length; i += 3) {
     for (let k = 0; k < 3; k++) shape.positions[i + k] = (shape.positions[i + k] + shift[k]) * scale;
   }
-  return { shape, scale, removed };
+  return { shape, scale, removed, flattened };
 }
 
 /** Step 5a: the finished shape as a three.js scene with one neutral material. */
@@ -253,7 +285,7 @@ export function buildScene(id, shape) {
 }
 
 /** Step 5b: the finished JSON, in a fixed order, measured fields filled in. */
-export function describeFinished(spec, { size, triangles, scale, removed, input }) {
+export function describeFinished(spec, { size, triangles, scale, removed, flattened = 0, input }) {
   const dims = {
     width_x: round(size[0], 3),
     height_y: spec.dimension_sources.find((s) => s.dimension === 'height_y').value_m,
@@ -277,6 +309,10 @@ export function describeFinished(spec, { size, triangles, scale, removed, input 
       entry.published = given.published;
       entry.difference_percent = round(((dims[dim] - given.published.value_m) / given.published.value_m) * 100, 1);
     }
+    // Any other keys in the spec's entry (for example "link") are kept, after the fixed ones.
+    for (const [key, value] of Object.entries(given)) {
+      if (!(key in entry) && key !== 'difference_percent') entry[key] = value;
+    }
     return entry;
   });
   const provenance = spec.kind === 'imported' ? { source: spec.source } : { generation: spec.generation };
@@ -298,6 +334,8 @@ export function describeFinished(spec, { size, triangles, scale, removed, input 
     finishing: {
       rotate_deg: spec.finishing?.rotate_deg ?? [0, 0, 0],
       drop_loose_parts_below: spec.finishing?.drop_loose_parts_below ?? 0,
+      flatten_below: spec.finishing?.flatten_below ?? 0,
+      flattened_vertices: flattened,
       input_file: input.name,
       input_sha256: input.sha256,
       input_triangles: input.triangles,
@@ -314,7 +352,7 @@ export async function finishModel({ input, spec, outDir = OUTPUT_DIR, dryRun = f
   const bytes = fs.readFileSync(input);
   const raw = readRawShape(bytes);
   const settings = readSpec(spec);
-  const { shape, scale, removed } = finishShape(raw, settings);
+  const { shape, scale, removed, flattened } = finishShape(raw, settings);
   const triangles = shape.indices.length / 3;
   const size = boundsOf(shape.positions).size;
   const description = describeFinished(spec, {
@@ -322,11 +360,13 @@ export async function finishModel({ input, spec, outDir = OUTPUT_DIR, dryRun = f
     triangles,
     scale,
     removed,
+    flattened,
     input: { name: path.basename(input), sha256: crypto.createHash('sha256').update(bytes).digest('hex'), triangles: raw.triangles },
   });
   const summary =
     `${spec.id}: ${size.map((x) => x.toFixed(3)).join(' x ')} m (x, y, z), ${triangles} triangles ` +
-    `(raw ${raw.triangles}, ${removed.pieces} loose pieces with ${removed.triangles} triangles dropped), scale x${scale.toFixed(4)}`;
+    `(raw ${raw.triangles}, ${removed.pieces} loose pieces with ${removed.triangles} triangles dropped` +
+    `${flattened > 0 ? `, ${flattened} low points flattened` : ''}), scale x${scale.toFixed(4)}`;
   if (triangles >= TRIANGLE_LIMIT) {
     throw new Error(`${summary}\nrefused: ${triangles} triangles is not under the limit of ${TRIANGLE_LIMIT}`);
   }

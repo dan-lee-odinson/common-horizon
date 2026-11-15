@@ -59,12 +59,14 @@ node finish-model.mjs --input <raw.glb> --spec <spec.json>
 
 It reads every triangle of the raw file and keeps only the shape: textures, images, UV
 coordinates, per-vertex colours and materials are dropped and the shape gets one neutral grey
-material. It turns the shape by `finishing.rotate_deg` so Y is up and the front faces +Z, can
-drop small loose pieces (`finishing.drop_loose_parts_below`, a share of all triangles), scales it
-evenly so its height matches the published figure in the `height_y` entry of
+material. It turns the shape by `finishing.rotate_deg` so Y is up and the front faces +Z (turns
+about the shape's own axes: X, then the new Y, then the new Z), can drop small loose pieces
+(`finishing.drop_loose_parts_below`, a share of all triangles), can flatten anything hanging
+below the wheels (`finishing.flatten_below`, a share of the height above the lowest point),
+scales it evenly so its height matches the published figure in the `height_y` entry of
 `dimension_sources`, and stands it on the origin. Width and depth are then measured from the
 shape (status "our estimate", with any published figure shown beside them for comparison).
-It refuses to write a shape with 20,000 triangles or more. `--dry-run` prints the result
+It refuses to write a shape with 20,000 triangles or more, an empty shape or a flat one. `--dry-run` prints the result
 without writing; `--out-dir` writes somewhere other than `web/public/models/`.
 
 The spec has the same layout as the finished JSON, so to repeat the step pass the finished JSON
@@ -85,8 +87,9 @@ solar array mast was not built with its default sizes, if the JSON disagrees
 with the brief (`brief-figures.mjs`), if a model uses textures or vertex colours, or if the
 Khronos glTF validator reports an error. It also fails if a model's `"kind"` is missing or its
 note is not the exact note for its kind, if an imported model does not name its author, source
-address and terms, or if a generated model does not name the picture's credit, the model
-(TRELLIS.2), the service, the request id and the date.
+address (a real https address) and terms, if a generated model does not name the picture's
+credit, the model (TRELLIS.2), the service, the request id and a real date, or if a published
+figure shown beside a size lacks its value, source, status or difference.
 
 ```bash
 npm test

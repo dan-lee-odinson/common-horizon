@@ -229,7 +229,13 @@
   const fmt = (value) => Number(value.toFixed(3)).toString();
   const kindBadge = (f) => el('span', { class: `kind kind-${f.kind ?? 'unknown'}`, text: KIND_LABEL[f.kind] ?? 'kind not stated' });
   // A link only for https addresses from the JSON; anything else is shown as plain text.
-  const link = (url, text = url) => (/^https:\/\/\S+$/.test(url ?? '') ? el('a', { href: url, rel: 'noopener noreferrer', text }) : (text ?? ''));
+  const link = (url, text = url) => {
+    try {
+      const u = new URL(url);
+      if (u.protocol === 'https:' && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(u.hostname)) return el('a', { href: u.href, rel: 'noopener noreferrer', text });
+    } catch { /* not an address: show it as text */ }
+    return text ?? '';
+  };
   const sizeText = (d) => `${fmt(d.width_x)} x ${fmt(d.height_y)} x ${fmt(d.depth_z)}`;
 
   // Read every model's JSON. A file that cannot be read is reported, and the others still show.

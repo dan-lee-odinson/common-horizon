@@ -16,8 +16,8 @@
     {
       "dimension": "width_x",
       "value_m": 4.741,
-      "meaning": "overall width across the landing legs (X) of the finished shape",
-      "source": "the community CAD model, scaled evenly to the published height; we found no published figure across the legs (the published 3.08 m is the body diameter)",
+      "meaning": "overall width (X) of the finished shape, set by the rim of the top deck; the landing legs span 4.30 m foot pad to foot pad",
+      "source": "the community CAD model, scaled evenly to the published height; we found no published figure for the deck or the legs",
       "status": "our estimate"
     },
     {
@@ -31,8 +31,8 @@
     {
       "dimension": "depth_z",
       "value_m": 4.741,
-      "meaning": "overall depth across the landing legs (Z) of the finished shape",
-      "source": "the community CAD model, scaled evenly to the published height; we found no published figure across the legs (the published 3.08 m is the body diameter)",
+      "meaning": "overall depth (Z) of the finished shape, set by the rim of the top deck; the landing legs span 4.30 m foot pad to foot pad",
+      "source": "the community CAD model, scaled evenly to the published height; we found no published figure for the deck or the legs",
       "status": "our estimate"
     }
   ],
@@ -40,7 +40,7 @@
     "title": "Blue Moon (Onshape public document), assembly \"Blue Moon Mk1\"",
     "author": "David Nagy",
     "url": "https://cad.onshape.com/documents/cc88aa273c89627a864e4c71/w/ae9127fe16876b483f50c07c/e/a0b9d18a7b5130719bd45a0d",
-    "terms": "Onshape Terms of Use, section 1(g)(ii), public documents: a worldwide, royalty-free, non-exclusive licence to use, copy, modify, publish and distribute. No LICENSE tab was seen in the document on 15 November 2026; the owner's plan, which decides whether that clause applies, could not be confirmed.",
+    "terms": "Onshape Terms of Use (effective 15 July 2020), section 1, item 7 \"Intellectual Property\", the paragraph on public documents owned by Free Plan users: a worldwide, royalty-free, non-exclusive licence to use, copy, modify, publish and distribute. Onshape's public record of the document shows it public, owned and created by David Nagy on 26 July 2025 and not enterprise-owned; whether the owner is on the Free Plan, which the clause requires, could not be confirmed. No LICENSE tab was seen on 15 November 2026.",
     "terms_url": "https://www.onshape.com/en/legal/terms-of-use",
     "exported": "2026-11-15",
     "changes": [
@@ -55,7 +55,8 @@
   "simplifications": [
     "The shape is a community CAD model by David Nagy, not the maker's data; we have not compared it with the maker's drawings.",
     "Scaled evenly from the CAD file's 8.005 m to the published 8.05 m (about 0.6 percent).",
-    "Width and depth across the landing legs come from the CAD model, scaled; no published figure across the legs was found. The published 3.08 m is the body diameter.",
+    "Width and depth come from the CAD model, scaled: 4.74 m at the rim of the top deck, 4.30 m across the landing leg foot pads; no published figure for either was found.",
+    "At the published 8.05 m height the CAD body is about 3.8 to 4.0 m across, wider than the published 3.08 m diameter: the community model's proportions differ from the published figures.",
     "Fairing and payload adapter not included; detail reduced to keep under 20,000 triangles.",
     "All colours removed; no names, marks or lettering; one plain grey material."
   ],
@@ -66,6 +67,8 @@
       0
     ],
     "drop_loose_parts_below": 0,
+    "flatten_below": 0,
+    "flattened_vertices": 0,
     "input_file": "blue-moon-mk1.glb",
     "input_sha256": "c5c8b493c2d258b8d06aa271b8ed51d720e23c8b27970d0422865631f0316a96",
     "input_triangles": 18978,

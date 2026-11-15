@@ -60,13 +60,31 @@ function isText(value) {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** A real calendar date written like 2026-11-15. */
+export function isIsoDate(value) {
+  if (!(isText(value) && ISO_DATE.test(value))) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** An https address with a real host name (for example https://example.org/page). */
+export function isHttpsAddress(value) {
+  if (!isText(value) || /\s/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** Where an imported model comes from: author, source address and terms. */
 export function checkImportedSource(json) {
   const problems = [];
   const s = json.source;
   if (!s || typeof s !== 'object') return ['JSON: an imported model needs a "source" with its author, address and terms'];
   if (!isText(s.author)) problems.push('JSON: imported model: "source.author" (who made the CAD model) is missing');
-  if (!(isText(s.url) && /^https:\/\/\S+$/.test(s.url))) problems.push('JSON: imported model: "source.url" (the source address, https://...) is missing');
+  if (!isHttpsAddress(s.url)) problems.push('JSON: imported model: "source.url" (the source address, https://...) is missing');
   if (!isText(s.terms)) problems.push('JSON: imported model: "source.terms" (the terms we rely on) is missing');
   return problems;
 }
@@ -80,7 +98,7 @@ export function checkGeneration(json) {
   if (g.model !== GENERATOR_MODEL) problems.push(`JSON: generated model: "generation.model" must be "${GENERATOR_MODEL}" (got ${JSON.stringify(g.model)})`);
   if (!isText(g.service)) problems.push('JSON: generated model: "generation.service" is missing');
   if (!isText(g.request_id)) problems.push('JSON: generated model: "generation.request_id" is missing');
-  if (!(isText(g.date) && ISO_DATE.test(g.date))) problems.push('JSON: generated model: "generation.date" must be a date like 2026-11-15');
+  if (!isIsoDate(g.date)) problems.push('JSON: generated model: "generation.date" must be a real date like 2026-11-15');
   if (g.cleanup !== undefined && g.cleanup !== null) {
     if (g.cleanup.model !== CLEANUP_MODEL) problems.push(`JSON: generated model: the cleanup step must name "${CLEANUP_MODEL}" as its model`);
     if (!isText(g.cleanup.request_id)) problems.push('JSON: generated model: the cleanup step has no request id');
@@ -139,6 +157,12 @@ export function checkDescription(json, { fileBase } = {}) {
     need(typeof entry.source === 'string' && entry.source.length > 0, `JSON: source text for ${dim} is empty`);
     need(typeof entry.status === 'string' && entry.status.length > 0, `JSON: status label for ${dim} is empty`);
     need(entry.value_m === json.dimensions_m?.[dim], `JSON: source entry for ${dim} says ${entry.value_m} m but dimensions_m says ${json.dimensions_m?.[dim]} m`);
+    if (entry.published !== undefined) {
+      const p = entry.published;
+      need(isPositiveNumber(p?.value_m) && isText(p?.source) && isText(p?.status),
+        `JSON: the published figure beside ${dim} needs a positive value_m, a source and a status`);
+      need(Number.isFinite(entry.difference_percent), `JSON: the published figure beside ${dim} has no difference_percent`);
+    }
   }
   for (const part of json.parts ?? []) {
     need(typeof part.node === 'string' && part.node.length > 0, 'JSON: a part has no "node" name');
@@ -162,10 +186,10 @@ export function checkAgainstBrief(json, brief) {
   if (json.status !== brief.status) {
     problems.push(`brief: status should be "${brief.status}" but the JSON says "${json.status}"`);
   }
-  if (brief.author && !String(json.source?.author ?? '').includes(brief.author)) {
+  if (brief.author && !String(json.source?.author ?? '').startsWith(brief.author)) {
     problems.push(`brief: the author should be ${brief.author} but the JSON says ${JSON.stringify(json.source?.author)}`);
   }
-  if (brief.picture_credit && !String(json.generation?.picture?.credit ?? '').includes(brief.picture_credit)) {
+  if (brief.picture_credit && !String(json.generation?.picture?.credit ?? '').startsWith(brief.picture_credit)) {
     problems.push(`brief: the picture credit should name ${brief.picture_credit} but the JSON says ${JSON.stringify(json.generation?.picture?.credit)}`);
   }
   if (brief.triangles !== undefined && json.triangles !== brief.triangles) {

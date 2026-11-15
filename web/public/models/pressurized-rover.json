@@ -90,6 +90,8 @@
       0
     ],
     "drop_loose_parts_below": 0,
+    "flatten_below": 0,
+    "flattened_vertices": 0,
     "input_file": "trellis2_8668336e5ddf46e8a9e0f18d449fac1f.glb",
     "input_sha256": "52be3275f5f5503c74f7c042e1d3c6c80c1672fd62e3e58f23013df500903909",
     "input_triangles": 17401,
