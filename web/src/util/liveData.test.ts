@@ -7,7 +7,8 @@ import catalogJson from '../api/examples/catalog.json';
 import type { CatalogItem, SiteEvaluation } from '../api/types';
 import { DATA_SOURCE_LABEL } from '../stages/TopBar';
 import { catalogFigureRows, chosenCapacity, figureValue, NOT_PUBLISHED } from './catalog';
-import { scoreQuantity, siteQuantities, transitQuantity, verdictText } from './quantities';
+import { rankRows } from './ranking';
+import { scoreQuantity, siteQuantities, SLOPE_NOT_CHECKED_LANDER, SLOPE_NOT_CHECKED_POINT, transitQuantity, verdictText } from './quantities';
 import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from './terrain';
 
 const CATALOG = catalogJson.items as unknown as CatalogItem[];
@@ -52,15 +53,19 @@ describe('the score', () => {
 });
 
 describe('the verdict', () => {
-  it('says UNKNOWN with the requirement that could not be checked, never pass', () => {
-    const v = { result: 'unknown' as const, requirement: 'landing slope', unknown_requirements: ['landing slope'] };
-    expect(verdictText(v)).toBe('UNKNOWN: landing slope');
+  it('says UNKNOWN with the requirement that could not be checked, never pass, unless the slope alone is unknown', () => {
+    const v = { result: 'unknown' as const, requirement: 'hardware fit', unknown_requirements: ['hardware fit'] };
+    expect(verdictText(v)).toBe('UNKNOWN: hardware fit');
     const q = siteQuantities(2, evaluation({ verdict: v }));
-    expect(q.verdict.text).toBe('UNKNOWN: landing slope');
+    expect(q.verdict.text).toBe('UNKNOWN: hardware fit');
     expect(q.verdict.tone).toBe('warn');
     expect(q.verdictWord).toBe('unknown');
     expect(q.passes).toBeNull();
     expect(q.result).toBe('unknown');
+    expect(q.slopeNote).toBeNull();
+    // The slope and something else unknown: still UNKNOWN, with the first.
+    const two = { result: 'unknown' as const, requirement: 'hardware fit', unknown_requirements: ['hardware fit', 'landing slope'] };
+    expect(siteQuantities(2, evaluation({ verdict: two })).verdict.text).toBe('UNKNOWN: hardware fit');
   });
   it('says fail with the first failed requirement, and pass only for a pass', () => {
     expect(verdictText({ result: 'fail', requirement: 'night power', unknown_requirements: [] })).toBe('fail: night power');
@@ -113,5 +118,72 @@ describe('terrain, data source and transit', () => {
     expect(transitQuantity(5, true)).toMatchObject({ label: 'Transit', text: '5', unit: 'days (our estimate)' });
     expect(transitQuantity(null, true).text).toBe('not stated, counted as 0');
     expect(transitQuantity(5, false).text).toBe('—');
+  });
+});
+
+describe('a pass with the slope not checked', () => {
+  const slopeOnly = { result: 'unknown' as const, requirement: 'landing slope', unknown_requirements: ['landing slope'] };
+
+  it('shows PASS with "no published slope limit for this lander" when the slope is known and the lander publishes no limit', () => {
+    const q = siteQuantities(2, evaluation({ slope_deg: 4.5, verdict: slopeOnly }), null, { custom: false, landerLimitDeg: null });
+    expect(q.verdict.text).toBe('pass');
+    expect(q.verdict.tone).toBe('good');
+    expect(q.result).toBe('pass');
+    expect(q.verdictWord).toBe('pass');
+    expect(q.passes).toBe(true);
+    // The answer's own word is kept beside it.
+    expect(q.answerResult).toBe('unknown');
+    expect(q.slopeNote).toBe('Slope not checked: no published slope limit for this lander');
+    expect(SLOPE_NOT_CHECKED_LANDER).toBe(q.slopeNote);
+  });
+
+  it('shows "no slope data for this point" for a custom point with no slope', () => {
+    const custom = evaluation({ site_id: 'custom:-45.0000:10.0000', slope_deg: null, verdict: slopeOnly });
+    expect(siteQuantities(1, custom, null, { custom: true, landerLimitDeg: null }).slopeNote).toBe('Slope not checked: no slope data for this point');
+    // Known as custom by its id when no context is given.
+    expect(siteQuantities(1, custom).slopeNote).toBe(SLOPE_NOT_CHECKED_POINT);
+  });
+
+  it('says what is missing, as the backend checks it: the lander’s limit first, then the point’s slope', () => {
+    // A lander with a published limit, and no slope for the site: the slope data is missing.
+    expect(siteQuantities(1, evaluation({ slope_deg: null, verdict: slopeOnly }), null, { custom: false, landerLimitDeg: 10 }).slopeNote).toBe(SLOPE_NOT_CHECKED_POINT);
+    // Neither: the lander publishes no limit (the backend's first check).
+    expect(siteQuantities(1, evaluation({ slope_deg: null, verdict: slopeOnly }), null, { custom: false, landerLimitDeg: null }).slopeNote).toBe(SLOPE_NOT_CHECKED_LANDER);
+    // A custom point with a slope from the answer and no limit: the limit is what is missing.
+    expect(siteQuantities(1, evaluation({ site_id: 'custom:1:2', slope_deg: 3, verdict: slopeOnly }), null, { custom: true, landerLimitDeg: null }).slopeNote).toBe(SLOPE_NOT_CHECKED_LANDER);
+  });
+
+  it('shows pass or fail as normal when the backend has the slope and a limit, and fail when something else failed', () => {
+    expect(siteQuantities(1, evaluation({ slope_deg: 4 })).verdict.text).toBe('pass');
+    const steep = { result: 'fail' as const, requirement: 'landing slope', unknown_requirements: [] };
+    expect(siteQuantities(1, evaluation({ slope_deg: 12, verdict: steep })).verdict.text).toBe('fail: landing slope');
+    const failWithSlopeUnknown = { result: 'fail' as const, requirement: 'night power', unknown_requirements: ['landing slope'] };
+    const q = siteQuantities(1, evaluation({ verdict: failWithSlopeUnknown }));
+    expect(q.verdict.text).toBe('fail: night power');
+    expect(q.slopeNote).toBeNull();
+  });
+
+  it('shows slope_deg when present, under the backend’s name for its requirement, with the backend’s sentence', () => {
+    const requirements = [{ requirement: 'landing slope', passed: true, detail: 'Slope 4.5 deg; Griffin accepts up to 10 deg.' }];
+    const q = siteQuantities(1, evaluation({ slope_deg: 4.5, requirements }));
+    expect(q.slope).toMatchObject({ key: 'slope', label: 'Landing slope', value: 4.5, text: '4.5', unit: '°' });
+    expect(q.slopeDetail).toBe('Slope 4.5 deg; Griffin accepts up to 10 deg.');
+    expect(siteQuantities(1, evaluation({ slope_deg: null })).slope.value).toBeNull();
+  });
+
+  it('keeps the backend’s order: a pass without the slope check stays where the backend ranked it', () => {
+    const rows = rankRows(
+      [
+        evaluation({ site_id: 'b', rank: 2, score: 95, slope_deg: 1, verdict: slopeOnly }),
+        evaluation({ site_id: 'a', rank: 1, score: 40, slope_deg: 1 }),
+        evaluation({ site_id: 'c', rank: 3, score: 99, verdict: { result: 'fail', requirement: 'night power', unknown_requirements: [] } }),
+      ],
+      null,
+    );
+    expect(rows.map((r) => [r.siteId, r.rank, siteQuantities(r.rank, r.evaluation).verdict.text])).toEqual([
+      ['a', 1, 'pass'],
+      ['b', 2, 'pass'],
+      ['c', 3, 'fail: night power'],
+    ]);
   });
 });

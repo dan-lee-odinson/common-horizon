@@ -159,7 +159,12 @@ for field, and both modes use them. Sample answers of the example model are in
 * **Ranking.** The website keeps the backend's order (each result's `rank`: passing sites, then
   unknown, then failing) and never re-sorts by score. A null score is shown as its range,
   `score_min`–`score_max`. A verdict of `unknown` is shown as UNKNOWN with the requirement that
-  could not be checked, never as a pass.
+  could not be checked, never as a pass, with one exception: when nothing failed and the landing
+  slope is the only requirement left unchecked, it shows as PASS with the reason beside it ("Slope
+  not checked: no published slope limit for this lander", or "... no slope data for this point" for
+  a custom point, or wherever the answer has no slope for a lander that publishes a limit). The site
+  keeps the backend's place in the order. `slope_deg`, when the answer has it, is shown under the
+  backend's name for its requirement ("Landing slope"), with the backend's sentence for it.
 * **Transit.** Every `POST /evaluate` carries `transit_days: 5` (our estimate, `src/util/transit.ts`),
   shown as "Transit 5 days (our estimate)" beside the landing. The landing is always the answer's
   own `landing_utc`.

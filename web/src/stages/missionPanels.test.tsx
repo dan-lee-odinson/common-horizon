@@ -85,6 +85,7 @@ function scene(slipDays: number, pick: string | null = null, updating = false): 
     horizonsCheck: idle(),
     dataSource: 'example',
     transitDays: TRANSIT_DAYS,
+    landerSlopeLimitDeg: null,
     allSites: SITES,
     siteById,
     highlighted,
