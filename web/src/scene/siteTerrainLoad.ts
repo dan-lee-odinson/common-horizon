@@ -115,10 +115,8 @@ export function useSiteTerrain(siteId: string | null | undefined): SiteTerrainSt
 
 /** What is said under the picture about the ground drawn: each sentence built from the manifest. */
 export interface GroundWords {
-  /** Where the heights come from and how they are drawn. */
+  /** Where the heights come from (each model's pixel size) and how they are drawn. */
   source: string;
-  /** Where the near file comes from the global model: it is smooth. */
-  nearSmooth: string | null;
   /** Where the engine's sunlight uses a smooth horizon: the sentence, and the highest ground in view in degrees (one decimal). */
   smoothHorizon: { before: string; deg: string; after: string } | null;
 }
@@ -126,23 +124,23 @@ export interface GroundWords {
 const metres = (m: number): string => `${Math.round(m)} m`;
 
 /**
- * The words for a site's ground. `far` says whether the far ground is drawn too; without it the near
- * ground eases back to level ground past its edge, and the words say so.
+ * The words for a site's ground, short enough to leave the Hardware panel its rows. The model sizes
+ * say where the near ground comes from the coarse global model. `far` says whether the far ground
+ * is drawn too; without it the near ground eases back to level ground past its edge, and the words
+ * say so (and carry no skyline figure: that figure is worked out from both files).
  */
 export function groundWords(entry: TerrainSiteEntry, far: boolean): GroundWords {
-  const nearReachM = ((entry.near.posts - 1) / 2) * entry.near.spacing_m;
+  const near = metres(entry.near.layer_pixel_m);
   const source = far
-    ? `Ground: LOLA elevation from NASA Moon Trek (${metres(entry.near.layer_pixel_m)} model near, ${metres(entry.far.layer_pixel_m)} model far), drawn at true scale. Shading only: shadows cast by terrain are not drawn.`
-    : `Ground: LOLA elevation from NASA Moon Trek (${metres(entry.near.layer_pixel_m)} model), drawn at true scale for ${metres(nearReachM)} round the site, then eased back to level ground, which is an illustration. Shading only: shadows cast by terrain are not drawn.`;
-  const nearSmooth = /global/i.test(entry.near.layer) ? `The near ground here comes from a ${metres(entry.near.layer_pixel_m)} model, so it is smooth with no small detail.` : null;
-  const smoothHorizon = entry.engine_sunlight_uses_terrain_skyline
-    ? null
-    : far
+    ? `Ground: NASA LOLA via Moon Trek (${near} near, ${metres(entry.far.layer_pixel_m)} far), true scale. No cast shadows.`
+    : `Ground: NASA LOLA via Moon Trek (${near} near), true scale to ${metres(((entry.near.posts - 1) / 2) * entry.near.spacing_m)}, then level (an illustration). No cast shadows.`;
+  const smoothHorizon =
+    far && !entry.engine_sunlight_uses_terrain_skyline
       ? {
-          before: 'Sunlight numbers at this site use a smooth horizon. The distant terrain is drawn for scale and is not in those numbers. It rises up to ',
+          before: 'Sunlight numbers here use a smooth horizon. The drawn terrain rises to ',
           deg: entry.skyline_from_these_files.highest_deg.toFixed(1),
-          after: ' degrees above the horizon here.',
+          after: ' degrees and is not in them.',
         }
       : null;
-  return { source, nearSmooth, smoothHorizon };
+  return { source, smoothHorizon };
 }

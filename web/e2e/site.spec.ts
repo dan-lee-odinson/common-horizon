@@ -199,9 +199,8 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
   // The ground is the real ground from the height files, and the words say where it comes from;
   // the rings on the ground say what they measure.
   await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain');
-  await expect(page.getByTestId('site-ground-source')).toContainText('Ground: LOLA elevation from NASA Moon Trek (');
-  await expect(page.getByTestId('site-ground-source')).toContainText('drawn at true scale');
-  await expect(page.getByTestId('site-ground-source')).toContainText('Shading only: shadows cast by terrain are not drawn.');
+  await expect(page.getByTestId('site-ground-source')).toContainText('Ground: NASA LOLA via Moon Trek (');
+  await expect(page.getByTestId('site-ground-source')).toContainText('true scale. No cast shadows.');
   await expect(page.getByTestId('site-illustration-ground')).toHaveCount(0);
   const rings = page.getByTestId('site-rings');
   await expect(rings.locator('[data-q="ground_ring_minor"]')).toHaveText(/^10\s?m$/);
@@ -931,7 +930,7 @@ test('site on a phone: zoom in, play, the sheet, and back, with nothing scrollin
     })
     .toBeLessThanOrEqual(1);
   // The sheet says where the ground comes from.
-  await expect(sheet.getByTestId('site-ground-source')).toContainText('Ground: LOLA elevation from NASA Moon Trek (');
+  await expect(sheet.getByTestId('site-ground-source')).toContainText('Ground: NASA LOLA via Moon Trek (');
   await page.getByTestId('site-scrub').fill('120');
   await expect.poll(() => readout(page, 'since_landing')).toBe('+5 d 00 h');
   expect(await page.getByTestId('horizon-sun').getAttribute('data-az')).toBe(await readout(page, 'sun_az'));
@@ -975,25 +974,23 @@ test('site: with the Data checks band measured after arrival (reduced motion), a
 
 // ---------- the ground ----------
 
-test('site ground: the real ground at Shackleton ridge, from the 5 m model, with no smoothness note', async ({ page }) => {
+test('site ground: the real ground at Shackleton ridge, from the 5 m model', async ({ page }) => {
   await enterMission(page);
   test.skip(isPhone(page), 'the phone layout has its own test');
   await spotlight(page, 'Shackleton Connecting Ridge');
   await zoomIn(page);
   await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain');
-  await expect(page.getByTestId('site-ground-source')).toContainText('(5 m model');
-  await expect(page.getByTestId('site-ground-near-smooth')).toHaveCount(0);
+  await expect(page.getByTestId('site-ground-source')).toContainText('(5 m near, 100 m far)');
   await expect(page.getByTestId('site-illustration-ground')).toHaveCount(0);
 });
 
-test('site ground: at Apollo 17 the near ground comes from the global model, and the note says it is smooth', async ({ page }) => {
+test('site ground: at Apollo 17 the near ground comes from the global model, and the model sizes say so', async ({ page }) => {
   await enterMission(page);
   test.skip(isPhone(page), 'the phone layout has its own test');
   await spotlight(page, 'Apollo 17');
   await zoomIn(page);
   await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain');
-  await expect(page.getByTestId('site-ground-source')).toContainText('(237 m model');
-  await expect(page.getByTestId('site-ground-near-smooth')).toHaveText('The near ground here comes from a 237 m model, so it is smooth with no small detail.');
+  await expect(page.getByTestId('site-ground-source')).toContainText('(237 m near, 237 m far)');
 });
 
 test('site ground: when the near file cannot be loaded, the level ground and its caption stay', async ({ page }) => {
@@ -1030,10 +1027,10 @@ test('site ground: at Apollo 17 the far terrain is drawn, and the screen says th
   await zoomIn(page);
   await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain');
   await expect(page.getByTestId('site-ground-source')).toHaveText(
-    'Ground: LOLA elevation from NASA Moon Trek (237 m model near, 237 m model far), drawn at true scale. Shading only: shadows cast by terrain are not drawn.',
+    'Ground: NASA LOLA via Moon Trek (237 m near, 237 m far), true scale. No cast shadows.',
   );
   const line = page.getByTestId('site-ground-smooth-horizon');
-  await expect(line).toHaveText('Sunlight numbers at this site use a smooth horizon. The distant terrain is drawn for scale and is not in those numbers. It rises up to 14.0 degrees above the horizon here.');
+  await expect(line).toHaveText('Sunlight numbers here use a smooth horizon. The drawn terrain rises to 14.0 degrees and is not in them.');
   await expect(line.locator('[data-q="terrain_rise_deg"]')).toHaveText('14.0');
 });
 
@@ -1043,7 +1040,7 @@ test('site ground: at Shackleton ridge the sunlight numbers use the terrain skyl
   await spotlight(page, 'Shackleton Connecting Ridge');
   await zoomIn(page);
   await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain');
-  await expect(page.getByTestId('site-ground-source')).toContainText('(5 m model near, 100 m model far)');
+  await expect(page.getByTestId('site-ground-source')).toContainText('(5 m near, 100 m far)');
   await expect(page.getByTestId('site-ground-smooth-horizon')).toHaveCount(0);
 });
 
@@ -1054,6 +1051,6 @@ test('site ground: when only the far file cannot be loaded, the near ground stay
   await spotlight(page, 'Apollo 17');
   await zoomIn(page);
   await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain-near');
-  await expect(page.getByTestId('site-ground-source')).toContainText('then eased back to level ground, which is an illustration');
+  await expect(page.getByTestId('site-ground-source')).toContainText('true scale to 640 m, then level (an illustration)');
   await expect(page.getByTestId('site-ground-smooth-horizon')).toHaveCount(0);
 });

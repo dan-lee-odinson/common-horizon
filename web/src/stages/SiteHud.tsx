@@ -54,7 +54,7 @@ import { AnchorTag } from './AnchorTag';
 import { ClockPanel, EarthPanel, HardwarePanel, Inline, SunPanel } from './SitePanels';
 import { useEntrance } from './useEntrance';
 import { SiteChecks } from './SiteChecks';
-import { GroundNote, GroundPanel } from './GroundNote';
+import { GroundNote, GroundPanel, useGroundWing } from './GroundNote';
 import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
 const LEADERS: LeaderSpec[] = [
@@ -82,6 +82,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   const sheetOpen = useStore(appStore, (s) => s.horizonOpen);
   const isPhone = useIsPhone();
   const short = useShortWindow();
+  const groundWing = useGroundWing();
   const rootRef = useRef<HTMLDivElement>(null);
   // In a short window the Data checks band would take too much of the picture: it is shown on request.
   const [checksShown, setChecksShown] = useState(false);
@@ -509,6 +510,8 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       <div className="hud-layer">
         <div className="site-wing wing-l absolute left-5 top-[8rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="left" data-site-zone="left">
           {sunPanel()}
+          {/* Under the Sun panel, where the wing has room: the wings do not frame the picture. */}
+          {webgl && groundWing === 'left' ? <GroundPanel siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} /> : null}
         </div>
       </div>
 
@@ -516,8 +519,8 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       <div className="hud-layer">
         <div className="site-wing site-wing-r wing-r absolute right-5 top-[4.75rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="right" data-site-zone="right">
           {earthPanel()}
-          {webgl ? <GroundPanel siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} className="shrink-[0.02]" /> : null}
-          {hardwarePanel({ className: 'min-h-[10rem] max-lg:hidden [@media(max-height:759px)]:hidden' })}
+          {webgl && groundWing === 'right' ? <GroundPanel siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} /> : null}
+          {hardwarePanel({ className: 'max-lg:hidden [@media(max-height:759px)]:hidden' })}
         </div>
       </div>
 

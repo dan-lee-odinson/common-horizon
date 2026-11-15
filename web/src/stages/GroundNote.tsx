@@ -4,11 +4,29 @@
 // ground is an illustration. The scene and these words read the same store, so they always
 // describe the ground actually drawn.
 //
-// The panel sits in a wing (on a phone, in the sheet), not in the console: the console's height
-// frames the 3D picture, and a taller console would push a low Sun out of it.
+// The panel sits in the left wing under the Sun panel (on a phone, in the sheet), not in the
+// console: the console's height frames the 3D picture, and a taller console would push a low Sun
+// out of it. Where the Hardware panel is hidden (a window under 1024 px wide or 760 px tall) the
+// left wing has no room left and the right wing has: the panel goes there, under Earth.
 
+import { useSyncExternalStore } from 'react';
 import { Glass } from '../hud/Glass';
 import { groundWords, useSiteTerrain, type SiteTerrainState } from '../scene/siteTerrainLoad';
+
+/** The windows where the Site view hides its Hardware panel (the same limits as its classes in SiteHud). */
+const HARDWARE_HIDDEN = '(max-width: 1023.98px), (max-height: 759px)';
+
+function subscribeHardwareHidden(cb: () => void) {
+  const mql = window.matchMedia(HARDWARE_HIDDEN);
+  mql.addEventListener('change', cb);
+  return () => mql.removeEventListener('change', cb);
+}
+
+/** Which wing holds the Ground panel: the left, under the Sun panel; the right where the Hardware panel is hidden. */
+export function useGroundWing(): 'left' | 'right' {
+  const hidden = useSyncExternalStore(subscribeHardwareHidden, () => window.matchMedia(HARDWARE_HIDDEN).matches, () => false);
+  return hidden ? 'right' : 'left';
+}
 
 function useGround(siteId: string | null, custom: boolean): SiteTerrainState | null {
   const terrain = useSiteTerrain(custom ? null : siteId);
@@ -26,9 +44,8 @@ export function GroundNote({ siteId, custom, pointer = false }: { siteId: string
 }
 
 /**
- * The Ground panel: where the drawn ground comes from, then (where it applies) that the sunlight
- * numbers use a smooth horizon, then that the near ground is smooth. In a crowded wing it keeps
- * most of its height and scrolls the rest; the Hardware panel below keeps room for a row.
+ * The Ground panel: where the drawn ground comes from and, where it applies, that the sunlight
+ * numbers use a smooth horizon. Its words open with "Ground:", so it carries no title of its own.
  * Nothing while the ground is level.
  */
 export function GroundPanel({ siteId, custom, bare = false, className = '' }: { siteId: string | null; custom: boolean; bare?: boolean; className?: string }) {
@@ -37,7 +54,6 @@ export function GroundPanel({ siteId, custom, bare = false, className = '' }: { 
   const words = groundWords(terrain.entry, terrain.far !== null);
   const body = (
     <>
-      <h3 className="panel-title m-0">Ground</h3>
       <p className={`m-0 text-[12px] leading-snug text-ink-2 ${bare ? '' : 'min-h-0 overflow-y-auto overscroll-contain'}`} data-testid="site-ground" tabIndex={bare ? undefined : 0}>
         <span data-testid="site-ground-source">{words.source}</span>
         {words.smoothHorizon ? (
@@ -48,12 +64,6 @@ export function GroundPanel({ siteId, custom, bare = false, className = '' }: { 
               <span data-q="terrain_rise_deg">{words.smoothHorizon.deg}</span>
               {words.smoothHorizon.after}
             </span>
-          </>
-        ) : null}
-        {words.nearSmooth ? (
-          <>
-            {' '}
-            <span data-testid="site-ground-near-smooth">{words.nearSmooth}</span>
           </>
         ) : null}
       </p>
