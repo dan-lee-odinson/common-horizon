@@ -4,6 +4,11 @@ Everything this module uses, where it came from, and its licence. A link is
 given only where it was opened while building this module; otherwise the
 entry says "link to add".
 
+The links to NASA Technical Reports Server (NTRS) records were added on
+15 November 2026, after each record was opened and its title read. That
+confirms the record exists and matches the source named; the figures taken
+from each report are as the team supplied them.
+
 ## Libraries
 
 The planner itself uses only the Python standard library at run time. The
@@ -42,19 +47,19 @@ figure; this table groups them by source.
 | Blue Origin; Gunter's Space Page | Blue Moon Mark 1: 3,000 kg payload; 8.05 m tall; 3.08 m wide; fueled mass under 21,350 kg | built, company figure | link to add |
 | Blue Origin; Space.com | Blue Moon Mark 2 cargo: 30,000 kg one-way; 20,000 kg reusable; about 16 m tall | company figure | link to add |
 | SpaceX HLS program manager, 2022 | Starship HLS: 100,000 kg; 52 m tall; 9 m wide | company figure | link to add |
-| Creech, IAC 2025, NTRS 20250008728 | HLS cargo variants: 12,000 to 15,000 kg | NASA figure | link to add |
+| Creech, IAC 2025, NTRS 20250008728 | HLS cargo variants: 12,000 to 15,000 kg | NASA figure | https://ntrs.nasa.gov/citations/20250008728 |
 | Astrobotic (now Voyager Lunar Systems) | Griffin: 625 kg; about 2 m tall; about 4.5 m wide | built, company figure | link to add |
-| Kaldon et al., IAC 2024, NTRS 20240011694 | Fission Surface Power 40 kWe: mass goal under 6,000 kg; stowed 4 m by 6 m | NASA goal | link to add |
+| Kaldon et al., IAC 2024, NTRS 20240011694 | Fission Surface Power 40 kWe: mass goal under 6,000 kg; stowed 4 m by 6 m | NASA goal | https://ntrs.nasa.gov/citations/20240011694 |
 | Burke and Howard, AIAA ASCEND 2022 | Surface Habitat: 12,000 kg allowable landed mass | NASA study | link to add |
-| Csank 2023, NTRS 20230002896 | Habitat crewed 20 kW; uncrewed 2 kW | NASA figure | link to add |
-| NTRS 20240004621 | Crew rover keep-warm 9.7 kWh per lunar night | NASA study | link to add |
+| Csank 2023, NTRS 20230002896 | Habitat crewed 20 kW; uncrewed 2 kW | NASA figure | https://ntrs.nasa.gov/citations/20230002896 |
+| NTRS 20240004621 | Crew rover keep-warm 9.7 kWh per lunar night | NASA study | https://ntrs.nasa.gov/citations/20240004621 |
 | Venturi, NASA Aerospace Battery Workshop, Jan 2026 | Crew rover battery 23.22 kWh | NASA study | link to add |
-| NTRS 20220005893 | Science rover recharge 500 W | NASA figure | link to add |
-| NTRS 19940021211 | Pressurized rover recharge 6.5 kW average, 9.5 kW peak | university study | link to add |
-| NTRS 20220005798 | Keep-alive heat 140 W per lander or payload | NASA study | link to add |
+| NTRS 20220005893 | Science rover recharge 500 W | NASA figure | https://ntrs.nasa.gov/citations/20220005893 |
+| NTRS 19940021211 | Pressurized rover recharge 6.5 kW average, 9.5 kW peak | university study | https://ntrs.nasa.gov/citations/19940021211 |
+| NTRS 20220005798 | Keep-alive heat 140 W per lander or payload | NASA study | https://ntrs.nasa.gov/citations/20220005798 |
 | arXiv 2508.10855 | Comms relay 200 W | research estimate | link to add |
-| NTRS 20190032521 | ISRU propellant pilot 20 kW | NASA figure | link to add |
-| NTRS 20210026557 (Schunk) | Habitat's own array 10 to 15 kW; heat leak 1,550 W; radiator protection 3,840 W deployed, about 700 W stowed | NASA study (a conceptual thermal design based on NASA's Surface Habitat reference design; label confirmed by the team, 14 Nov 2026) | link to add |
+| NTRS 20190032521 | ISRU propellant pilot 20 kW | NASA figure | https://ntrs.nasa.gov/citations/20190032521 |
+| NTRS 20210026557 (Schunk) | Habitat's own array 10 to 15 kW; heat leak 1,550 W; radiator protection 3,840 W deployed, about 700 W stowed | NASA study (a conceptual thermal design based on NASA's Surface Habitat reference design; label confirmed by the team, 14 Nov 2026) | https://ntrs.nasa.gov/citations/20210026557 |
 | GSFC-STD-1000 Rev I, Table 1.06-1 | 25 percent power margin, Pre-Phase A | NASA figure (inferred, to confirm) | link to add |
 | NASA 2018; NASA 2019; NASA 2023 | Delta-v, Artemis halo orbit to the surface: 2,850; 2,750; 2,700 m/s | NASA figure (inferred, to confirm) | link to add |
 | NASA HLS-R-0071, through a secondary source | Landing tilt for crew landers: 0 to 8 degrees threshold; 0 to 5 degrees goal | NASA figure; NASA goal (inferred, to confirm) | link to add |
