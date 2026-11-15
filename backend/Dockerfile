@@ -75,6 +75,9 @@ COPY app ./app
 # Stored terrain horizon profiles (backend/data/horizon, about 0.3 MB); the validation data next to them
 # is not needed at run time and stays out (.dockerignore).
 COPY data/horizon ./data/horizon
+# Stored slopes of the preset sites (backend/data/site_slopes.json, a few kB), read by the engine adapter;
+# the elevation patches they were fitted to (data/site_slopes/) stay out.
+COPY data/site_slopes.json ./data/site_slopes.json
 
 # Unprivileged user for local/container runs (Lambda always runs functions as its own non-root user).
 USER 10001

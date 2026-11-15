@@ -117,7 +117,19 @@ class SiteInfo(_OutputModel):
     longitude_deg: float
     elevation_m: float = Field(description="Site elevation relative to the 1737.4 km reference sphere, metres.")
     elevation_source: Literal["input", "terrain_model", "synthetic_default"]
-    slope_deg: float | None = Field(default=None, ge=0, le=90, description="Local terrain slope, degrees.")
+    slope_deg: float | None = Field(
+        default=None,
+        ge=0,
+        le=90,
+        description="Terrain slope at the site, degrees. Null when unknown; slope_source says what it is.",
+    )
+    slope_source: str | None = Field(
+        default=None,
+        description=(
+            "What slope_deg is, whenever it is given. Real engine: 'slope of the best-fit plane to LOLA heights "
+            "within 500 m (NASA Moon Trek)', a regional slope, wider than a lander."
+        ),
+    )
 
 
 class TerrainSkyline(_OutputModel):

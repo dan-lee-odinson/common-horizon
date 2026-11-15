@@ -79,6 +79,8 @@ NASA data and resources used:
   engine's Sun and Earth directions, stored for every preset site and asked live by the service.
 - **NAIF SPICE kernels** (<https://naif.jpl.nasa.gov/pub/naif/generic_kernels/>): every Sun and
   Earth position.
+- **NASA Moon Trek** (<https://trek.nasa.gov/moon/>): the LOLA elevation patches behind the preset
+  sites' slopes (`backend/data/site_slopes.json`).
 - **LOLA elevation models**, Lunar Reconnaissance Orbiter (<https://pgda.gsfc.nasa.gov/products/90>
   and the USGS global model): every terrain skyline.
 - **CGI Moon Kit**, NASA's Scientific Visualization Studio (<https://svs.gsfc.nasa.gov/4720>):
