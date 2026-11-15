@@ -17,7 +17,7 @@ through the dark.
   planner, the AWS setup, the demo video and the submission.
 - **Isabella Lin**: the physics engine. SPICE positions of the Sun, Earth and Moon, the lunar
   coordinate frames, the LOLA terrain lookup, and the horizon and ephemeris calculations.
-- **Alexandru (@\~Shaganelul\~)**: the backend, AI-assisted and logged in
+- **Murariu Alexandru-Stefan (@\~Shaganelul\~)**: the backend, AI-assisted and logged in
   [backend/docs/AI_USE_LOG.md](backend/docs/AI_USE_LOG.md). The API contract and FastAPI
   service, the integration of the physics engine, the website API and site ranking, reviews, and
   AWS testing, including the Mission Assistant's model on Amazon Bedrock.
