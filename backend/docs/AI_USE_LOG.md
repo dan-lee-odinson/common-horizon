@@ -133,3 +133,19 @@ Physical results (adapter vs the stored independent 2027 check, `results_2027.js
 (Earth, the parallax of the 1.7 km / 6.4 km site height that function leaves out); azimuth differences
 5e-7 degree (transport rounding). Bug found and fixed: the provenance text printed Earth's radius as
 6378.14 km (`:g` format) instead of the 6378.1366 km used.
+
+### Fixes for the independent Codex review of `fd7c5de` (2026-11-15)
+
+Review by Codex by OpenAI, posted on PR #14 at 11:19:02 UTC (GitHub timestamp). Fixes drafted by
+Claude Code (Claude Opus 5.5). Correction to the earlier entry: the real-kernel run counted 9 tests, of
+which 8 use the kernels; the ninth (the radius-text regression) does not.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 11:19:02 | 13:19:02 | Codex review posted (GitHub timestamp) | 1 blocker (unbounded launch-delay work), 3 nonblocking defects |
+| by 11:30:10 | by 13:30:10 | Work budget (exact distinct-sample count, 422), elevation kept for incompatible skylines, sanitised profile errors, strict position validation; regression tests | 434 passed, 9 skipped with kernels (LOLA DEM tests only); 424 passed, 19 skipped without |
+
+- Review counts reproduced exactly by the new estimate: 310 000 samples (61 s step) and 53 200 (60 s).
+- During the work an over-broad `ruff format app/` reformatted 12 files, including the physics engine
+  modules; they were restored from Git before any commit and are not part of this change.
+- Local timings are not Lambda measurements (see `backend/README.md`, "Work budget").

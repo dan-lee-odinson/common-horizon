@@ -64,6 +64,7 @@ python -m scripts.export_contract
 | `CH_PHYSICS_ENGINE` | `synthetic` | `synthetic` (labelled fixture) or `physics` (real engine: SPICE + stored terrain profiles; answers 503 while its data is missing, never falls back to synthetic). |
 | `CH_SPICE_KERNEL_DIR` | `app/physics/data/datasets/spice` | Folder holding the four NAIF kernels, lowercase names: `naif0012.tls`, `de440s.bsp`, `moon_pa_de440_200625.bpc`, `moon_de440_250416.tf`. Only read with `CH_PHYSICS_ENGINE=physics`. |
 | `CH_HORIZON_PROFILE_DIR` | `data/horizon` | Folder of the stored terrain horizon profiles. Only read with `CH_PHYSICS_ENGINE=physics`. |
+| `CH_MAX_TOTAL_SAMPLES` | `20000` | Work budget of one evaluation: distinct sample timestamps over the baseline and all launch-delay cases. Larger requests get 422. |
 | `CH_CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Comma-separated origins allowed to call the API from a browser. |
 | `PORT` | `8080` (Docker) | Port uvicorn listens on inside the container. |
 
@@ -125,11 +126,18 @@ in `spk/planets/aa_checksums.txt`, and it matches):
 | `moon_pa_de440_200625.bpc` | 12 863 488 | `60cd55aa401ea2ea97360636f567554bfe4e37bb829f901b4460a455dfaf783f` |
 | `moon_de440_250416.tf` | 19 478 | `a47c71e9c9f33796bdafb2c9d69a7ee447b6016ecad80f71cd6f3e479f9cf768` |
 
-Measured with these kernels (local laptop, through the HTTP endpoint): 14 days hourly 0.12 to
-0.15 s (first request, which loads kernels and profiles, 0.15 s); the same with a 30-day
-launch-delay sweep 0.38 to 0.44 s. The largest allowed request (10 000 samples at 60 s) takes 3.3 s,
-and 19.2 s with a 30-day sweep, mostly disc integration near the skyline. Launch-delay runs reuse
-the samples they share with earlier runs.
+**Work budget.** One evaluation may compute at most `CH_MAX_TOTAL_SAMPLES` (default 20 000)
+distinct sample timestamps over the baseline and all launch-delay cases together; larger requests
+get 422 before any engine work, naming the settings to reduce. Delayed cases share timestamps only
+when `time_step_s` divides 86 400 s, so a 61 s step with a 30-day sweep needs 310 000 samples while
+60 s needs 53 200 (both rejected). The count is exact: it equals the samples the adapter computes.
+
+Measured with these kernels on a local laptop through the HTTP endpoint (**not on Lambda**): 14 days
+hourly 0.13 s, with a 30-day sweep 0.39 to 0.43 s; 365 days hourly with a 30-day sweep (9 481 samples)
+4.2 s; the largest accepted request (20 000 samples: 10 000 at 60 s with a 7-day delay) 6.9 to 7.4 s,
+mostly disc integration near the skyline. The deployment is a Lambda Function URL (512 MB, 60 s
+timeout); at 512 MB Lambda gets about a third of a vCPU, so these figures must be measured on Lambda
+before `CH_PHYSICS_ENGINE=physics` is enabled, and `CH_MAX_TOTAL_SAMPLES` lowered if needed.
 
 ## Docker and AWS Lambda
 

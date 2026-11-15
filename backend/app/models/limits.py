@@ -5,6 +5,7 @@ physics engine (see backend/docs/API_CONTRACT.md, "Provisional technical assumpt
 They live in one place so they can be tuned without touching the models.
 """
 
+import os
 from datetime import UTC, datetime
 
 LATITUDE_MIN_DEG = -90.0
@@ -31,6 +32,23 @@ TIME_STEP_MAX_S = 86_400
 # Caps the time-series length so a full response stays well below the 6 MB
 # synchronous AWS Lambda response payload limit (checked by tests).
 MAX_SAMPLES = 10_000
+
+
+def _positive_int_from_env(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    value = int(raw)  # a malformed value stops the service at start-up instead of being ignored
+    if value < 1:
+        raise ValueError(f"{name} must be a positive integer")
+    return value
+
+
+# Work budget of one evaluation: distinct Sun/Earth sample timestamps over the baseline and every
+# launch-delay case together (cases share timestamps when time_step_s divides a day). Sized for the
+# Lambda deployment (512 MB, 60 s timeout, about a third of a vCPU): about 7 s for the real engine on
+# a laptop at a polar site, leaving room for slower Lambda CPU. Not yet measured on Lambda.
+MAX_TOTAL_SAMPLES = _positive_int_from_env("CH_MAX_TOTAL_SAMPLES", 20_000)
 
 # One synodic month (~29.5 days) covers a full lunar illumination cycle.
 LAUNCH_DELAY_MAX_DAYS = 30

@@ -265,12 +265,12 @@ def test_unknown_elevation_is_a_labelled_placeholder_not_a_measurement(profile_d
     terrain = select_terrain(ProfileIndex.load(profile_dir), _request(latitude_deg=10.0, longitude_deg=20.0))
     assert terrain.site_height_m == 0.0
     assert terrain.elevation_source == "synthetic_default"
-    assert any("Site elevation is unknown" in warning for warning in terrain.warnings)
+    assert any("Site elevation is UNKNOWN" in warning for warning in terrain.warnings)
 
     supplied = select_terrain(ProfileIndex.load(profile_dir), _request(latitude_deg=10.0, altitude_m=-1500.0))
     assert supplied.site_height_m == -1500.0
     assert supplied.elevation_source == "input"
-    assert not any("Site elevation is unknown" in warning for warning in supplied.warnings)
+    assert not any("Site elevation is UNKNOWN" in warning for warning in supplied.warnings)
 
 
 def test_smooth_sphere_horizon_is_the_geometric_dip(profile_dir):
@@ -512,6 +512,160 @@ def test_provenance_states_the_disc_radii_actually_used():
     assert "Earth 6378.1366 km" in radii
     assert f"Sun {SUN_RADIUS_KM!r} km" in radii
     assert f"Earth {EARTH_RADIUS_KM!r} km" in radii
+
+
+# ------------------------------------------- regressions for the independent Codex review of fd7c5de
+
+
+@pytest.mark.parametrize("step_s", [60, 61])
+def test_the_work_estimate_equals_the_ephemeris_samples_actually_computed(profile_dir, step_s):
+    """The 422 budget counts exactly the samples the sweep computes: shared timestamps once (60 s), none (61 s)."""
+    from app.models.mission import MissionInput
+    from app.services.evaluation import evaluate_mission
+    from app.timegrid import count_distinct_samples
+
+    sky = _sky_at_fixture(_fixed((90.0, 5.0, AU_KM), (0.0, 5.0, EARTH_DISTANCE_KM)))
+    adapter = PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=sky)
+    mission = MissionInput.model_validate(
+        {
+            "landing_site": {"latitude_deg": SITE["latitude_deg"], "longitude_deg": SITE["longitude_deg"]},
+            "observer_height_m": 2.0,
+            "mission_start_utc": "2027-01-15T00:00:00Z",
+            "stay_duration_days": 1.5,  # cases one day apart overlap by half a day
+            "time_step_s": step_s,
+            "launch_delay_days": 2,
+        }
+    )
+
+    evaluation = evaluate_mission(mission, adapter)
+
+    expected = count_distinct_samples(1.5 * 86_400, step_s, [d * 86_400.0 for d in range(3)])
+    assert sky.calls == expected
+    assert len(evaluation.launch_delay_results) == 3
+    per_case = len(evaluation.timeseries.timestamps_utc)
+    if step_s == 60:
+        assert expected == per_case + 2 * 1440  # each delayed case computes only its new day
+    else:
+        assert expected == 3 * per_case  # 61 s: nothing is shared
+
+
+@pytest.mark.parametrize("observer_height_m", [0.0, 3.0])
+def test_known_site_elevation_survives_an_incompatible_skyline(observer_height_m):
+    """Exact Nobile with another observer height: no stored skyline, but the site's own elevation."""
+    terrain = select_terrain(
+        ProfileIndex.load(DEFAULT_PROFILE_DIR),
+        _request(latitude_deg=-85.42088, longitude_deg=31.6218, observer_height_m=observer_height_m),
+    )
+
+    assert terrain.stored is False
+    assert terrain.skyline is None
+    assert terrain.sky_visibility_fraction is None
+    assert terrain.site_height_m == 6416.081
+    assert terrain.elevation_source == "terrain_model"
+    assert "Local terrain is NOT included" in terrain.warnings[0]
+    assert "not 2 m" not in terrain.warnings[0]
+    assert any("taken from the stored profile 'nobile'" in warning for warning in terrain.warnings)
+    assert not any("UNKNOWN" in warning for warning in terrain.warnings)
+    # The smooth sphere passes through the real site, so its dip uses the site's radius.
+    assert terrain.profile.site_height_m == 6416.081
+
+
+def test_supplied_altitude_still_wins_over_a_stored_site_elevation():
+    terrain = select_terrain(
+        ProfileIndex.load(DEFAULT_PROFILE_DIR),
+        _request(latitude_deg=-85.42088, longitude_deg=31.6218, observer_height_m=0.0, altitude_m=6000.0),
+    )
+    assert terrain.site_height_m == 6000.0
+    assert terrain.elevation_source == "input"
+
+
+def test_elevation_is_not_borrowed_from_a_stored_site_more_than_50_m_away():
+    terrain = select_terrain(
+        ProfileIndex.load(DEFAULT_PROFILE_DIR), _request(latitude_deg=-85.42088 + 0.002, longitude_deg=31.6218)
+    )
+    assert terrain.elevation_source == "synthetic_default"
+    assert terrain.site_height_m == 0.0
+    assert any("Site elevation is UNKNOWN" in warning for warning in terrain.warnings)
+
+
+@pytest.mark.parametrize("content", ["[]", "{not json", json.dumps({"format": "something-else"})])
+def test_profile_errors_never_reveal_server_paths(tmp_path, content):
+    (tmp_path / "test-site.json").write_text(content, encoding="utf-8")
+    with pytest.raises(PhysicsEngineUnavailable) as error:
+        ProfileIndex.load(tmp_path)
+    message = str(error.value)
+    assert "test-site.json" in message
+    assert str(tmp_path) not in message
+    assert str(tmp_path.resolve()) not in message
+    assert "\\" not in message and "/" not in message.replace("test-site.json", "")
+
+
+def test_profile_errors_through_the_api_are_503_without_paths(app, client, mission_payload, tmp_path):
+    (tmp_path / "test-site.json").write_text("[]", encoding="utf-8")
+    app.dependency_overrides[get_physics_engine] = lambda: PhysicsEngineAdapter(
+        horizon_profile_dir=tmp_path, body_positions=lambda _: None
+    )
+
+    response = client.post(URL, json=mission_payload)
+
+    assert response.status_code == 503
+    assert str(tmp_path) not in response.json()["detail"]
+    assert "unreadable or invalid" in response.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    "bad_position",
+    [
+        ["a", 0.0, 0.0],
+        [None, 0.0, 0.0],
+        ["1.0", "2.0", "3.0"],  # numeric strings are refused, not parsed
+        [True, 0.0, 0.0],
+        [[1.0], [2.0], [3.0]],
+        [1.0, 2.0],
+        [1.0, 2.0, 3.0, 4.0],
+        "abc",
+        5.0,
+        None,
+        {"x": 1.0, "y": 2.0, "z": 3.0},
+        [math.inf, 0.0, 0.0],
+    ],
+)
+def test_malformed_ephemeris_positions_are_contract_errors(profile_dir, bad_position):
+    adapter = PhysicsEngineAdapter(
+        horizon_profile_dir=profile_dir, body_positions=lambda _: (bad_position, [1e6, 0, 0])
+    )
+    with pytest.raises(EngineContractError, match="three finite numbers"):
+        adapter.simulate(_request())
+
+
+@pytest.mark.parametrize("bad_return", [None, 5, ([1e8, 0, 0],), ([1e8, 0, 0], [1e6, 0, 0], [0, 0, 1])])
+def test_ephemeris_that_does_not_return_two_positions_is_a_contract_error(profile_dir, bad_return):
+    adapter = PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=lambda _: bad_return)
+    with pytest.raises(EngineContractError, match="one Sun and one Earth position"):
+        adapter.simulate(_request())
+
+
+def test_numpy_position_components_are_accepted(profile_dir):
+    import numpy as np
+
+    sky = _sky_at_fixture(_fixed((90.0, 20.0, AU_KM), (0.0, 5.0, EARTH_DISTANCE_KM)))
+    adapter = PhysicsEngineAdapter(
+        horizon_profile_dir=profile_dir,
+        body_positions=lambda moment: tuple(np.asarray(p, dtype=np.float64) for p in sky(moment)),
+    )
+    assert adapter.simulate(_request()).timeseries.sun.elevation_deg[0] == pytest.approx(20.0, abs=1e-6)
+
+
+def test_nonnumeric_engine_output_is_502_not_500(app, server_client, mission_payload, profile_dir):
+    app.dependency_overrides[get_physics_engine] = lambda: PhysicsEngineAdapter(
+        horizon_profile_dir=profile_dir, body_positions=lambda _: (["x", 0, 0], [1e6, 0, 0])
+    )
+    mission_payload["landing_site"] = {"latitude_deg": SITE["latitude_deg"], "longitude_deg": SITE["longitude_deg"]}
+
+    response = server_client.post(URL, json=mission_payload)
+
+    assert response.status_code == 502
+    assert "three finite numbers" in response.json()["detail"]
 
 
 # ----------------------------------------------------- opt-in: REAL SPICE kernels (physical output)

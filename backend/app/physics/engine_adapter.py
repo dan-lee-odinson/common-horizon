@@ -36,6 +36,7 @@ process runs under one lock.
 
 import logging
 import math
+import numbers
 import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -43,6 +44,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from app.models import limits
 from app.models.results import BodyTimeseries, ObstructionState, SiteInfo, TerrainSkyline, Timeseries
 from app.physics.horizon.geometry import MOON_RADIUS_M, unit_from_lat_lon
 from app.physics.horizon.profile import DEFAULT_PROFILE_DIR, HorizonProfile, load_profile
@@ -80,8 +82,9 @@ OBSERVER_HEIGHT_MATCH_M = 0.01
 PROFILE_FRAME = "MOON_ME"
 
 # Launch-delay runs reuse the per-timestamp disc fractions of earlier runs for the same site.
-# About 0.3 kB per entry: the cap keeps the cache near 20 MB.
-_FRACTION_CACHE_MAX = 60_000
+# About 0.3 kB per entry. The cap is never below the per-evaluation work budget, so an accepted
+# request never has its shared samples evicted mid-sweep (20 000 entries: about 6 MB).
+_FRACTION_CACHE_MAX = max(60_000, limits.MAX_TOTAL_SAMPLES)
 
 # Transport rounding of the time series (metrics are computed before rounding): 1 m for
 # positions, 1e-9 for unit vectors, 1e-6 degree for angles. Visibility fractions are not rounded.
@@ -171,9 +174,12 @@ class ProfileIndex:
         for path in sorted(directory.glob("*.json")):
             try:
                 profile = load_profile(path)
-            except (OSError, ValueError) as error:  # ProfileError and JSON errors are ValueErrors
+            except (OSError, ValueError):  # ProfileError and JSON errors are ValueErrors
+                # The loader's message can contain the absolute path: it goes to the log only.
                 logger.exception("Unreadable horizon profile %s", path)
-                raise PhysicsEngineUnavailable(f"Stored horizon profile {path.name} is unreadable: {error}") from None
+                raise PhysicsEngineUnavailable(
+                    f"Stored horizon profile {path.name} is unreadable or invalid (details in the server log)."
+                ) from None
             problem = _convention_problem(profile, path)
             if problem:
                 raise PhysicsEngineUnavailable(f"Stored horizon profile {path.name} {problem}.")
@@ -248,10 +254,12 @@ def select_terrain(index: ProfileIndex, request: SimulationRequest) -> Terrain:
     """The stored profile computed for this site and observer, else a smooth sphere (with a warning)."""
     nearest = index.nearest(request.latitude_deg, request.longitude_deg)
     reason: str
+    same_site: HorizonProfile | None = None  # the stored site at these coordinates, even if its skyline cannot be used
     if nearest is None or nearest[1] > PROFILE_MATCH_DISTANCE_M:
         reason = f"no stored terrain horizon profile lies within {PROFILE_MATCH_DISTANCE_M:g} m of this site"
     else:
         profile, _ = nearest
+        same_site = profile
         if abs(profile.observer_height_m - request.observer_height_m) > OBSERVER_HEIGHT_MATCH_M:
             reason = (
                 f"the stored profile '{profile.site_id}' is for an observer {profile.observer_height_m:g} m above "
@@ -282,16 +290,27 @@ def select_terrain(index: ProfileIndex, request: SimulationRequest) -> Terrain:
             "the real site, especially near the poles. No terrain skyline or sky visibility fraction is given."
         )
     ]
-    if request.altitude_m is None:
-        site_height = 0.0
-        elevation_source: Literal["input", "synthetic_default"] = "synthetic_default"
-        warnings.append(
-            "Site elevation is unknown (no stored profile and no altitude_m supplied). elevation_m = 0 is a "
-            "placeholder on the 1737.4 km reference sphere, not a measured value; supply altitude_m to set it."
-        )
-    else:
+    elevation_source: Literal["input", "terrain_model", "synthetic_default"]
+    if request.altitude_m is not None:
         site_height = request.altitude_m
         elevation_source = "input"
+    elif same_site is not None:
+        # Same coordinates as a stored site: its elevation (from the elevation model) still applies,
+        # although its skyline does not fit this observer.
+        site_height = same_site.site_height_m
+        elevation_source = "terrain_model"
+        warnings.append(
+            f"Site elevation {site_height:.1f} m is taken from the stored profile '{same_site.site_id}' of this "
+            "site; only its skyline could not be used."
+        )
+    else:
+        site_height = 0.0
+        elevation_source = "synthetic_default"
+        warnings.append(
+            "Site elevation is UNKNOWN (no stored profile at this site and no altitude_m supplied). "
+            "elevation_m = 0 is a placeholder on the 1737.4 km reference sphere, not a measured value; "
+            "display it as unknown, or supply altitude_m."
+        )
     profile = HorizonProfile.smooth_sphere(
         latitude_deg=request.latitude_deg,
         longitude_deg=request.longitude_deg,
@@ -309,6 +328,31 @@ def select_terrain(index: ProfileIndex, request: SimulationRequest) -> Terrain:
     )
 
 
+def _position_vector(position_km: Any) -> Any:
+    """Three finite real numbers as a numpy vector, else ``EngineContractError`` (HTTP 502).
+
+    Components must be real numbers already: strings, booleans, None, nested arrays and other
+    objects are refused rather than converted.
+    """
+    import numpy as np
+
+    if isinstance(position_km, str | bytes):
+        components: list[Any] = []
+    else:
+        try:
+            components = list(position_km)
+        except TypeError:
+            components = []
+    if len(components) != 3 or not all(
+        isinstance(c, numbers.Real) and not isinstance(c, bool | np.bool_) for c in components
+    ):
+        raise EngineContractError("The ephemeris returned a position that is not three finite numbers.")
+    position = np.array([float(c) for c in components], dtype=float)
+    if not np.all(np.isfinite(position)):
+        raise EngineContractError("The ephemeris returned a position that is not three finite numbers.")
+    return position
+
+
 def _observe(
     position_km: Sequence[float],
     site_km: Any,
@@ -321,9 +365,7 @@ def _observe(
 
     from app.physics.engine import frames
 
-    position = np.asarray(position_km, dtype=float)
-    if position.shape != (3,) or not np.all(np.isfinite(position)):
-        raise EngineContractError("The ephemeris returned a position that is not three finite numbers.")
+    position = _position_vector(position_km)
     vector = position - site_km
     distance = float(np.linalg.norm(vector))
     if not distance > body_radius_km:
@@ -494,7 +536,10 @@ class PhysicsEngineAdapter:
             self._use_cache_for(request, terrain)
 
             def observe(moment: datetime) -> tuple[BodySample, BodySample]:
-                sun_km, earth_km = body_positions(moment)
+                positions = body_positions(moment)
+                if not isinstance(positions, tuple | list) or len(positions) != 2:
+                    raise EngineContractError("The ephemeris did not return one Sun and one Earth position.")
+                sun_km, earth_km = positions
                 lat, lon, profile = request.latitude_deg, request.longitude_deg, terrain.profile
                 sun = _observe(sun_km, site_km, lat, lon, SUN_RADIUS_KM, profile)
                 earth = _observe(earth_km, site_km, lat, lon, EARTH_RADIUS_KM, profile)

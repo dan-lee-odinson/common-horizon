@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.models import limits
 from app.models.types import UtcDatetime
-from app.timegrid import SECONDS_PER_DAY, count_samples
+from app.timegrid import SECONDS_PER_DAY, count_distinct_samples, count_samples
 
 
 class _InputModel(BaseModel):
@@ -119,7 +119,9 @@ class MissionInput(_InputModel):
         le=limits.LAUNCH_DELAY_MAX_DAYS,
         description=(
             "Maximum launch slip to analyse, whole days. 0 disables the analysis; otherwise the mission is "
-            "re-evaluated for delays 0, step, 2*step, ... up to this value."
+            "re-evaluated for delays 0, step, 2*step, ... up to this value. All cases together may use at most "
+            "MAX_TOTAL_SAMPLES (20 000 by default) distinct sample timestamps; larger requests are rejected "
+            "with 422."
         ),
     )
     launch_delay_step_days: int = Field(
@@ -177,6 +179,17 @@ class MissionInput(_InputModel):
 
         if self.launch_delay_days > 0 and self.launch_delay_step_days > self.launch_delay_days:
             raise ValueError("launch_delay_step_days must not exceed launch_delay_days")
+
+        if self.launch_delay_days > 0:
+            offsets_s = [delay * SECONDS_PER_DAY for delay in self.launch_delays()]
+            total = count_distinct_samples(duration_s, self.time_step_s, offsets_s)
+            if total > limits.MAX_TOTAL_SAMPLES:
+                raise ValueError(
+                    f"the launch-delay analysis needs {total} distinct samples over {len(offsets_s)} cases; "
+                    f"the maximum is {limits.MAX_TOTAL_SAMPLES}. Reduce launch_delay_days, increase "
+                    "launch_delay_step_days, shorten stay_duration_days or increase time_step_s (a step that "
+                    "divides 86400 s lets delayed cases reuse samples)."
+                )
 
         # Cannot overflow: the start is bounded by the field validator and delay/stay are capped in limits.
         latest_end = self.mission_start_utc + timedelta(days=self.launch_delay_days + self.stay_duration_days)

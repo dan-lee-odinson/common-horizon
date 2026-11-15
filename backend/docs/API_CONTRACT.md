@@ -51,6 +51,13 @@ always strict JSON.
 Additional rule: the number of samples, `ceil(stay / time_step) + 1`, must be ≤ 10 000. This keeps a
 full response under the 6 MB AWS Lambda synchronous payload limit; a test checks it.
 
+Work budget: with `launch_delay_days > 0`, the distinct sample timestamps over all cases together (the
+baseline and every delayed case, counting a timestamp shared by several cases once) must be ≤
+`MAX_TOTAL_SAMPLES` (20 000 by default, set by `CH_MAX_TOTAL_SAMPLES`). Cases share timestamps only when
+`time_step_s` divides 86 400. Over the budget: 422 naming `launch_delay_days`, `launch_delay_step_days`,
+`stay_duration_days` and `time_step_s`. Request and response shapes are unchanged, so `contract_version`
+stays 0.1.0, but requests accepted before (for example a 61 s step with a 30-day sweep) are now rejected.
+
 `hardware_requirements` (all optional, proposed schema): `min_sunlight_percentage` (0–100),
 `min_sunlight_hours`, `max_darkness_hours`, `min_earth_visibility_percentage` (0–100),
 `min_earth_visibility_hours`, `max_slope_deg` (0–90).
@@ -117,9 +124,12 @@ kernels or stored profiles are missing and never falls back to synthetic data. P
    visible fraction and obstruction state against the skyline (`body_visibility`);
 4. aggregates metrics and communication windows (`app/physics/metrics.py`, sample-and-hold).
 
-`slope_deg` is null (no slope data at run time). Without a stored profile, `terrain_skyline` and
-`sky_visibility_fraction` are null, and with no `altitude_m` either, `site.elevation_m` is a 0 m placeholder
-labelled `elevation_source = "synthetic_default"` with a warning (the contract requires a number). With a
+`slope_deg` is null (no slope data at run time). Without a usable stored skyline, `terrain_skyline` and
+`sky_visibility_fraction` are null. Site elevation, in order: a supplied `altitude_m` (`input`); else the
+elevation of a stored site within 50 m, even when its skyline does not fit the observer height
+(`terrain_model`, with a warning); else a 0 m placeholder labelled `elevation_source = "synthetic_default"`
+with a warning that the elevation is UNKNOWN (the contract requires a number; clients should display it as
+unknown even though `provenance.is_synthetic` is false). With a
 profile, `sky_visibility_fraction` is the share of the upper hemisphere's solid angle above the skyline.
 Launch-delay (metric-only) runs skip the time series and reuse samples shared with earlier runs.
 Time series are rounded for transport (positions 1 m, unit vectors 1e-9, angles 1e-6 degree); metrics
@@ -147,9 +157,9 @@ response shapes bumps `contract_version`.
 | Obstruction states | `visible`, `partial`, `terrain_blocked`, `below_horizon` | Whether these four classes are sufficient |
 | Metrics | Sample-and-hold: each interval takes the state sampled at its start. `time_to_sunset_hours` / `time_to_earthset_hours` are `null` when the body is already down at mission start or does not set | Interpolated crossings; meaning of time-to-set when the body starts below the horizon |
 | Launch delay | Sweep of whole-day delays 0, step, 2·step, … up to `launch_delay_days` | Whether a single fixed slip is needed instead |
-| Limits | Values in `app/models/limits.py` (see [Inputs](#inputs-website--engine-missioninput)) | Kernel coverage and per-simulation runtime, which bound the date window and whether a launch-delay sweep fits one synchronous request (API Gateway ~29 s) |
+| Limits | Values in `app/models/limits.py` (see [Inputs](#inputs-website--engine-missioninput)) | Kernel coverage and per-simulation runtime, which bound the date window and whether a launch-delay sweep fits one synchronous request (Lambda Function URL, 60 s timeout at 512 MB; work budget `MAX_TOTAL_SAMPLES`) |
 | Requirement checks, launch-delay sweep | Run in the backend as threshold comparisons on engine values. `hardware_id` is echoed in the response, not passed to the engine, and not mapped to a catalogue | Whether these move into the engine; which requirement fields the engine uses |
-| Observer height | Default 0 m. The synthetic model applies it only as horizon dip. Stored terrain profiles are for 2 m; another height gets the smooth sphere (+ warning) | Profiles for other heights |
+| Observer height | Default 0 m. The synthetic model applies it only as horizon dip. Stored terrain profiles are for 2 m; another height gets the smooth sphere (+ warning) but keeps the stored site's elevation | Profiles for other heights |
 
 ## Physics engine runtime requirements
 
@@ -157,7 +167,7 @@ response shapes bumps `contract_version`.
 - Data: the four NAIF kernels in `CH_SPICE_KERNEL_DIR` (not in Git; not yet in the container image) and the
   stored profiles in `CH_HORIZON_PROFILE_DIR` (default `backend/data/horizon`; not yet copied into the image).
   See `backend/README.md`, "Real physics engine".
-- Runtime with the real kernels (laptop): 14 days hourly about 0.13 s, with a 30-day launch-delay sweep about
-  0.4 s; the largest allowed request (10 000 samples) 3.3 s, and 19.2 s with a 30-day sweep, which is close to
-  the API Gateway limit (~29 s).
+- Runtime with the real kernels on a laptop (not Lambda): 14 days hourly about 0.13 s, with a 30-day sweep
+  about 0.4 s; the largest request the work budget accepts (20 000 samples) about 7 s. The deployment is a
+  Lambda Function URL with 512 MB and a 60 s timeout; runtime there is not measured yet.
 - Not provided yet: site slope, site elevation away from stored profiles, the terrain elevation grid.
