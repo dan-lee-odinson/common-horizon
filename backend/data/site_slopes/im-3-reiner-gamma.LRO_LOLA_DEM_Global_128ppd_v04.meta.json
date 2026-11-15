@@ -1,0 +1,6 @@
+{
+ "url": "https://trek.nasa.gov/moon/TrekWS/rest/transform/latlon/subset/stream/tiff?src=LRO_LOLA_DEM_Global_128ppd_v04&ulx=-59&uly=8&lrx=-58&lry=7",
+ "retrieved_utc": "2026-11-15T16:41:59Z",
+ "bytes": 66115,
+ "sha256": "dd1d1e5985deddf4b45d756ef22555464e1496e853683ebdbc6907a54a544f07"
+}

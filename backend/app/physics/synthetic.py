@@ -234,6 +234,7 @@ class SyntheticPhysicsEngine:
             elevation_m=elevation_m,
             elevation_source="input" if request.altitude_m is not None else "synthetic_default",
             slope_deg=0.0,
+            slope_source="synthetic engine: terrain is not modelled, 0 is a placeholder, not a measured slope",
         )
         return SimulationResult(
             site=site,
