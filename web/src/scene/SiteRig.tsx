@@ -13,7 +13,7 @@
 //
 // Leaving the stage puts back everything the Moon stages expect of the shared camera.
 
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import gsap from 'gsap';
 import * as THREE from 'three';
@@ -35,6 +35,16 @@ const LOOK_S = 0.3;
 
 type Controls = ControlsLike & { enableDamping: boolean };
 
+/**
+ * What to do with a "Look" request (each press counts `seq` up; `looked` is the last one carried
+ * out): turn now while the camera rests; wait while it is on its way down, and turn once it
+ * rests; nothing if it is already done.
+ */
+export function lookStep(seq: number, looked: number, mode: 'idle' | 'descent' | 'rest'): 'turn' | 'wait' | 'done' {
+  if (seq === looked) return 'done';
+  return mode === 'rest' ? 'turn' : 'wait';
+}
+
 export function SiteRig({ active, data, heightM, layoutRadius }: { active: boolean; data: SceneData; heightM: number | null; layoutRadius: number }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const gl = useThree((s) => s.gl);
@@ -44,6 +54,8 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
   const look = useStore(siteLook, (s) => s);
   /** The last request to turn the view that was carried out (or was already there on arrival). */
   const looked = useRef(look.seq);
+  /** Counts the camera's arrivals at rest: a "Look" pressed on the way down is carried out then. */
+  const [rested, setRested] = useState(0);
   const fov = data.isPhone ? SITE_VIEW.fovPhone : SITE_VIEW.fov;
 
   const dataRef = useRef(data);
@@ -80,6 +92,7 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
   function release() {
     if (!controls) return;
     mode.current = 'rest';
+    setRested((n) => n + 1);
     siteArrival.settled = true;
     const distance = camera.position.distanceTo(controls.target);
     const polar = Math.acos(THREE.MathUtils.clamp((camera.position.y - controls.target.y) / Math.max(distance, 1e-6), -1, 1));
@@ -248,9 +261,10 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
 
   // "Look" at the Sun or Earth, and "Reset view": swing the view round, the short way, in a third of a second.
   useLayoutEffect(() => {
-    if (!active || !controls || look.seq === looked.current) return;
+    if (!active || !controls) return;
+    // A press on the way down is kept, not dropped: it is carried out once the camera rests (`rested`).
+    if (lookStep(look.seq, looked.current, mode.current) !== 'turn') return;
     looked.current = look.seq;
-    if (mode.current !== 'rest') return;
     // Back to the lander: the rest pose, at its own distance again.
     moved.current = !look.home;
     const offset = scratch.copy(camera.position).sub(controls.target);
@@ -280,7 +294,7 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
       },
     });
     // A request is carried out once; the sizes it reads are those of the moment it was made.
-  }, [active, controls, look.seq]);
+  }, [active, controls, look.seq, rested]);
 
   // Every frame: the picture shift, written only when it or the window has changed.
   const applied = useRef('');
