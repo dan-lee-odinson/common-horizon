@@ -411,6 +411,31 @@ describe('a missing or non-finite time or value is a dash, never "NaN"', () => {
     }
   });
 
+  it('does not throw, and shows no "NaN", when a horizon sample beside a sunrise has no direction or no readable time', () => {
+    const sr = site('shackleton-ridge');
+    const whole = horizonFor(sr, LANDING, LANDING + SYNODIC_MONTH_DAYS * DAY_MS, 1);
+    const times = sunPathTimes(whole);
+    const i = whole.sun_path.findIndex((p, k) => k + 1 < whole.sun_path.length && p.state !== whole.sun_path[k + 1].state);
+    const holes: Partial<Record<'az' | 'el' | 't', unknown>>[] = [{ az: Number.NaN }, { az: undefined }, { el: null }, { az: Infinity, el: Number.NaN }, { t: 'not a time' }, { t: undefined }];
+    for (const hole of holes) {
+      for (const k of [i, i + 1]) {
+        const horizon = { ...whole, sun_path: whole.sun_path.map((p, n) => (n === k ? { ...p, ...hole } : p)) } as HorizonResponse;
+        // With and without a track: without one, the Sun's direction would have to come from these samples.
+        for (const tr of [track, null]) {
+          for (const t of [times[i] - 3.4 * HOUR_MS, times[i] + 0.2 * HOUR_MS, times[i + 1] + 0.3 * HOUR_MS, times[i + 2] + 0.5 * HOUR_MS]) {
+            const q = skyQuantities({ track: tr, tMs: t, landingMs: LANDING, site: sr, horizon });
+            clean(quantitiesOf(q));
+            expect(['lit', 'dark']).toContain(q.sunState.text);
+          }
+          // The change beside the hole is not claimed to a tenth of an hour.
+          const ahead = skyQuantities({ track: tr, tMs: times[i - 1] - 3.4 * HOUR_MS, landingMs: LANDING, site: sr, horizon });
+          expect(ahead.nextChange.label).toMatch(/ in about$/);
+          expect(ahead.nextChange.text).toMatch(/^\d+$/);
+        }
+      }
+    }
+  });
+
   it('blanks a site direction when the site’s own coordinates are not numbers', () => {
     const lost: SiteRef = { ...s, lat: Number.NaN };
     const q = skyQuantities({ track, tMs: LANDING, landingMs: LANDING, site: lost, horizon: null });

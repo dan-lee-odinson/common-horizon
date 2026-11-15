@@ -60,6 +60,9 @@ interface Crossing {
 }
 
 interface Prepared {
+  /** The samples whose time can be read, in the answer's order. Every reading is taken from these. */
+  path: SunPathPoint[];
+  /** Their times, in milliseconds: times[i] belongs to path[i]. */
   times: number[];
   crossings: Crossing[];
   startsAbove: boolean;
@@ -67,25 +70,44 @@ interface Prepared {
 
 const prepared = new WeakMap<HorizonResponse, Prepared>();
 
+/**
+ * The Sun's height above the terrain skyline at a sample. Not a number when the sample has no real
+ * direction or the answer has no skyline: the sample still counts for its lit or dark word, but no
+ * crossing is read off it.
+ */
+function heightAboveSkyline(data: HorizonResponse, p: SunPathPoint): number {
+  if (!Array.isArray(data.skyline) || data.skyline.length === 0) return Number.NaN;
+  return Number.isFinite(p.az) && Number.isFinite(p.el) ? p.el - sampleProfile(data.skyline, p.az) : Number.NaN;
+}
+
 function prepare(data: HorizonResponse): Prepared {
   const hit = prepared.get(data);
   if (hit) return hit;
-  const path = data.sun_path;
-  const times = path.map((p) => Date.parse(p.t));
+  const path: SunPathPoint[] = [];
+  const times: number[] = [];
+  for (const p of data.sun_path) {
+    const t = Date.parse(p.t);
+    // A sample whose time cannot be read is left out: nothing can be placed by it, and a change
+    // beside it is placed between the readable samples around it.
+    if (!Number.isFinite(t)) continue;
+    path.push(p);
+    times.push(t);
+  }
   const crossings: Crossing[] = [];
   for (let i = 0; i + 1 < path.length; i++) {
     const a = path[i];
     const b = path[i + 1];
     if (a.state === b.state) continue;
-    const ma = a.el - sampleProfile(data.skyline, a.az);
-    const mb = b.el - sampleProfile(data.skyline, b.az);
-    // Opposite signs: the height above the skyline passes zero between the samples.
+    const ma = heightAboveSkyline(data, a);
+    const mb = heightAboveSkyline(data, b);
+    // Opposite signs: the height above the skyline passes zero between the samples. Never so when
+    // either height is missing: the change is then placed mid-way, like any other without a crossing.
     const interpolated = ma * mb < 0;
     const f = interpolated ? ma / (ma - mb) : 0.5;
     const gapMs = times[i + 1] - times[i];
     crossings.push({ atMs: times[i] + f * gapMs, toAbove: b.state === 'above', gapMs, interpolated });
   }
-  const out: Prepared = { times, crossings, startsAbove: path.length > 0 && path[0].state === 'above' };
+  const out: Prepared = { path, times, crossings, startsAbove: path.length > 0 && path[0].state === 'above' };
   prepared.set(data, out);
   return out;
 }
@@ -119,12 +141,15 @@ function lineUncertaintyDeg(path: readonly SunPathPoint[], i: number): number {
   return worst < 0 || !Number.isFinite(worst) ? Infinity : worst / 2;
 }
 
-/** Sample times of the Sun's path, in milliseconds (cached per answer). */
+/**
+ * Sample times of the Sun's path, in milliseconds (cached per answer). One for each sample of
+ * `sun_path`, in order; a sample whose time cannot be read is left out.
+ */
 export function sunPathTimes(data: HorizonResponse): readonly number[] {
   return prepare(data).times;
 }
 
-/** Sun position at a time, interpolated between samples. Null when the answer has no path. */
+/** Sun position at a time, interpolated between samples. Null when the answer has no readable path. */
 export function sunAt(data: HorizonResponse, tMs: number): SunNow | null {
   const p = prepare(data);
   const times = p.times;
@@ -142,15 +167,15 @@ export function sunAt(data: HorizonResponse, tMs: number): SunNow | null {
     }
   }
   const hi = Math.max(i, j);
-  const a = data.sun_path[i];
-  const b = data.sun_path[hi];
+  const a = p.path[i];
+  const b = p.path[hi];
   const span = times[hi] - times[i];
   const f = span > 0 ? (tMs - times[i]) / span : 0;
   return {
     az: normalizeLon360(a.az + wrap180(b.az - a.az) * f),
     el: a.el + (b.el - a.el) * f,
     above: aboveAt(p, Math.min(times[n - 1], Math.max(times[0], tMs))),
-    uncertaintyDeg: hi === i ? 0 : lineUncertaintyDeg(data.sun_path, i),
+    uncertaintyDeg: hi === i ? 0 : lineUncertaintyDeg(p.path, i),
   };
 }
 

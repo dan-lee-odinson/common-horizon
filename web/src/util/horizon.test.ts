@@ -159,6 +159,71 @@ describe('how finely a reading is known', () => {
   });
 });
 
+describe('a horizon answer with a missing value', () => {
+  // Shackleton ridge has several sunrises and sunsets in a month.
+  const h = month('shackleton-ridge');
+  const times = sunPathTimes(h);
+  const i = h.sun_path.findIndex((p, k) => k + 1 < h.sun_path.length && p.state !== h.sun_path[k + 1].state);
+  const before = h.sun_path[i].state === 'above';
+
+  it('does not throw when a sample beside a sunrise or sunset has no direction: the change is placed mid-way', () => {
+    // A missing azimuth here used to throw while looking up the skyline, and took the readouts with it.
+    for (const k of [i, i + 1]) {
+      for (const field of ['az', 'el'] as const) {
+        for (const bad of [Number.NaN, Infinity, undefined, null]) {
+          const broken: HorizonResponse = { ...h, sun_path: h.sun_path.map((p, n) => (n === k ? { ...p, [field]: bad as unknown as number } : p)) };
+          const change = nextSunChange(broken, times[i] - HOUR_MS)!;
+          expect(change.kind).toBe(before ? 'sunset' : 'sunrise');
+          // No crossing can be read off a sample without a direction.
+          expect(change.interpolated).toBe(false);
+          expect(change.atMs).toBe((times[i] + times[i + 1]) / 2);
+          // The words either side of the change are still the answer's own.
+          expect(sunAt(broken, times[i] - HOUR_MS)!.above).toBe(before);
+          expect(sunAt(broken, times[i + 1])!.above).toBe(!before);
+          // A position read beside the broken sample is not vouched for.
+          const beside = sunAt(broken, (times[k] + times[k + 1]) / 2)!;
+          expect(Number.isFinite(beside.az) && Number.isFinite(beside.el) && beside.uncertaintyDeg <= 0.05).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('reads no crossing off an answer without a skyline', () => {
+    for (const skyline of [[], undefined as unknown as HorizonResponse['skyline']]) {
+      const bare: HorizonResponse = { ...h, skyline };
+      const change = nextSunChange(bare, times[i] - HOUR_MS)!;
+      expect(change.interpolated).toBe(false);
+      expect(change.atMs).toBe((times[i] + times[i + 1]) / 2);
+    }
+  });
+
+  it('leaves out a sample whose time cannot be read, and places a change beside it between its readable neighbours', () => {
+    for (const k of [i, i + 1]) {
+      for (const bad of ['not a time', '', undefined, null]) {
+        const broken: HorizonResponse = { ...h, sun_path: h.sun_path.map((p, n) => (n === k ? { ...p, t: bad as unknown as string } : p)) };
+        expect(sunPathTimes(broken)).toHaveLength(h.sun_path.length - 1);
+        for (const t of sunPathTimes(broken)) expect(Number.isFinite(t)).toBe(true);
+        const change = nextSunChange(broken, times[i - 1] - HOUR_MS)!;
+        expect(change.kind).toBe(before ? 'sunset' : 'sunrise');
+        // Somewhere between the readable samples around it, which are now two steps apart.
+        expect(change.atMs).toBeGreaterThanOrEqual(times[k - 1]);
+        expect(change.atMs).toBeLessThanOrEqual(times[k + 1]);
+        expect(change.sampleGapHours).toBeCloseTo(2, 2);
+        // An unreadable time used to flip the lit or dark word for every instant before the change.
+        expect(sunAt(broken, times[0])!.above).toBe(h.sun_path[0].state === 'above');
+        expect(sunAt(broken, times[i - 1])!.above).toBe(before);
+        expect(sunAt(broken, times[i + 2])!.above).toBe(!before);
+        for (const p of litPeriods(broken)) expect(Number.isFinite(p.start) && Number.isFinite(p.end)).toBe(true);
+      }
+    }
+    // No readable sample at all is no path.
+    const none: HorizonResponse = { ...h, sun_path: h.sun_path.map((p) => ({ ...p, t: 'not a time' })) };
+    expect(sunAt(none, times[0])).toBeNull();
+    expect(nextSunChange(none, times[0])).toBeNull();
+    expect(litPeriods(none)).toEqual([]);
+  });
+});
+
 describe('the horizon answer the app asks for', () => {
   const stay = (days: number) => horizonStepHours(T0, T0 + days * DAY_MS);
   const points = (days: number) => (days * 24) / stay(days);
