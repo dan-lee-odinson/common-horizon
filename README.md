@@ -50,9 +50,10 @@ with how terrain close to the observer is treated. The limits are set out in
 ## How it is checked
 
 - **Against NASA's JPL Horizons System.** The engine's Sun and Earth directions are compared
-  with Horizons for the preset sites. The largest difference is about 0.006° for the Sun, which
-  is the aberration of light, and about 0.0002° for the Earth. The Sun's disc is 0.53° wide.
-  See [backend/docs/HORIZONS-CHECK.md](backend/docs/HORIZONS-CHECK.md).
+  with Horizons for all seventeen preset sites, every hour of 2027. The largest difference is
+  0.006° for the Sun, which is the aberration of light, and 0.0002° for the Earth. The Sun's
+  disc is 0.53° wide. The service also runs the comparison live, for any place and minute, at
+  `/api/v1/horizons/compare`. See [backend/docs/HORIZONS-CHECK.md](backend/docs/HORIZONS-CHECK.md).
 - **Two horizon calculations.** The skyline code was written twice, separately, on different
   LOLA models. At the Shackleton Connecting Ridge the two differ by a median of 0.01°.
 - **Automated tests.** The backend's tests run before every deployment
@@ -75,7 +76,7 @@ Each folder's README says how to run it and its tests on your own computer.
 NASA data and resources used:
 
 - **JPL Horizons System** (<https://ssd.jpl.nasa.gov/horizons/>): the independent check of the
-  engine's Sun and Earth directions.
+  engine's Sun and Earth directions, stored for every preset site and asked live by the service.
 - **NAIF SPICE kernels** (<https://naif.jpl.nasa.gov/pub/naif/generic_kernels/>): every Sun and
   Earth position.
 - **LOLA elevation models**, Lunar Reconnaissance Orbiter (<https://pgda.gsfc.nasa.gov/products/90>
