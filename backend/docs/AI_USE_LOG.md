@@ -196,6 +196,26 @@ reproduces 27 120 extra samples against `51c4cf0` and passes on the fix.
 | 11:44:56 | 13:44:56 | Codex re-review posted (GitHub timestamp) | 1 blocker, 1 minor defect |
 | by 11:59:20 | by 13:59:20 | Per-evaluation cache, overflow handling, regressions, real-kernel HTTP probe | 447 passed, 9 skipped with kernels (LOLA DEM tests only); warm exact-20 000 evaluation computes 20 000 samples (6.9 s locally, not Lambda) |
 
+## Website API and multi-site ranking (2026-11-15)
+
+Drafted with Claude Code (Claude Opus 5.5) on `feat/website-api` (from `main` at `2d4bbd9`). Times are
+from the branch reflog, file modification times and the clock at each step.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| before 13:30:13 | before 15:30:13 | Read `web/src/api` (client, types, examples, mock model), `web/README.md`, the planner README and code, the backend services, models and API, and PRs #6, #11 and #14 | Website expects root paths; mock catalog ids and fields differ from the planner's; slope and full skylines are not available from the engine |
+| 13:30:13 | 15:30:13 | Branch created from `origin/main`; planner package and preset site list copied into `backend/app` | Docker build context is `backend/` only, so copies plus a drift test |
+| 13:30–13:38 | 15:30–15:38 | Website models, sites, catalog mapping, planner calls, ranking module, `/check` and `/evaluate` orchestration, router, `assistant_available` on `/health`; tests | 98 new tests; smoke test of all four endpoints on the synthetic engine |
+| 13:37:56 | 15:37:56 | OpenAPI regenerated | Additive only: new paths and schemas, one new `/health` field |
+| by 13:40:38 | by 15:40:39 | Ruff on the changed files, full backend and planner suites, `docs/WEBSITE_API.md` | 439 passed, 11 skipped (backend); 166 passed (planner); repo-wide Ruff count unchanged at 60 |
+| ~13:41–13:43 | ~15:41–15:43 | Controlled real-kernel check in a throwaway worktree (this branch merged with PR #14's adapter, never committed): merged-tree pytest with kernels, then all 17 presets through `/evaluate` and `/check` with `CH_PHYSICS_ENGINE=physics` | Found and fixed one bug: per-site `provenance.sources` (one terrain profile per site) made the one-engine check refuse the request; now only the engine identity is compared and sources are merged. Then 540 passed, 14 skipped (merged tree); 17 sites x 14 d in 1.6-1.75 s, 17 x 365 d in 5.2 s (laptop); 445 passed on this branch |
+| by 13:57:03 | by 15:57:03 | Merged `origin/main` at `86ee0b1` (PRs #14 and #15) into `feat/website-api`; the only conflict was this log (both sides appended a section; both kept, in time order); OpenAPI regenerated (identical to the auto-merged file) | Backend 546 passed, 19 skipped without kernels; 556 passed, 9 skipped with `CH_SPICE_KERNEL_DIR` and `CH_NAIF_DIR` (only LOLA DEM tests skip); planner 166 passed; all website endpoints checked on the real engine (17 x 14 d in 1.5 s, 17 x 365 d in 5.2 s, laptop) |
+
+**Not decided here (listed in `WEBSITE_API.md`):** transit time, Earth-link thresholds, ranking of
+unknown verdicts, slope source and lander slope limits, empty-payload and no-lander fit, observer
+height, refill window and catalog item linking. No physics was added: every physical number comes
+from the configured engine (synthetic in production), every hardware number from the planner.
+
 ## Physics packaging and PR #6 reconciliation (2026-11-15)
 
 Drafted with Claude Code (Claude Opus 5.5) on `feat/backend-deploy-readiness` (PR #6), updated in place by

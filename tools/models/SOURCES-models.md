@@ -19,7 +19,7 @@ read the source's own license or terms, it says "to check".
 | Starship lander (stand-in) | Diameter ("across") | 9 m | Same as above | NASA figure, secondary source | Same as above | link to add |
 | Habitat unit | Inflatable section: diameter, height | about 6.5 m, 5.2 m | Burke, Howard and Kessler, AIAA ASCEND 2022 | NASA study | Conference paper published by AIAA: license to check; cited figure only | link to add |
 | Habitat unit | Metal section: diameter, height | 4.4 m, 2.6 m | Same as above | NASA study | Same as above | link to add |
-| Fission power unit | Stowed size (cylinder): diameter, height | 4 m, 6 m | Kaldon et al., IAC 2024, NASA Technical Reports Server 20240011694 | NASA goal | Terms on the NTRS record: to check; cited figure only | link to add |
+| Fission power unit | Stowed size (cylinder): diameter, height | 4 m, 6 m | Kaldon et al., IAC 2024, NASA Technical Reports Server 20240011694 | NASA goal | Terms on the NTRS record: to check; cited figure only | https://ntrs.nasa.gov/citations/20240011694 (record opened 15 November 2026) |
 | Solar array mast | Height, panel width | 10 m, 4 m (defaults) | None on file; parameters | our estimate, to be replaced by a published figure | Our own estimate (this repository's Apache-2.0 license) | none |
 | Griffin lander | Overall height | about 2 m | Space.com's report of the 15 June 2026 unveiling | company figure, secondary source | News article, publisher's terms: to check; cited figure only | link to add |
 | Griffin lander | Overall width | about 4.5 m | Voyager's lunar missions page | company figure, secondary source | Company web page, site terms: to check; cited figure only | link to add |

@@ -1,0 +1,263 @@
+{
+ "format": "common-horizon/horizons-check-summary",
+ "format_version": 1,
+ "what": "Largest angle, in degrees, between the physics engine's direction to the Sun and to the Earth and the direction NASA's JPL Horizons System gives, over every hour of the period.",
+ "source": "backend/data/horizon_validation/horizons_check_2027.json",
+ "sites": {
+  "shackleton-ridge": {
+   "sun_max_angle_deg": 0.005991,
+   "earth_max_angle_deg": 0.000211,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:01Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "nobile": {
+   "sun_max_angle_deg": 0.005991,
+   "earth_max_angle_deg": 0.000211,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:01Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "apollo-11": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:01Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "apollo-12": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:01Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "apollo-14": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:01Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "apollo-15": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:01Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "apollo-16": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "apollo-17": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "im-1-odysseus": {
+   "sun_max_angle_deg": 0.005991,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "im-2-athena": {
+   "sun_max_angle_deg": 0.005991,
+   "earth_max_angle_deg": 0.000211,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "blue-ghost-m1": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "im-3-reiner-gamma": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "blue-ghost-m2": {
+   "sun_max_angle_deg": 0.005991,
+   "earth_max_angle_deg": 0.000211,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "blue-ghost-m3": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "draper-cp12": {
+   "sun_max_angle_deg": 0.005991,
+   "earth_max_angle_deg": 0.000211,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "chandrayaan-3": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  },
+  "slim": {
+   "sun_max_angle_deg": 0.00599,
+   "earth_max_angle_deg": 0.00021,
+   "samples": {
+    "sun": 8761,
+    "earth": 8761
+   },
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T14:02Z",
+   "horizons_url": "https://ssd.jpl.nasa.gov/api/horizons.api"
+  }
+ }
+}

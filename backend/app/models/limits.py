@@ -56,3 +56,22 @@ LAUNCH_DELAY_MAX_DAYS = 30
 LAUNCH_DELAY_STEP_MAX_DAYS = 30
 
 HARDWARE_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.\-]{0,63}$"
+
+# ---- Website API (GET /sites, GET /catalog, POST /check, POST /evaluate) ----
+# Site ids include custom points typed on the website, e.g. "custom:-89.6840:196.7390".
+SITE_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.:\-]{0,79}$"
+SITE_NAME_MAX_LENGTH = 120
+# East-positive longitude as the website sends it: 0..360, with -180..0 also accepted and normalised.
+LON_EAST_MIN_DEG = -180.0
+LON_EAST_MAX_DEG = 360.0
+MAX_SITES_PER_EVALUATION = 25
+# The website's own bounds (web/src/state/app.ts: MIN_STAY_DAYS, MAX_STORAGE_KWH).
+STAY_MIN_DAYS = 1.0
+MAX_STORAGE_KWH = 1_000_000.0
+# Upper limit on the count of one catalog item in a request (a request limit, not a hardware figure).
+MAX_HARDWARE_COUNT = 10
+# Transit time (launch to landing) the caller may state; the team has not fixed one (see the report).
+TRANSIT_MAX_DAYS = 30.0
+# All sites of one POST /evaluate together may use at most this many samples; the time step grows
+# (from one hour) to stay inside it, so 17 sites x 365 days cannot exceed the Lambda timeout.
+WEBSITE_MAX_TOTAL_SAMPLES = 20_000
