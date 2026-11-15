@@ -1,4 +1,4 @@
-// The Orbit picture is laid out so the Sun, Earth and the Moon never collide with each other or
+// The Orbit picture is laid out so the Sun's tick, Earth and the Moon never collide with each other or
 // with the side columns of panels. This checks the arithmetic over a whole lunar day of the mock
 // model, with the camera at both ends of its sway.
 
@@ -7,7 +7,7 @@ import { geometryAt, TRANSIT_DAYS } from '../api/mock/model';
 import { normalizeLon360, wrap180 } from '../util/geo';
 import { DAY_MS, HOUR_MS, SYNODIC_MONTH_DAYS } from '../util/time';
 import { EARTH_RADIUS_KM, MOON_RADIUS_KM } from '../util/bodies';
-import { ORBIT_COLUMN_PX, ORBIT_VIEW, orbitCameraLongitude, orbitDistance, orbitEarthSide, orbitZoomDistance, projectOrbit, ringRadii } from './orbitView';
+import { hitBall, ORBIT_COLUMN_PX, ORBIT_VIEW, orbitCameraFrame, orbitCameraLongitude, orbitDistance, orbitEarthSide, orbitRay, orbitZoomDistance, projectOrbit, projectOrbitPoint, ringRadii, SUN_TICK, worldPoint } from './orbitView';
 
 const LANDING = Date.UTC(2027, 1, 10, 15, 0, 0) + TRANSIT_DAYS * DAY_MS;
 
@@ -44,15 +44,15 @@ for (const [width, height] of [
       expect(moon.scale * 2).toBeLessThan(height * 0.5);
     });
 
-    it('keeps the Sun on its ring between the side columns, all the way round', () => {
+    it('keeps the Sun’s tick on its ring between the side columns, all the way round', () => {
       for (const offset of offsets) {
         for (const el of elevations) {
           const cameraLon = orbitCameraLongitude(earthLon0, 'right', offset);
           for (let lon = 0; lon < 360; lon += 3) {
-            const sun = projectOrbit(1.54, lon, radii[1], cameraLon, el, distance, width, height);
-            const marker = 0.085 * sun.scale + 4;
-            expect(sun.x - marker).toBeGreaterThan(ORBIT_COLUMN_PX - 40);
-            expect(sun.x + marker).toBeLessThan(width - ORBIT_COLUMN_PX + 40);
+            // The tick lies in the ring's plane and reaches a little outside the ring.
+            const tick = projectOrbit(0, lon, radii[1] + SUN_TICK.outer, cameraLon, el, distance, width, height);
+            expect(tick.x - 4).toBeGreaterThan(ORBIT_COLUMN_PX - 40);
+            expect(tick.x + 4).toBeLessThan(width - ORBIT_COLUMN_PX + 40);
           }
         }
       }
@@ -127,5 +127,32 @@ describe('which side Earth stands on', () => {
     expect(orbitEarthSide({ subsolar_lon_east: 70, subearth_lon_east: 0 })).toBe('left');
     expect(orbitEarthSide({ subsolar_lon_east: 290, subearth_lon_east: 0 })).toBe('left');
     expect(orbitEarthSide(null)).toBe('left');
+  });
+});
+
+describe('lines of sight through the Orbit picture', () => {
+  const cameraLon = 136;
+  const distance = 7;
+  it('run from the camera through the pixel a point lands on', () => {
+    for (const p of [worldPoint(10, 40, 1), worldPoint(-50, 200, 3), worldPoint(2, 353, 11.5)]) {
+      const at = projectOrbitPoint(p, cameraLon, ORBIT_VIEW.elevation, distance, 1440, 900);
+      const ray = orbitRay(at.x, at.y, cameraLon, ORBIT_VIEW.elevation, distance, 1440, 900);
+      const cam = orbitCameraFrame(cameraLon, ORBIT_VIEW.elevation, distance).position;
+      const to = { x: p.x - cam.x, y: p.y - cam.y, z: p.z - cam.z };
+      const len = Math.hypot(to.x, to.y, to.z);
+      expect(ray.dir.x).toBeCloseTo(to.x / len, 9);
+      expect(ray.dir.y).toBeCloseTo(to.y / len, 9);
+      expect(ray.dir.z).toBeCloseTo(to.z / len, 9);
+    }
+  });
+  it('meet the Moon at the middle of the picture on the side facing the camera, and miss it at the corner', () => {
+    const middle = orbitRay(720, 450, cameraLon, ORBIT_VIEW.elevation, distance, 1440, 900);
+    const n = hitBall(middle.origin, middle.dir, { x: 0, y: 0, z: 0 }, 1)!;
+    const cam = worldPoint(ORBIT_VIEW.elevation, cameraLon, 1);
+    expect(n.x).toBeCloseTo(cam.x, 9);
+    expect(n.y).toBeCloseTo(cam.y, 9);
+    expect(n.z).toBeCloseTo(cam.z, 9);
+    const corner = orbitRay(5, 5, cameraLon, ORBIT_VIEW.elevation, distance, 1440, 900);
+    expect(hitBall(corner.origin, corner.dir, { x: 0, y: 0, z: 0 }, 1)).toBeNull();
   });
 });

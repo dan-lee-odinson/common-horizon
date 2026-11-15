@@ -3,7 +3,10 @@
 //   orbit    back from the Moon, looking down on the ring system at an angle. The camera sits on
 //            the side away from Earth, turned so Earth stands behind the Moon and to the left,
 //            its limb in the top-left corner; it sways a few degrees, leans a little with the
-//            pointer, and zooms out until the whole Earth is in view.
+//            pointer, and zooms out until the whole Earth is in view. The visitor can turn it
+//            round the Moon by dragging (one finger on a touch screen) or with the arrow keys;
+//            the view stays where it is left until "Reset view", and the sway pauses meanwhile
+//            (orbitTurn.ts).
 //   mission  close to the Moon, turned to the site in the spotlight, the Moon set off-centre and
 //            the picture shifted so the site's marker and tag stay clear of the glass panels (see
 //            missionView.ts); the visitor can turn and zoom the Moon
@@ -22,6 +25,7 @@ import { normalizeLon360 } from '../util/geo';
 import { DAY_MS, SYNODIC_MONTH_DAYS } from '../util/time';
 import { earthSwing } from '../util/track';
 import { missionCameraLatitude, missionDistance as missionDistanceFor, missionFrame, placeInFrame } from './missionView';
+import { dragTurn, isTurned, keyTurn, ORBIT_TURN, orbitTurn, turnedElevation } from './orbitTurn';
 import { MOON_CLIP, ORBIT_VIEW, orbitCameraLongitude, orbitDistance, orbitEarthSide, orbitZoomDistance } from './orbitView';
 import { geometryNow, toVector, type SceneData } from './sceneData';
 
@@ -94,6 +98,10 @@ export function CameraDirector({ data }: { data: SceneData }) {
   const holding = useRef(false);
   /** Degrees added to the Orbit pose: the slow sway, and the lean toward the pointer. */
   const drift = useRef({ sway: 0, leanX: 0, leanY: 0 });
+  /** The turn the camera is at right now (degrees): it follows what the visitor asked for (orbitTurn) with a short eased move. */
+  const turnNow = useRef({ lon: 0, lat: 0 });
+  /** True while the visitor is dragging the view round. */
+  const dragging = useRef(false);
   const scratch = useMemo(() => new THREE.Vector3(), []);
 
   const orbitD = useMemo(() => orbitDistance(size.width, size.height, isPhone), [size.width, size.height, isPhone]);
@@ -111,8 +119,104 @@ export function CameraDirector({ data }: { data: SceneData }) {
     // month); until the data arrives, the middle of that swing stands in.
     const now = geometryNow(data);
     const lon = now ? now.subearth_lon_east : earthLon;
-    return toVector(ORBIT_VIEW.elevation + d.leanY, orbitCameraLongitude(lon, earthSide, d.sway + d.leanX), orbitZoomDistance(orbitD, zoomNow.current.value), out);
+    const turn = turnNow.current;
+    return toVector(turnedElevation(turn.lat, d.leanY), orbitCameraLongitude(lon, earthSide, turn.lon + d.sway + d.leanX), orbitZoomDistance(orbitD, zoomNow.current.value), out);
   }
+
+  // Turning the view by hand. The camera follows the turn the visitor asked for: closely during a
+  // drag, quickly after a key, and in one eased move on "Reset view" (at once with reduced motion).
+  useEffect(() => {
+    const follow = () => {
+      const t = orbitTurn.get();
+      const now = turnNow.current;
+      if (t.via === 'reset') {
+        // The short way home: whole turns round the Moon are dropped first (the pose is the same).
+        now.lon = ((((now.lon + 180) % 360) + 360) % 360) - 180;
+      }
+      const duration = reducedMotion ? 0 : t.via === 'drag' ? 0.12 : t.via === 'key' ? 0.16 : 0.8;
+      gsap.to(now, { lon: t.lon, lat: t.lat, duration, ease: t.via === 'reset' ? 'power3.inOut' : 'power3.out', overwrite: true });
+    };
+    const stop = orbitTurn.subscribe(follow);
+    // Pick up wherever a move was cut short (this effect restarts if the motion setting changes).
+    if (turnNow.current.lon !== orbitTurn.get().lon || turnNow.current.lat !== orbitTurn.get().lat) follow();
+    return () => {
+      stop();
+      gsap.killTweensOf(turnNow.current);
+    };
+  }, [reducedMotion]);
+  // Leaving Orbit, the view goes back to standard, so the stage is always entered the same way.
+  useEffect(() => {
+    if (stage === 'orbit') return;
+    gsap.killTweensOf(turnNow.current);
+    turnNow.current.lon = turnNow.current.lat = 0;
+    orbitTurn.set({ lon: 0, lat: 0, via: 'reset' });
+  }, [stage]);
+  useEffect(() => {
+    if (stage !== 'orbit') return;
+    let drag: { id: number; x: number; y: number; moved: boolean } | null = null;
+    const end = () => {
+      drag = null;
+      dragging.current = false;
+      canvas.style.cursor = 'grab';
+    };
+    const onDown = (e: PointerEvent) => {
+      // The main button, or one finger. Not during a flight between stages.
+      if (e.button !== 0 || !e.isPrimary || !holding.current) return;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (!drag.moved) {
+        if (Math.hypot(dx, dy) < ORBIT_TURN.dragSlop) return;
+        drag.moved = true;
+        dragging.current = true;
+        canvas.style.cursor = 'grabbing';
+        // Keep the drag even if the pointer leaves the picture or crosses a panel.
+        try {
+          canvas.setPointerCapture(e.pointerId);
+        } catch {
+          // The pointer is already gone: the drag ends with the next "up".
+        }
+      }
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+      orbitTurn.set({ ...dragTurn(orbitTurn.get(), dx, dy, view.current.roll), via: 'drag' });
+    };
+    const onUp = (e: PointerEvent) => {
+      if (drag && e.pointerId === drag.id) end();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || !holding.current) return;
+      // Arrow keys belong to whatever control has them: the preview scrubber, a text box, an open card.
+      const from = e.target instanceof Element ? e.target : null;
+      if (from?.closest('input, textarea, select, [contenteditable="true"], [role="slider"], [role="dialog"], [role="listbox"]')) return;
+      const next = keyTurn(orbitTurn.get(), e.key, e.shiftKey);
+      if (!next) return;
+      e.preventDefault();
+      orbitTurn.set({ ...next, via: 'key' });
+    };
+    const before = { cursor: canvas.style.cursor, touchAction: canvas.style.touchAction };
+    canvas.style.cursor = 'grab';
+    // One finger turns the view: the browser must not take the touch for a scroll.
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointercancel', onUp);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      canvas.removeEventListener('pointerdown', onDown);
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerup', onUp);
+      canvas.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('keydown', onKey);
+      dragging.current = false;
+      canvas.style.cursor = before.cursor;
+      canvas.style.touchAction = before.touchAction;
+    };
+  }, [stage, canvas]);
 
   // Zooming in Orbit: out until the whole Earth is in view, and back. The wheel changes the setting;
   // the camera eases to it (at once for visitors who prefer reduced motion).
@@ -298,12 +402,21 @@ export function CameraDirector({ data }: { data: SceneData }) {
     const leanX = gsap.quickTo(d, 'leanX', { duration: 1.4, ease: 'power3.out' });
     const leanY = gsap.quickTo(d, 'leanY', { duration: 1.4, ease: 'power3.out' });
     const onPointer = (e: PointerEvent) => {
-      if (e.pointerType === 'touch') return;
+      // Not while the visitor is dragging the view round: the lean would fight the drag.
+      if (e.pointerType === 'touch' || dragging.current) return;
       leanX(-((e.clientX / window.innerWidth) * 2 - 1) * ORBIT_VIEW.lean);
       leanY(((e.clientY / window.innerHeight) * 2 - 1) * ORBIT_VIEW.lean);
     };
     window.addEventListener('pointermove', onPointer, { passive: true });
+    // The slow sway pauses while the view is turned, and picks up where it stopped on "Reset view".
+    const pauseWhileTurned = () => {
+      if (isTurned(orbitTurn.get())) tl.pause();
+      else tl.resume();
+    };
+    pauseWhileTurned();
+    const stop = orbitTurn.subscribe(pauseWhileTurned);
     return () => {
+      stop();
       window.removeEventListener('pointermove', onPointer);
       tl.kill();
       gsap.killTweensOf(d);
