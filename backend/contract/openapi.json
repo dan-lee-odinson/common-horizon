@@ -90,6 +90,174 @@
           }
         }
       }
+    },
+    "/sites": {
+      "get": {
+        "tags": [
+          "website"
+        ],
+        "summary": "The 17 approved preset landing sites",
+        "description": "Longitudes are degrees east, 0..360. Source: the team's preset list (``web/src/api/examples/sites.json``).",
+        "operationId": "sites_sites_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/catalog": {
+      "get": {
+        "tags": [
+          "website"
+        ],
+        "summary": "Hardware catalog from the planner module",
+        "description": "Every item and figure comes from ``planner.list_catalog()``; unpublished figures are null.",
+        "operationId": "catalog_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/check": {
+      "post": {
+        "tags": [
+          "website"
+        ],
+        "summary": "Fit and power checks for one site",
+        "description": "The planner's ``fit_check``, ``power_check`` and ``site_energy``. With a site, the darkness comes from\nthe physics engine; check ``provenance.is_synthetic``.",
+        "operationId": "check_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Hardware the planner cannot use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Engine output violated the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Physics engine unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluate": {
+      "post": {
+        "tags": [
+          "website"
+        ],
+        "summary": "Evaluate and rank several sites",
+        "description": "One physics run per site, the planner's checks, then Dan's ranking (best first, see ``rank``).\n\nCheck ``provenance.is_synthetic`` (also the ``X-Data-Source`` header): synthetic fixtures are not physics.",
+        "operationId": "evaluate_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Hardware the planner cannot use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Engine output violated the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Physics engine unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -172,6 +340,464 @@
         "title": "BodyTimeseries",
         "description": "Sun or Earth as seen from the observer, one entry per timestamp."
       },
+      "CapacityOption": {
+        "properties": {
+          "option": {
+            "type": "string",
+            "title": "Option"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "capacity_kg": {
+            "type": "number",
+            "title": "Capacity Kg",
+            "description": "The value a fit check uses (the low end of a published range)."
+          },
+          "figure": {
+            "$ref": "#/components/schemas/CatalogFigure"
+          }
+        },
+        "type": "object",
+        "required": [
+          "option",
+          "label",
+          "capacity_kg",
+          "figure"
+        ],
+        "title": "CapacityOption"
+      },
+      "CatalogFigure": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "status": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Status"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "qualifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualifier"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "unit",
+          "status",
+          "source"
+        ],
+        "title": "CatalogFigure",
+        "description": "One figure exactly as the planner catalog stores it (published unit, status labels, source)."
+      },
+      "CatalogItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "lander",
+              "cargo",
+              "power",
+              "load"
+            ],
+            "title": "Kind",
+            "description": "lander, cargo (payload mass), power (a power source) or load (a power load). 'load' is new."
+          },
+          "countable": {
+            "type": "boolean",
+            "title": "Countable"
+          },
+          "default_count": {
+            "type": "integer",
+            "title": "Default Count"
+          },
+          "max_count": {
+            "type": "integer",
+            "title": "Max Count"
+          },
+          "mass_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mass Kg",
+            "description": "Payload mass. Null when not published, and for landers, sources and loads (no mass here)."
+          },
+          "capacity_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity Kg",
+            "description": "Landers only. Null when there are several published figures: see capacity_options."
+          },
+          "capacity_options": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityOption"
+            },
+            "type": "array",
+            "title": "Capacity Options"
+          },
+          "max_slope_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Slope Deg",
+            "description": "Landers only. Null when no slope limit is published for this lander."
+          },
+          "load_day_kw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load Day Kw",
+            "description": "Loads only: power drawn in sunlight. Null for other kinds."
+          },
+          "load_night_kw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load Night Kw",
+            "description": "Loads only: power drawn in darkness. Null for other kinds."
+          },
+          "energy_per_night_kwh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Energy Per Night Kwh"
+          },
+          "gen_kw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gen Kw",
+            "description": "Sources only: power produced per unit. Null for other kinds."
+          },
+          "gen_needs_sun": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gen Needs Sun",
+            "description": "Sources only: true when it works in sunlight only."
+          },
+          "picture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picture"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "figures": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CatalogFigure"
+            },
+            "type": "object",
+            "title": "Figures",
+            "description": "The planner's figures behind the numbers above, with status and source."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "countable",
+          "default_count",
+          "max_count",
+          "mass_kg",
+          "load_day_kw",
+          "load_night_kw",
+          "gen_kw",
+          "gen_needs_sun"
+        ],
+        "title": "CatalogItem"
+      },
+      "CatalogResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "status_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Status Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "status_labels"
+        ],
+        "title": "CatalogResponse"
+      },
+      "CheckRequest": {
+        "properties": {
+          "site": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SiteRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "landing_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Landing Utc"
+          },
+          "stay_days": {
+            "type": "number",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Stay Days"
+          },
+          "hardware": {
+            "items": {
+              "$ref": "#/components/schemas/HardwareChoice"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "title": "Hardware"
+          },
+          "storage_kwh": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Storage Kwh",
+            "description": "Battery storage typed by the visitor, kWh. 0 = none."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "site",
+          "landing_utc",
+          "stay_days",
+          "hardware",
+          "storage_kwh"
+        ],
+        "title": "CheckRequest"
+      },
+      "CheckResponse": {
+        "properties": {
+          "fits": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fits",
+            "description": "Null when the planner cannot decide (several capacity figures, a mass missing)."
+          },
+          "fit_verdict": {
+            "type": "string",
+            "enum": [
+              "fits",
+              "does not fit",
+              "depends on capacity figure",
+              "mass needed",
+              "no lander",
+              "nothing to fit"
+            ],
+            "title": "Fit Verdict"
+          },
+          "fit_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fit Notes"
+          },
+          "day": {
+            "$ref": "#/components/schemas/DayCheck"
+          },
+          "night": {
+            "$ref": "#/components/schemas/NightCheck"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/PowerBalance"
+          },
+          "power_notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Power Notes"
+          },
+          "energy_added_kwh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Energy Added Kwh",
+            "description": "Null: the planner has no net generation-minus-load figure. The energy the site's darkness adds is in site_energy."
+          },
+          "site_energy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SiteEnergy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when no site is given (no darkness length)."
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the darkness length came from. Null without a site."
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fits",
+          "fit_verdict",
+          "fit_notes",
+          "day",
+          "night",
+          "balance",
+          "power_notes",
+          "energy_added_kwh",
+          "site_energy",
+          "provenance",
+          "warnings"
+        ],
+        "title": "CheckResponse"
+      },
       "DataProvenance": {
         "properties": {
           "source": {
@@ -214,6 +840,79 @@
         ],
         "title": "DataSource"
       },
+      "DayCheck": {
+        "properties": {
+          "needed": {
+            "type": "boolean",
+            "title": "Needed"
+          },
+          "generation_kw": {
+            "type": "number",
+            "title": "Generation Kw"
+          },
+          "load_kw": {
+            "type": "number",
+            "title": "Load Kw"
+          },
+          "refill_kw": {
+            "type": "number",
+            "title": "Refill Kw"
+          },
+          "refill_kwh": {
+            "type": "number",
+            "title": "Refill Kwh"
+          },
+          "refill_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refill Hours"
+          },
+          "margin_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Percent"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "green",
+              "yellow",
+              "red",
+              "none"
+            ],
+            "title": "Status"
+          },
+          "passes": {
+            "type": "boolean",
+            "title": "Passes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "needed",
+          "generation_kw",
+          "load_kw",
+          "refill_kw",
+          "refill_kwh",
+          "refill_hours",
+          "margin_percent",
+          "status",
+          "passes"
+        ],
+        "title": "DayCheck"
+      },
       "EngineStatus": {
         "properties": {
           "name": {
@@ -255,6 +954,187 @@
         ],
         "title": "ErrorResponse"
       },
+      "EvaluateRequest": {
+        "properties": {
+          "sites": {
+            "items": {
+              "$ref": "#/components/schemas/SiteRef"
+            },
+            "type": "array",
+            "maxItems": 25,
+            "minItems": 1,
+            "title": "Sites"
+          },
+          "launch_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Launch Utc"
+          },
+          "slip_days": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Slip Days"
+          },
+          "stay_days": {
+            "type": "number",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Stay Days"
+          },
+          "hardware": {
+            "items": {
+              "$ref": "#/components/schemas/HardwareChoice"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "title": "Hardware"
+          },
+          "storage_kwh": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Storage Kwh",
+            "description": "Battery storage typed by the visitor, kWh. 0 = none."
+          },
+          "transit_days": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 30.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transit Days",
+            "description": "Launch-to-landing time, days (new, optional). The team has not fixed one: when it is left out the stay starts at launch_utc + slip_days and the response says so in warnings."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sites",
+          "launch_utc",
+          "slip_days",
+          "stay_days",
+          "hardware",
+          "storage_kwh"
+        ],
+        "title": "EvaluateRequest"
+      },
+      "EvaluateResponse": {
+        "properties": {
+          "launch_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Launch Utc"
+          },
+          "landing_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Landing Utc",
+            "description": "launch_utc + transit_days + slip_days."
+          },
+          "transit_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transit Days",
+            "description": "As sent; null means not stated (counted as 0, with a warning)."
+          },
+          "slip_days": {
+            "type": "integer",
+            "title": "Slip Days"
+          },
+          "stay_days": {
+            "type": "number",
+            "title": "Stay Days"
+          },
+          "time_step_s": {
+            "type": "integer",
+            "title": "Time Step S",
+            "description": "Sampling step the backend chose for every site in this response."
+          },
+          "geometry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Geometry"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sub-solar and sub-Earth points at landing_utc, from the engine."
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SiteEvaluation"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "Best first, ranked by the backend."
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/DataProvenance"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "launch_utc",
+          "landing_utc",
+          "transit_days",
+          "slip_days",
+          "stay_days",
+          "time_step_s",
+          "geometry",
+          "results",
+          "provenance",
+          "warnings"
+        ],
+        "title": "EvaluateResponse"
+      },
+      "Geometry": {
+        "properties": {
+          "subsolar_lat": {
+            "type": "number",
+            "title": "Subsolar Lat"
+          },
+          "subsolar_lon_east": {
+            "type": "number",
+            "title": "Subsolar Lon East"
+          },
+          "subearth_lat": {
+            "type": "number",
+            "title": "Subearth Lat"
+          },
+          "subearth_lon_east": {
+            "type": "number",
+            "title": "Subearth Lon East"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subsolar_lat",
+          "subsolar_lon_east",
+          "subearth_lat",
+          "subearth_lon_east"
+        ],
+        "title": "Geometry"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -267,6 +1147,28 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HardwareChoice": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.\\-]{0,63}$",
+            "title": "Id"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "count"
+        ],
+        "title": "HardwareChoice"
       },
       "HardwareRequirements": {
         "properties": {
@@ -378,6 +1280,11 @@
           },
           "physics_engine": {
             "$ref": "#/components/schemas/EngineStatus"
+          },
+          "assistant_available": {
+            "type": "boolean",
+            "title": "Assistant Available",
+            "description": "False: the assistant (language model) is not part of this backend yet."
           }
         },
         "type": "object",
@@ -386,7 +1293,8 @@
           "service",
           "version",
           "contract_version",
-          "physics_engine"
+          "physics_engine",
+          "assistant_available"
         ],
         "title": "HealthResponse"
       },
@@ -778,6 +1686,126 @@
         ],
         "title": "MissionMetrics"
       },
+      "NightCheck": {
+        "properties": {
+          "needed": {
+            "type": "boolean",
+            "title": "Needed"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "energy",
+              "power",
+              "power only",
+              "no darkness"
+            ],
+            "title": "Basis"
+          },
+          "generation_kw": {
+            "type": "number",
+            "title": "Generation Kw"
+          },
+          "load_kw": {
+            "type": "number",
+            "title": "Load Kw"
+          },
+          "per_night_kwh": {
+            "type": "number",
+            "title": "Per Night Kwh"
+          },
+          "longest_darkness_h": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longest Darkness H"
+          },
+          "storage_kwh": {
+            "type": "number",
+            "title": "Storage Kwh"
+          },
+          "storage_needed_kwh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Needed Kwh"
+          },
+          "available_kwh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Kwh"
+          },
+          "load_kwh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load Kwh"
+          },
+          "margin_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Percent"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "green",
+              "yellow",
+              "red",
+              "none"
+            ],
+            "title": "Status"
+          },
+          "passes": {
+            "type": "boolean",
+            "title": "Passes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "needed",
+          "basis",
+          "generation_kw",
+          "load_kw",
+          "per_night_kwh",
+          "longest_darkness_h",
+          "storage_kwh",
+          "storage_needed_kwh",
+          "available_kwh",
+          "load_kwh",
+          "margin_percent",
+          "status",
+          "passes"
+        ],
+        "title": "NightCheck"
+      },
       "ObstructionState": {
         "type": "string",
         "enum": [
@@ -788,6 +1816,84 @@
         ],
         "title": "ObstructionState",
         "description": "Why a body is (not) visible from the observer."
+      },
+      "PowerBalance": {
+        "properties": {
+          "margin_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Percent"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "green",
+              "yellow",
+              "red",
+              "none"
+            ],
+            "title": "Status"
+          },
+          "limiting": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "day",
+                  "night",
+                  "day and night"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limiting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "margin_percent",
+          "status",
+          "limiting"
+        ],
+        "title": "PowerBalance"
+      },
+      "RequirementCheck": {
+        "properties": {
+          "requirement": {
+            "type": "string",
+            "title": "Requirement"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement",
+          "passed",
+          "detail"
+        ],
+        "title": "RequirementCheck"
       },
       "RequirementResult": {
         "properties": {
@@ -853,6 +1959,319 @@
         ],
         "title": "RequirementResult"
       },
+      "ScoreComponents": {
+        "properties": {
+          "sunlight": {
+            "type": "number",
+            "title": "Sunlight"
+          },
+          "darkness": {
+            "type": "number",
+            "title": "Darkness"
+          },
+          "earth": {
+            "type": "number",
+            "title": "Earth"
+          },
+          "slope": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sunlight",
+          "darkness",
+          "earth",
+          "slope"
+        ],
+        "title": "ScoreComponents",
+        "description": "The four 0..100 terms of the score; null when the input is unknown."
+      },
+      "Site": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "lat": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Lat"
+          },
+          "lon_east": {
+            "type": "number",
+            "exclusiveMaximum": 360.0,
+            "minimum": 0.0,
+            "title": "Lon East",
+            "description": "Degrees east, 0..360."
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "default_hardware": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Default Hardware"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "lat",
+          "lon_east"
+        ],
+        "title": "Site"
+      },
+      "SiteEnergy": {
+        "properties": {
+          "dark_hours": {
+            "type": "number",
+            "title": "Dark Hours"
+          },
+          "nights": {
+            "type": "integer",
+            "title": "Nights"
+          },
+          "night_penalty_kwh": {
+            "type": "number",
+            "title": "Night Penalty Kwh"
+          },
+          "heating_penalty_kwh": {
+            "type": "number",
+            "title": "Heating Penalty Kwh"
+          },
+          "total_kwh": {
+            "type": "number",
+            "title": "Total Kwh"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dark_hours",
+          "nights",
+          "night_penalty_kwh",
+          "heating_penalty_kwh",
+          "total_kwh"
+        ],
+        "title": "SiteEnergy",
+        "description": "The planner's ``site_energy``: the energy a site's darkness adds (night load plus heating)."
+      },
+      "SiteEvaluation": {
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "title": "Site Id"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Rank",
+            "description": "Position in this response, 1 = best. The backend owns the order."
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score",
+            "description": "0..100. Null when a term is unknown (today: slope); see score_min/max."
+          },
+          "score_min": {
+            "type": "number",
+            "title": "Score Min",
+            "description": "The score with every unknown term at its worst (0)."
+          },
+          "score_max": {
+            "type": "number",
+            "title": "Score Max",
+            "description": "The score with every unknown term at its best (100)."
+          },
+          "score_components": {
+            "$ref": "#/components/schemas/ScoreComponents"
+          },
+          "sunlight_hours": {
+            "type": "number",
+            "title": "Sunlight Hours"
+          },
+          "sunlight_percent": {
+            "type": "number",
+            "title": "Sunlight Percent"
+          },
+          "longest_darkness_hours": {
+            "type": "number",
+            "title": "Longest Darkness Hours"
+          },
+          "earth_visible_percent": {
+            "type": "number",
+            "title": "Earth Visible Percent"
+          },
+          "clear_sky_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clear Sky Percent",
+            "description": "Null when no terrain skyline is available for the site."
+          },
+          "slope_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope Deg"
+          },
+          "earth_link": {
+            "type": "string",
+            "enum": [
+              "clear",
+              "intermittent",
+              "none"
+            ],
+            "title": "Earth Link"
+          },
+          "hardware_fits": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hardware Fits"
+          },
+          "energy_added_kwh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Energy Added Kwh"
+          },
+          "site_energy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SiteEnergy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "power_margin_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power Margin Percent"
+          },
+          "power_status": {
+            "type": "string",
+            "enum": [
+              "green",
+              "yellow",
+              "red",
+              "none"
+            ],
+            "title": "Power Status"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementCheck"
+            },
+            "type": "array",
+            "title": "Requirements"
+          },
+          "elevation_m": {
+            "type": "number",
+            "title": "Elevation M"
+          },
+          "elevation_source": {
+            "type": "string",
+            "title": "Elevation Source"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "site_id",
+          "rank",
+          "score",
+          "score_min",
+          "score_max",
+          "score_components",
+          "sunlight_hours",
+          "sunlight_percent",
+          "longest_darkness_hours",
+          "earth_visible_percent",
+          "clear_sky_percent",
+          "slope_deg",
+          "earth_link",
+          "hardware_fits",
+          "energy_added_kwh",
+          "site_energy",
+          "power_margin_percent",
+          "power_status",
+          "verdict",
+          "requirements",
+          "elevation_m",
+          "elevation_source",
+          "warnings"
+        ],
+        "title": "SiteEvaluation"
+      },
       "SiteInfo": {
         "properties": {
           "latitude_deg": {
@@ -900,6 +2319,60 @@
           "elevation_source"
         ],
         "title": "SiteInfo"
+      },
+      "SiteListResponse": {
+        "properties": {
+          "sites": {
+            "items": {
+              "$ref": "#/components/schemas/Site"
+            },
+            "type": "array",
+            "title": "Sites"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sites"
+        ],
+        "title": "SiteListResponse"
+      },
+      "SiteRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:\\-]{0,79}$",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "lat": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Lat"
+          },
+          "lon_east": {
+            "type": "number",
+            "maximum": 360.0,
+            "minimum": -180.0,
+            "title": "Lon East",
+            "description": "Degrees east. 0..360 as the website sends it; -180..0 is accepted and normalised to 0..360."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "lat",
+          "lon_east"
+        ],
+        "title": "SiteRef",
+        "description": "A site as the website sends it: a preset, a saved point or a typed coordinate."
       },
       "TerrainSkyline": {
         "properties": {
@@ -1027,6 +2500,47 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "Verdict": {
+        "properties": {
+          "result": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "unknown"
+            ],
+            "title": "Result",
+            "description": "'unknown' (new) when no requirement fails but one cannot be checked."
+          },
+          "requirement": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement",
+            "description": "fail: the first requirement that failed. unknown: the first that could not be checked."
+          },
+          "unknown_requirements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Requirements",
+            "description": "Every requirement that could not be checked, in order."
+          }
+        },
+        "type": "object",
+        "required": [
+          "result",
+          "requirement",
+          "unknown_requirements"
+        ],
+        "title": "Verdict"
       }
     }
   }

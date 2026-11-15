@@ -17,3 +17,5 @@ filterwarnings = [
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+# app/vendor holds an exact copy of planner/planner (see app/planner_bridge.py); it is linted there.
+extend-exclude = ["app/vendor"]

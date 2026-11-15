@@ -29,9 +29,16 @@ uvicorn app.main:app --reload --port 8000
 |---|---|---|
 | GET | `/health` | Liveness, contract version, active physics engine. Lambda readiness check. |
 | POST | `/api/v1/missions/evaluate` | Evaluate one landing site and mission window. |
+| GET | `/sites` | The 17 approved preset sites (website API). |
+| GET | `/catalog` | The planner's hardware catalog in the website's shape. |
+| POST | `/check` | The planner's fit, power and site-energy checks for one site. |
+| POST | `/evaluate` | Evaluate several sites and rank them by Dan's rules. |
 
 See [docs/API_CONTRACT.md](docs/API_CONTRACT.md) for every field, its unit, its validation
-bounds and how it maps to the physics engine integration document.
+bounds and how it maps to the physics engine integration document. The website endpoints,
+their contract changes against `web/src/api/types.ts`, the ranking rules and the open team
+decisions are in [docs/WEBSITE_API.md](docs/WEBSITE_API.md). They use copies of `planner/` and
+the preset site list; refresh them with `python backend/scripts/sync_shared_data.py`.
 
 ## Tests
 

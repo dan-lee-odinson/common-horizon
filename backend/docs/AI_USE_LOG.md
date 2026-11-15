@@ -86,3 +86,21 @@ the source files' modification times.
 | UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
 |---|---|---|---|
 | 15:28:19 | 17:28:19 | Drafted with Claude Code: open coordination questions in `API_CONTRACT.md` restated as neutral provisional technical assumptions and engine integration requirements; private working notes moved to a git-ignored `.local-notes/` directory | No change to the API, code behaviour or OpenAPI contract |
+
+## Website API and multi-site ranking (2026-11-15)
+
+Drafted with Claude Code (Claude Opus 5.5) on `feat/website-api` (from `main` at `2d4bbd9`). Times are
+from the branch reflog, file modification times and the clock at each step.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| before 13:30:13 | before 15:30:13 | Read `web/src/api` (client, types, examples, mock model), `web/README.md`, the planner README and code, the backend services, models and API, and PRs #6, #11 and #14 | Website expects root paths; mock catalog ids and fields differ from the planner's; slope and full skylines are not available from the engine |
+| 13:30:13 | 15:30:13 | Branch created from `origin/main`; planner package and preset site list copied into `backend/app` | Docker build context is `backend/` only, so copies plus a drift test |
+| 13:30–13:38 | 15:30–15:38 | Website models, sites, catalog mapping, planner calls, ranking module, `/check` and `/evaluate` orchestration, router, `assistant_available` on `/health`; tests | 98 new tests; smoke test of all four endpoints on the synthetic engine |
+| 13:37:56 | 15:37:56 | OpenAPI regenerated | Additive only: new paths and schemas, one new `/health` field |
+| by 13:40:38 | by 15:40:39 | Ruff on the changed files, full backend and planner suites, `docs/WEBSITE_API.md` | 439 passed, 11 skipped (backend); 166 passed (planner); repo-wide Ruff count unchanged at 60 |
+
+**Not decided here (listed in `WEBSITE_API.md`):** transit time, Earth-link thresholds, ranking of
+unknown verdicts, slope source and lander slope limits, empty-payload and no-lander fit, observer
+height, refill window and catalog item linking. No physics was added: every physical number comes
+from the configured engine (synthetic in production), every hardware number from the planner.
