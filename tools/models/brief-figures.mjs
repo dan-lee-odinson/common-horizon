@@ -92,4 +92,16 @@ export const BRIEF = Object.freeze({
     dimensions_m: { height_y: 4.85 }, // L x W x H = 6.44 x 4.84 x 4.85 m (JAXA, 29 Sep 2025)
     picture_credit: 'Dan Lee-Odinson', // team member's own photo of a scale model
   },
+  'hab-module': {
+    kind: 'generated',
+    status: STATUS_LABELS.ourEstimate,
+    dimensions_m: { height_y: 4 }, // our estimate: NASA publishes no size for this concept
+    picture_credit: 'NASA', // NASA rendering, "Conceptual Lunar Habitation Module"
+  },
+  'fission-surface-power': {
+    kind: 'generated',
+    status: STATUS_LABELS.ourEstimate,
+    dimensions_m: { height_y: 6 }, // our estimate: the 6 m stowed length of NASA's 40 kWe goal, taken as the deployed height
+    picture_credit: 'NASA', // NASA rendering of Kilopower on the Moon
+  },
 });
