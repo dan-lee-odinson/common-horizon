@@ -311,7 +311,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
   const trueSize = (
     <p className="m-0 text-[13px] leading-snug text-ink-2" data-testid="true-size">
-      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
+      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. Lit and dark are for the Sun's centre, so part of its disc can show over a ridge while it is dark. <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
       <span data-testid="site-rings">
         Range rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
       </span>
@@ -333,7 +333,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
         <h2 className="sr-only">Site: {name}</h2>
 
         <div className="hud-layer" data-depth="0.5">
-          <div className="flat-plane absolute left-3 right-3 top-[4.25rem] flex flex-col gap-2" data-enter="lead" data-site-zone="top">
+          <div className="absolute left-3 right-3 top-[4.25rem] flex flex-col gap-2" data-enter="lead" data-site-zone="top">
             <div className="flex items-center gap-2">
               <button type="button" className="btn btn-glass btn-icon shrink-0" onClick={actions.backToMission} aria-label="Back to mission select" data-testid="back-to-mission">
                 <Icon name="back" size={16} />
@@ -408,7 +408,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
       {/* Across the top: the way back, and which site this is. */}
       <div className="hud-layer" data-depth="0.6">
-        <div className="flat-plane absolute left-5 right-[22.5rem] top-[4.75rem] flex items-center gap-2 max-lg:right-[18.5rem]" data-enter="lead" data-site-zone="top">
+        <div className="absolute left-5 right-[22.5rem] top-[4.75rem] flex items-center gap-2 max-lg:right-[18.5rem]" data-enter="lead" data-site-zone="top">
           <button type="button" className="btn btn-glass shrink-0" onClick={actions.backToMission} aria-label="Back to mission select" data-testid="back-to-mission">
             <Icon name="back" size={14} />
             <span>

@@ -187,11 +187,19 @@
     perspective-origin: 50% 46%;
     pointer-events: none;
   }
+  /* A layer is one flat plane: it leans with the pointer and its wings tilt inside it, and the
+     result is drawn flat. A layer must never keep its children in 3D (transform-style:
+     preserve-3d). A tilted wing would then be drawn apart from the scene, so the glass inside it
+     would find nothing behind it to blur and dim and its text would lose its contrast over a
+     bright scene; and a button that shrinks when pressed could end up behind its holder for the
+     pointer, and the press be lost. (e2e/hud.spec.ts checks the dimming.) The layer gives its own
+     perspective to the wings, so they still lean toward the viewer. */
   .hud-layer {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    transform-style: preserve-3d;
+    perspective: 1500px;
+    perspective-origin: 50% 46%;
   }
   .hud-layer > * {
     pointer-events: auto;
@@ -207,12 +215,6 @@
   .tilt-back {
     transform: rotateX(5deg);
     transform-origin: 50% 100%;
-  }
-  /* A holder that is not glass and holds controls: one flat plane of its own in the HUD space.
-     A button shrinks a little when pressed; a part that takes a transform straight inside the
-     tilted space can end up behind its holder for the pointer, and the press is then lost. */
-  .flat-plane {
-    transform: translateZ(0);
   }
 
   /* ---------- readouts ---------- */
@@ -363,6 +365,12 @@
     .btn-primary:hover:not(:disabled) {
       background: var(--ch-accent-strong);
       border-color: var(--ch-accent-strong);
+    }
+    /* A pressed primary button (Pause while playing) has light text on a dark fill. It keeps that
+       fill under the pointer: the light hover fill would hide its own light text. */
+    .btn-primary[aria-pressed='true']:hover:not(:disabled) {
+      background: rgb(95 230 245 / 0.14);
+      border-color: var(--ch-accent);
     }
     .btn-quiet:hover:not(:disabled) {
       background: rgb(95 230 245 / 0.08);
