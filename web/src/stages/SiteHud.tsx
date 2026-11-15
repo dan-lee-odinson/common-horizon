@@ -54,7 +54,7 @@ import { AnchorTag } from './AnchorTag';
 import { ClockPanel, EarthPanel, HardwarePanel, Inline, SunPanel } from './SitePanels';
 import { useEntrance } from './useEntrance';
 import { SiteChecks } from './SiteChecks';
-import { GroundNote } from './GroundNote';
+import { GroundNote, GroundPanel } from './GroundNote';
 import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
 const LEADERS: LeaderSpec[] = [
@@ -400,6 +400,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             {clockPanel({ bare: true })}
             {sunPanel({ bare: true })}
             {earthPanel({ bare: true })}
+            {webgl ? <GroundPanel siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} bare /> : null}
             {hardwarePanel({ bare: true })}
             {checks('bare')}
           </div>
@@ -417,7 +418,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             )}
             {webgl ? (
               <p className="m-0 text-[12px] leading-snug text-ink-2" data-testid="true-size">
-                Sun <Inline q={fixed.sunWidth} />, Earth <Inline q={q.earthWidth} />: true apparent size (mean distances). <GroundNote siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} />{' '}
+                Sun <Inline q={fixed.sunWidth} />, Earth <Inline q={q.earthWidth} />: true apparent size (mean distances). <GroundNote siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} pointer />{' '}
                 <span data-testid="site-rings">
                   Rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
                 </span>
@@ -515,6 +516,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       <div className="hud-layer" data-depth="0.9">
         <div className="site-wing site-wing-r wing-r absolute right-5 top-[4.75rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="right" data-site-zone="right">
           {earthPanel()}
+          {webgl ? <GroundPanel siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} className="shrink" /> : null}
           {hardwarePanel({ className: 'max-lg:hidden [@media(max-height:759px)]:hidden' })}
         </div>
       </div>
