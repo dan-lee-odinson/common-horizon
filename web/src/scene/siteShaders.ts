@@ -47,6 +47,17 @@ uniform float uAmbient;
 uniform float uRadius;    // radius of the ground disc, metres
 uniform vec3 uRings;      // spacing of the near rings, how far out they go, spacing of the far rings (metres)
 uniform float uHole;      // half the width of the square the terrain mesh covers (no level ground there), metres; 0 for none
+uniform sampler2D uSurface; // the site's surface picture (siteSurface.ts), grayscale, rows flipped so v = 1 is the north edge
+uniform float uSurfaceOn;     // 1 while the picture is drawn, 0 for the plain ground
+uniform float uSurfaceMean;   // the picture's mean brightness, 0 to 1
+uniform float uSurfaceHalf;   // half the width of the square it covers, metres
+// The ground's tone from the picture: the pixel under this point over the picture's mean, kept
+// between TONE_RANGE's limits (siteSurface.ts). 1 (the plain ground) with no picture.
+float surfaceTone(vec2 xz) {
+  if (uSurfaceOn < 0.5) return 1.0;
+  vec2 uv = vec2((xz.x + uSurfaceHalf) / (2.0 * uSurfaceHalf), (uSurfaceHalf - xz.y) / (2.0 * uSurfaceHalf));
+  return clamp(texture2D(uSurface, uv).r / uSurfaceMean, 0.3, 2.4);
+}
 
 // A hash with no trigonometry in it: the ground covers most of the picture, so every pixel counts.
 float hash(vec2 p) {
@@ -79,7 +90,7 @@ void main() {
   float px = max(fw.x, fw.y);
   float mottle = (valueNoise(vWorld.xz / 7.0) - 0.5) * (1.0 - smoothstep(1.5, 6.0, px))
                + (valueNoise(vWorld.xz / 45.0 + 17.0) - 0.5) * (1.0 - smoothstep(10.0, 40.0, px));
-  vec3 col = uGround * (uAmbient + uDirect * uLit * uSunTerm) * (1.0 + 0.16 * mottle);
+  vec3 col = uGround * surfaceTone(vWorld.xz) * (uAmbient + uDirect * uLit * uSunTerm) * (1.0 + 0.16 * mottle);
 
   // Range rings: near ones out to a set distance, far ones to ten times that. Each kind fades out
   // where its rings would crowd closer than a few pixels (toward the horizon, or from high up).
@@ -95,7 +106,8 @@ void main() {
 }
 `;
 
-// The real ground (siteTerrain.ts): the same grey, mottle and rings as the level ground, lit by the
+// The real ground (siteTerrain.ts): the site's surface picture sets its tone (siteSurface.ts; the
+// plain grey where there is none), with the same mottle and rings as the level ground, lit by the
 // Sun's direction against each point's own slope, with the same display curve (the cosine to the
 // power 0.35; on level ground that is exactly `groundSunTerm`). Shading only: the terrain casts no
 // shadows. It is never cut off at the skyline: it is data, not an illustration. Where the near grid
@@ -130,6 +142,17 @@ uniform float uAmbient;
 uniform float uRadius;
 uniform vec3 uRings;
 uniform vec2 uFarFade;    // the far ground fades into the band's colour between these distances, metres
+uniform sampler2D uSurface; // the site's surface picture (siteSurface.ts), grayscale, rows flipped so v = 1 is the north edge
+uniform float uSurfaceOn;     // 1 while the picture is drawn, 0 for the plain ground
+uniform float uSurfaceMean;   // the picture's mean brightness, 0 to 1
+uniform float uSurfaceHalf;   // half the width of the square it covers, metres
+// The ground's tone from the picture: the pixel under this point over the picture's mean, kept
+// between TONE_RANGE's limits (siteSurface.ts). 1 (the plain ground) with no picture.
+float surfaceTone(vec2 xz) {
+  if (uSurfaceOn < 0.5) return 1.0;
+  vec2 uv = vec2((xz.x + uSurfaceHalf) / (2.0 * uSurfaceHalf), (uSurfaceHalf - xz.y) / (2.0 * uSurfaceHalf));
+  return clamp(texture2D(uSurface, uv).r / uSurfaceMean, 0.3, 2.4);
+}
 
 float hash(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -155,7 +178,7 @@ void main() {
   float px = max(fw.x, fw.y);
   float mottle = (valueNoise(vWorld.xz / 7.0) - 0.5) * (1.0 - smoothstep(1.5, 6.0, px))
                + (valueNoise(vWorld.xz / 45.0 + 17.0) - 0.5) * (1.0 - smoothstep(10.0, 40.0, px));
-  vec3 col = uGround * (uAmbient + uLit * sun) * (1.0 + 0.16 * mottle);
+  vec3 col = uGround * surfaceTone(vWorld.xz) * (uAmbient + uLit * sun) * (1.0 + 0.16 * mottle);
 
   // Range rings, measured flat from the landing point and painted on the ground itself.
   float w = fwidth(r);

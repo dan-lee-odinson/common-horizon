@@ -11,6 +11,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { Glass } from '../hud/Glass';
+import { surfaceWords, useSiteSurface } from '../scene/siteSurface';
 import { groundWords, useSiteTerrain, type SiteTerrainState } from '../scene/siteTerrainLoad';
 
 /** The windows where the Site view hides its Hardware panel (the same limits as its classes in SiteHud). */
@@ -44,18 +45,26 @@ export function GroundNote({ siteId, custom, pointer = false }: { siteId: string
 }
 
 /**
- * The Ground panel: where the drawn ground comes from and, where it applies, that the sunlight
- * numbers use a smooth horizon. Its words open with "Ground:", so it carries no title of its own.
+ * The Ground panel: where the drawn ground comes from, what its surface picture is (once drawn)
+ * and, where it applies, that the sunlight numbers use a smooth horizon. Its words open with "Ground:", so it carries no title of its own.
  * Nothing while the ground is level.
  */
 export function GroundPanel({ siteId, custom, bare = false, className = '' }: { siteId: string | null; custom: boolean; bare?: boolean; className?: string }) {
   const terrain = useGround(siteId, custom);
+  // What the surface picture is, once the scene has drawn it.
+  const surface = useSiteSurface(custom ? null : siteId);
   if (!terrain || !terrain.entry) return null;
   const words = groundWords(terrain.entry, terrain.far !== null);
   const body = (
     <>
-      <p className={`m-0 text-[12px] leading-snug text-ink-2 ${bare ? '' : 'min-h-0 overflow-y-auto overscroll-contain'}`} data-testid="site-ground" tabIndex={bare ? undefined : 0}>
+      <p className={`m-0 text-[12px] leading-[1.25] text-ink-2 ${bare ? '' : 'min-h-0 overflow-y-auto overscroll-contain'}`} data-testid="site-ground" tabIndex={bare ? undefined : 0}>
         <span data-testid="site-ground-source">{words.source}</span>
+        {surface.status === 'ready' && surface.entry ? (
+          <>
+            {' '}
+            <span data-testid="site-ground-surface">{surfaceWords(surface.entry)}</span>
+          </>
+        ) : null}
         {words.smoothHorizon ? (
           <>
             {' '}
@@ -77,7 +86,7 @@ export function GroundPanel({ siteId, custom, bare = false, className = '' }: { 
     );
   }
   return (
-    <Glass as="section" className={`flex min-h-0 flex-col gap-2 p-3.5 ${className}`} aria-label="Ground" data-panel data-testid="ground-panel">
+    <Glass as="section" className={`flex min-h-0 flex-col gap-2 px-3.5 py-2 ${className}`} aria-label="Ground" data-panel data-testid="ground-panel">
       {body}
     </Glass>
   );

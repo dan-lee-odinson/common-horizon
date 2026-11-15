@@ -10,6 +10,7 @@ import { shadowOffsetPerMetre } from '../util/shadow';
 import type { GeometryTrack } from '../util/track';
 import { cssColor } from './colors';
 import { GROUND_FRAGMENT, GROUND_VERTEX, TERRAIN_FRAGMENT, TERRAIN_VERTEX } from './siteShaders';
+import { SURFACE_HALF_M } from './siteSurface';
 import { groundCutDeg, groundSunTerm, SITE_VIEW, skylineMinDeg } from './siteView';
 
 export interface SiteNow {
@@ -45,6 +46,11 @@ export function createGroundUniforms() {
     uShadow: { value: new THREE.Vector2(0, 0) },
     /** Toward the Sun, for the real ground's slopes; straight down while there is no Sun. */
     uSunDir: { value: new THREE.Vector3(0, -1, 0) },
+    /** The site's surface picture and how to read it (siteSurface.ts); off for the plain ground. */
+    uSurface: { value: null as THREE.Texture | null },
+    uSurfaceOn: { value: 0 },
+    uSurfaceMean: { value: 0.5 },
+    uSurfaceHalf: { value: SURFACE_HALF_M },
   };
 }
 
@@ -59,7 +65,8 @@ export function createGroundMaterial(uniforms: GroundUniforms, shadow: boolean):
   return new THREE.ShaderMaterial({
     vertexShader: GROUND_VERTEX,
     fragmentShader: GROUND_FRAGMENT,
-    uniforms: { ...uniforms, uProject: { value: shadow ? 1 : 0 }, uDirect: { value: shadow ? 0 : 1 }, uHole: { value: 0 } },
+    // The level ground is an illustration and stays plain; a shadow takes the picture of the ground it lies on.
+    uniforms: { ...uniforms, uProject: { value: shadow ? 1 : 0 }, uDirect: { value: shadow ? 0 : 1 }, uHole: { value: 0 }, ...(shadow ? {} : { uSurfaceOn: { value: 0 } }) },
     // A shadow lies in the ground's own plane: it is drawn straight after the ground, over it, and
     // leaves the depth alone, so the hardware drawn next stands in front of it.
     depthTest: !shadow,
