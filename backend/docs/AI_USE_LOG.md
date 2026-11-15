@@ -99,6 +99,7 @@ from the branch reflog, file modification times and the clock at each step.
 | 13:30–13:38 | 15:30–15:38 | Website models, sites, catalog mapping, planner calls, ranking module, `/check` and `/evaluate` orchestration, router, `assistant_available` on `/health`; tests | 98 new tests; smoke test of all four endpoints on the synthetic engine |
 | 13:37:56 | 15:37:56 | OpenAPI regenerated | Additive only: new paths and schemas, one new `/health` field |
 | by 13:40:38 | by 15:40:39 | Ruff on the changed files, full backend and planner suites, `docs/WEBSITE_API.md` | 439 passed, 11 skipped (backend); 166 passed (planner); repo-wide Ruff count unchanged at 60 |
+| ~13:41–13:43 | ~15:41–15:43 | Controlled real-kernel check in a throwaway worktree (this branch merged with PR #14's adapter, never committed): merged-tree pytest with kernels, then all 17 presets through `/evaluate` and `/check` with `CH_PHYSICS_ENGINE=physics` | Found and fixed one bug: per-site `provenance.sources` (one terrain profile per site) made the one-engine check refuse the request; now only the engine identity is compared and sources are merged. Then 540 passed, 14 skipped (merged tree); 17 sites x 14 d in 1.6-1.75 s, 17 x 365 d in 5.2 s (laptop); 445 passed on this branch |
 
 **Not decided here (listed in `WEBSITE_API.md`):** transit time, Earth-link thresholds, ranking of
 unknown verdicts, slope source and lander slope limits, empty-payload and no-lander fit, observer

@@ -289,3 +289,46 @@ def test_the_website_request_shapes_are_accepted(client, web_types):
     }
     assert set(body) == _interface_fields(web_types, "EvaluateRequest")
     assert client.post(URL, json=body).status_code == 200
+
+
+# ---------------------------------------------------------------- provenance across sites
+
+
+def _provenance(**changes):
+    from app.models.results import DataProvenance, DataSource
+
+    base = DataProvenance(
+        source=DataSource.PHYSICS_ENGINE, is_synthetic=False, engine_name="e", engine_version="1", notice="n"
+    )
+    return base.model_copy(update=changes)
+
+
+def test_per_site_provenance_details_do_not_split_one_engine():
+    """Regression: with the real adapter each site's provenance lists its own terrain profile."""
+    from app.services.website_evaluation import merged_provenance
+
+    first, second = _provenance(notice="site one"), _provenance(notice="site two")
+    assert merged_provenance([first, second]).engine_name == "e"
+
+
+def test_per_site_sources_are_merged_in_order(monkeypatch):
+    from pydantic import create_model
+
+    from app.models.results import DataProvenance
+    from app.services.website_evaluation import merged_provenance
+
+    with_sources = create_model("WithSources", __base__=DataProvenance, sources=(list[str], []))
+    common = {"source": "physics_engine", "is_synthetic": False, "engine_name": "e", "engine_version": "1"}
+    one = with_sources(**common, notice="n", sources=["kernels", "profile a"])
+    two = with_sources(**common, notice="n", sources=["kernels", "profile b"])
+    assert merged_provenance([one, two]).sources == ["kernels", "profile a", "profile b"]
+
+
+@pytest.mark.parametrize(
+    "change", [{"engine_name": "other"}, {"engine_version": "2"}, {"is_synthetic": True}, {"source": "synthetic"}]
+)
+def test_two_engines_in_one_request_are_refused(change):
+    from app.services.website_evaluation import merged_provenance
+
+    with pytest.raises(RuntimeError, match="different engines"):
+        merged_provenance([_provenance(), _provenance(**change)])

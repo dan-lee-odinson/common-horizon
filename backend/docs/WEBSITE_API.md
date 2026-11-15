@@ -121,6 +121,14 @@ These are differences from `web/src/api/types.ts`. All other fields match it by 
 - All sites of one `/evaluate` together use at most `WEBSITE_MAX_TOTAL_SAMPLES` = 20,000 samples.
 - The step is hourly, coarsened in whole minutes only when needed. For example, 17 sites × 365 days are sampled every 26,880 s.
 - `time_step_s` and a warning say so.
+- A coarser step coarsens the darkness and crossing times by up to one step. At 26,880 s (about 7.5 h), a 354 h night reads as 358 h.
+
+**Measured with real kernels** (laptop, not Lambda; this branch merged locally with PR #14, nothing committed):
+- 17 presets × 14 days: 1.6–1.75 s;
+- 17 presets × 365 days: 5.2 s;
+- responses about 32 kB.
+
+When both branches are merged, regenerate `contract/openapi.json`; `AI_USE_LOG.md` will conflict (both append a section).
 
 ## Decisions for Dan and Isabella
 

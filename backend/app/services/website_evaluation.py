@@ -215,11 +215,24 @@ def _evaluate_site(
     return evaluation, score, decided.result
 
 
-def _provenance_of(stays: list[_SiteStay]) -> DataProvenance:
-    first = stays[0].evaluation.provenance
-    if any(stay.evaluation.provenance != first for stay in stays[1:]):  # one engine per request
+_ENGINE_IDENTITY = ("source", "is_synthetic", "engine_name", "engine_version")
+
+
+def merged_provenance(provenances: list[DataProvenance]) -> DataProvenance:
+    """One engine per request. Per-site details (an engine may list its data files, such as one terrain
+    profile per site, in an optional ``sources`` field) are merged in first-seen order, never dropped."""
+    first = provenances[0]
+    identity = [getattr(first, name) for name in _ENGINE_IDENTITY]
+    if any([getattr(p, name) for name in _ENGINE_IDENTITY] != identity for p in provenances[1:]):
         raise RuntimeError("sites of one request were evaluated by different engines")
-    return first
+    if not hasattr(first, "sources"):
+        return first
+    merged = list(dict.fromkeys(source for p in provenances for source in p.sources))
+    return first.model_copy(update={"sources": merged})
+
+
+def _provenance_of(stays: list[_SiteStay]) -> DataProvenance:
+    return merged_provenance([stay.evaluation.provenance for stay in stays])
 
 
 def evaluate_sites(request: EvaluateRequest, engine: PhysicsEngine) -> EvaluateResponse:
