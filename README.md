@@ -54,6 +54,9 @@ with how terrain close to the observer is treated. The limits are set out in
   0.006° for the Sun, which is the aberration of light, and 0.0002° for the Earth. The Sun's
   disc is 0.53° wide. The service also runs the comparison live, for any place and minute, at
   `/api/v1/horizons/compare`. See [backend/docs/HORIZONS-CHECK.md](backend/docs/HORIZONS-CHECK.md).
+- **Against NASA Moon Trek.** The engine's Sun directions are also compared with Moon Trek's Sun
+  angle service, for the same seventeen sites and hours. The largest difference is 0.0066°. See the
+  same file.
 - **Two horizon calculations.** The skyline code was written twice, separately, on different
   LOLA models. At the Shackleton Connecting Ridge the two differ by a median of 0.01°.
 - **Automated tests.** The backend's tests run before every deployment
@@ -80,7 +83,7 @@ NASA data and resources used:
 - **NAIF SPICE kernels** (<https://naif.jpl.nasa.gov/pub/naif/generic_kernels/>): every Sun and
   Earth position.
 - **NASA Moon Trek** (<https://trek.nasa.gov/moon/>): the LOLA elevation patches behind the preset
-  sites' slopes (`backend/data/site_slopes.json`).
+  sites' slopes (`backend/data/site_slopes.json`), and a second check of the engine's Sun directions.
 - **LOLA elevation models**, Lunar Reconnaissance Orbiter (<https://pgda.gsfc.nasa.gov/products/90>
   and the USGS global model): every terrain skyline.
 - **CGI Moon Kit**, NASA's Scientific Visualization Studio (<https://svs.gsfc.nasa.gov/4720>):

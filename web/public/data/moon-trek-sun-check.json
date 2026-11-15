@@ -1,0 +1,195 @@
+{
+ "format": "common-horizon/moon-trek-sun-check-summary",
+ "format_version": 1,
+ "what": "Largest angle, in degrees, between the physics engine's direction to the Sun and the direction NASA Moon Trek's Sun angle service gives, over every hour of the period.",
+ "source": "backend/data/horizon_validation/moon_trek_sun_check_2027.json",
+ "sites": {
+  "shackleton-ridge": {
+   "sun_max_angle_deg": 0.006048,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:34:39Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "nobile": {
+   "sun_max_angle_deg": 0.006025,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:35:06Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "apollo-11": {
+   "sun_max_angle_deg": 0.0064,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:34:09Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "apollo-12": {
+   "sun_max_angle_deg": 0.006555,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:35:33Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "apollo-14": {
+   "sun_max_angle_deg": 0.006536,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:36:00Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "apollo-15": {
+   "sun_max_angle_deg": 0.0064,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:36:27Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "apollo-16": {
+   "sun_max_angle_deg": 0.006421,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:36:54Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "apollo-17": {
+   "sun_max_angle_deg": 0.006338,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:37:21Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "im-1-odysseus": {
+   "sun_max_angle_deg": 0.00607,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:37:47Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "im-2-athena": {
+   "sun_max_angle_deg": 0.006025,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:38:14Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "blue-ghost-m1": {
+   "sun_max_angle_deg": 0.006276,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:38:41Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "im-3-reiner-gamma": {
+   "sun_max_angle_deg": 0.006633,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:39:08Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "blue-ghost-m2": {
+   "sun_max_angle_deg": 0.006426,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:39:35Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "blue-ghost-m3": {
+   "sun_max_angle_deg": 0.006477,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:40:03Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "draper-cp12": {
+   "sun_max_angle_deg": 0.005971,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:40:30Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "chandrayaan-3": {
+   "sun_max_angle_deg": 0.006035,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:40:57Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  },
+  "slim": {
+   "sun_max_angle_deg": 0.006382,
+   "samples": 8761,
+   "period": {
+    "start_utc": "2027-01-01T00:00Z",
+    "stop_utc": "2028-01-01T00:00Z",
+    "step_minutes": 60
+   },
+   "retrieved_utc": "2026-11-15T16:41:24Z",
+   "moon_trek_url": "https://trek.nasa.gov/getAzElfromT1"
+  }
+ }
+}
