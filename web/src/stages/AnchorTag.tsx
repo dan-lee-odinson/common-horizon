@@ -1,7 +1,7 @@
 // A floating data point: a small tag that follows a point in the 3D scene (the Sun, Earth, a mark
 // on a ring), set a short way off it. It hides whenever the point is out of view, for example while
-// the body is behind the Moon. A tag sits on the side of its point that faces the Moon (or in a
-// fixed direction), so it never reaches toward the panels at the sides of the screen.
+// the body is behind the Moon. A tag sits on the side of its point that faces the Moon (or a given
+// point, or in a fixed direction), so it never reaches toward the panels at the sides of the screen.
 
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import gsap from 'gsap';
@@ -24,8 +24,11 @@ export function AnchorTag({
   anchor: AnchorName;
   label: string;
   tone: keyof typeof COLOR;
-  /** Which way the tag sits from its point: toward the Moon's centre, or a fixed screen direction (degrees clockwise from up). */
-  toward?: 'moon' | number;
+  /**
+   * Which way the tag sits from its point: toward the Moon's centre, toward a point on screen
+   * (given by a function, read each frame), or in a fixed screen direction (degrees clockwise from up).
+   */
+  toward?: 'moon' | number | (() => { x: number; y: number });
   /** Pixels between the point's edge and the tag. */
   gap?: number;
   /** A quantity shown after the name; it is kept running like any readout. */
@@ -74,9 +77,10 @@ export function AnchorTag({
     if (++box.current.age > 20) box.current = { w: tag.offsetWidth, h: tag.offsetHeight, age: 0 };
     let ux: number;
     let uy: number;
-    if (toward === 'moon') {
-      const dx = anchors.moon.x - a.x;
-      const dy = anchors.moon.y - a.y;
+    if (toward === 'moon' || typeof toward === 'function') {
+      const to = toward === 'moon' ? anchors.moon : toward();
+      const dx = to.x - a.x;
+      const dy = to.y - a.y;
       const len = Math.hypot(dx, dy) || 1;
       ux = dx / len;
       uy = dy / len;

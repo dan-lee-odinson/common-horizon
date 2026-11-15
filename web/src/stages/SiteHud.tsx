@@ -6,16 +6,16 @@
 // mission clock, play, pause and the speed beside it. On a phone the same parts become a status card, a dock along
 // the bottom and a sheet that rises above the dock.
 //
-// One function gives the sky at the instant shown (util/quantities.ts: liveSiteQuantities), and
-// every part reads it: the readouts, the plot's Sun dot, the timeline's state and the scene. So the
-// picture and the numbers cannot disagree. Nothing here re-renders while time runs: the readouts
+// The site itself is drawn in the app's one 3D canvas, behind this HUD (src/scene/SiteWorld.tsx).
+// One function gives the sky at the instant shown (util/quantities.ts: liveSiteQuantities, over
+// skyAt), and every part reads it: the readouts, the plot's Sun dot, the timeline's state and the
+// scene. So the picture and the numbers cannot disagree. Nothing here re-renders while time runs: the readouts
 // are rewritten in place once per frame, and only when the instant has changed.
 
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import type { SiteRef } from '../api/types';
 import { AsyncView } from '../components/AsyncView';
 import { Icon } from '../components/Icon';
-import { AnchorReticle } from '../hud/AnchorReticle';
 import { Drawer } from '../hud/Drawer';
 import { Glass } from '../hud/Glass';
 import { HorizonPanel, SkyLegend, type SunMark } from '../hud/HorizonPanel';
@@ -26,15 +26,16 @@ import { StayTimeline, type StayState } from '../hud/StayTimeline';
 import { Transport } from '../hud/Transport';
 import { useTicker } from '../hud/useTicker';
 import { hideAnchors } from '../scene/anchors';
-import { siteFrame } from '../scene/siteView';
+import { siteFrame, SITE_VIEW } from '../scene/siteView';
 import { actions, appStore, simClock, SPEEDS } from '../state/app';
 import { useData } from '../state/data';
-import { primaryLanderId, useModelMetas } from '../state/models';
+import { modelShapes, primaryLanderId, useModelMetas } from '../state/models';
 import { useStore } from '../state/store';
 import { useIsPhone, useShortWindow } from '../state/useMedia';
 import { litPeriods } from '../util/horizon';
 import {
   DASH,
+  groundRingQuantities,
   hardwareQuantities,
   horizonAxisQuantities,
   liveSiteQuantities,
@@ -53,16 +54,13 @@ import { AnchorTag } from './AnchorTag';
 import { ClockPanel, EarthPanel, HardwarePanel, Inline, SunPanel } from './SitePanels';
 import { useEntrance } from './useEntrance';
 
-// The site scene as it was, behind the new HUD: replaced by the terrain inside the one canvas.
-const SiteScene = lazy(() => import('../scene/SiteScene').then((m) => ({ default: m.SiteScene })));
-
 const LEADERS: LeaderSpec[] = [
   { anchor: 'sun', to: '[data-leader-target="sun"]', color: 'var(--ch-sun)' },
   { anchor: 'earth', to: '[data-leader-target="earth"]', color: 'var(--ch-earth)' },
 ];
 
-/** What the heights in the hardware list are, and that the list stands in for a drawing of the hardware. */
-const HARDWARE_NOTE = 'Heights are those of the hardware models, in their descriptions’ own words. The hardware is listed here, not drawn in the view.';
+/** What of the hardware in the picture is true and what is an illustration. (Without 3D there is no picture: only what the heights are.) */
+const HARDWARE_NOTE = 'Drawn at true scale from its models; each height is the model’s. Where each piece stands is an illustration. An item with no model is listed, not drawn.';
 const HARDWARE_NOTE_FLAT = 'Heights are those of the hardware models, in their descriptions’ own words.';
 
 export function SiteHud({ webgl }: { webgl: boolean }) {
@@ -86,6 +84,8 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   // The hardware, and the lander that stands at the landing point (its height gives the shadow figure).
   const chosenIds = useMemo(() => hardwareChosen.map((h) => h.id), [hardwareChosen]);
   const models = useModelMetas(chosenIds);
+  // Whether each item's shape is in the 3D picture: the hardware list says so when one is not.
+  const shapes = useStore(modelShapes, (s) => s);
   const catalogItems = catalog.data?.items;
   const landerId = primaryLanderId(chosenIds);
   const landerName = landerId ? (catalogItems?.find((c) => c.id === landerId)?.name ?? landerId) : null;
@@ -135,6 +135,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   const dates = missionDates(launchUtcMs, slipDays, landingMs, landingGeometry);
   const hardware = hardwareQuantities(hardwareChosen, catalogItems ?? [], models);
   const speeds = useMemo(() => speedQuantities(SPEEDS), []);
+  const rings = useMemo(() => groundRingQuantities(SITE_VIEW.ringMinor, SITE_VIEW.ringMajor), []);
 
   // The scrub range: the planned landing (the landing itself with no delay) to the end of the stay.
   const ranged = landingMs !== null && windowStartMs !== null && windowEndMs !== null && windowEndMs > windowStartMs;
@@ -268,22 +269,16 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   );
   const clockPanel = (extra: { dense?: boolean; bare?: boolean } = {}) => <ClockPanel utc={q.utcClock} ltc={q.ltcClock} ltcOffset={q.ltcOffset} sinceLanding={q.sinceLanding} stayEnd={fixed.stayEnd} {...extra} />;
   const earthPanel = (extra: { dense?: boolean; bare?: boolean } = {}) => <EarthPanel earthAz={q.earthAz} earthEl={q.earthEl} earthWidth={q.earthWidth} earthLink={fixed.earthLink} clearSky={result.clearSky} {...extra} />;
-  const hardwarePanel = (extra: { bare?: boolean; className?: string } = {}) => <HardwarePanel rows={hardware} note={webgl ? HARDWARE_NOTE : HARDWARE_NOTE_FLAT} {...extra} />;
+  const hardwarePanel = (extra: { bare?: boolean; className?: string } = {}) => <HardwarePanel rows={hardware} note={webgl ? HARDWARE_NOTE : HARDWARE_NOTE_FLAT} shapes={webgl ? shapes : undefined} {...extra} />;
 
   const trueSize = (
     <p className="m-0 text-[13px] leading-snug text-ink-2" data-testid="true-size">
-      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. <span data-testid="site-illustration-ground">The ground is an illustration.</span>
+      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
+      <span data-testid="site-rings">
+        Range rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
+      </span>
     </p>
   );
-
-  const scene =
-    webgl && focus && landingMs !== null ? (
-      <div className="absolute inset-0">
-        <Suspense fallback={null}>
-          <SiteScene site={focus} horizon={horizonData} track={trackData} landingMs={landingMs} isPhone={isPhone} />
-        </Suspense>
-      </div>
-    ) : null;
 
   const rootProps = {
     ref: rootRef,
@@ -298,8 +293,6 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
     return (
       <div {...rootProps}>
         <h2 className="sr-only">Site: {name}</h2>
-        {scene}
-        {webgl ? <AnchorReticle anchor="lander" label="Landing point" size={56} /> : null}
 
         <div className="hud-layer" data-depth="0.5">
           <div className="flat-plane absolute left-3 right-3 top-[4.25rem] flex flex-col gap-2" data-enter="lead" data-site-zone="top">
@@ -372,13 +365,11 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   return (
     <div {...rootProps}>
       <h2 className="sr-only">Site: {name}</h2>
-      {scene}
       {webgl ? (
         <>
           <Leaders items={LEADERS} />
-          <AnchorTag anchor="sun" label="Sun" tone="sun" toward={0} gap={8} q={q.sunEl} />
-          <AnchorTag anchor="earth" label="Earth" tone="earth" toward={0} gap={8} q={q.earthEl} />
-          <AnchorReticle anchor="lander" label="Landing point" />
+          <AnchorTag anchor="sun" label="Sun" tone="sun" toward={freeCentre} gap={8} q={q.sunEl} />
+          <AnchorTag anchor="earth" label="Earth" tone="earth" toward={freeCentre} gap={8} q={q.earthEl} />
         </>
       ) : null}
 
@@ -476,6 +467,12 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       </div>
     </div>
   );
+}
+
+/** The middle of the part of the window the panels leave free: a body's tag sits on the side of the body that faces it. */
+function freeCentre(): { x: number; y: number } {
+  const f = siteFrame.get();
+  return { x: (f.left + f.right) / 2, y: (f.top + f.bottom) / 2 };
 }
 
 /** The lit word for the stage's root attribute: "true", "false" or "unknown". */

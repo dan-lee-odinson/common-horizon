@@ -203,12 +203,19 @@ export interface HardwarePanelProps {
   rows: readonly HardwareRow[];
   /** What in the picture is an illustration, in a sentence. */
   note: string;
+  /**
+   * By catalog id, whether the item's shape is in the 3D picture (see state/models.ts). An item
+   * whose shape is still loading, or could not be loaded, says so on its row.
+   */
+  shapes?: Readonly<Record<string, 'loading' | 'ready' | 'failed'>>;
   bare?: boolean;
   className?: string;
 }
 
+const SHAPE_WORDS = { loading: 'Loading its shape…', failed: 'Not drawn: its shape could not be loaded.' } as const;
+
 /** The mission's hardware: how many of each, how tall each model is and how well founded that size is. */
-export function HardwarePanel({ rows, note, bare = false, className = '' }: HardwarePanelProps) {
+export function HardwarePanel({ rows, note, shapes, bare = false, className = '' }: HardwarePanelProps) {
   return (
     <Shell bare={bare} label="Hardware" testId="hardware-panel" className={`min-h-0 ${className}`}>
       <h3 className="panel-title m-0">Hardware</h3>
@@ -230,6 +237,12 @@ export function HardwarePanel({ rows, note, bare = false, className = '' }: Hard
               </div>
               {/* In a short window the list keeps to one line an item, so the whole mission stays in view. */}
               {row.status ? <span className={`text-[12px] leading-tight text-muted ${bare ? '' : 'short:hidden'}`}>{row.status}</span> : null}
+              {/* Said in every window: the list names something the picture does not (yet) show. */}
+              {shapes && (shapes[row.id] === 'loading' || shapes[row.id] === 'failed') ? (
+                <span className="text-[12px] leading-tight text-ink-2" role="status" data-testid="hardware-shape">
+                  {SHAPE_WORDS[shapes[row.id] as 'loading' | 'failed']}
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>

@@ -12,6 +12,7 @@
 
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { HorizonResponse } from '../api/types';
+import { sampleProfile } from '../util/geo';
 import { naturalElRange } from '../util/horizon';
 import { axisCenter, azFraction, azTickValues, boxRects, compassLetters, elScale, elTickValues, skylinePaths, sunRuns, type ElScale, type PlotBox } from '../util/horizonPlot';
 import { horizonAxisQuantities } from '../util/quantities';
@@ -133,6 +134,8 @@ export function HorizonPanel({ data, fromMs, toMs, elRange = null, label, getSun
             sunEl.dataset.below = String(p.below);
             sunEl.dataset.az = sun.azText ?? '';
             sunEl.dataset.el = sun.elText ?? '';
+            // Where the dot stands against the plotted skyline: the 3D scene can be checked against it.
+            sunEl.dataset.above = String(sun.el > sampleProfile(data.skyline, sun.az));
           }
         }
       }
@@ -145,6 +148,8 @@ export function HorizonPanel({ data, fromMs, toMs, elRange = null, label, getSun
         const key = p && !p.below ? `${p.x.toFixed(1)},${p.y.toFixed(1)}` : 'none';
         if (key !== written.current.earth) {
           written.current.earth = key;
+          if (ok) earthEl.dataset.above = String(earth.el > sampleProfile(data.skyline, earth.az));
+          else delete earthEl.dataset.above;
           earthEl.dataset.state = key === 'none' ? 'none' : 'shown';
           earthEl.style.opacity = key === 'none' ? '0' : '1';
           if (p && key !== 'none') earthEl.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, 0)`;

@@ -25,6 +25,9 @@ export const ORBIT_VIEW = {
   swayPeriod: 26,
 } as const;
 
+/** Nearest and farthest things the camera draws in the Moon stages, in Moon radii. (The site stage, in metres, sets its own.) */
+export const MOON_CLIP = { near: 0.05, far: 400 } as const;
+
 /** Radii in Moon radii: longitude scale, Sun ring, ring of days, Earth's bracket. */
 export function ringRadii(isPhone: boolean): [number, number, number, number] {
   const k = isPhone ? 0.92 : 1;

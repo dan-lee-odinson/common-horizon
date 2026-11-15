@@ -5,7 +5,20 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import { cssColor } from './colors';
 
-export function Stars({ radius = 90, count = 1100, upperOnly = false }: { radius?: number; count?: number; upperOnly?: boolean }) {
+export function Stars({
+  radius = 90,
+  count = 1100,
+  upperOnly = false,
+  renderOrder = 0,
+  visible = true,
+}: {
+  radius?: number;
+  count?: number;
+  upperOnly?: boolean;
+  /** Where the stars fall in the drawing order (the site's sky draws its parts in a fixed order). */
+  renderOrder?: number;
+  visible?: boolean;
+}) {
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
@@ -27,7 +40,7 @@ export function Stars({ radius = 90, count = 1100, upperOnly = false }: { radius
     return g;
   }, [radius, count, upperOnly]);
   return (
-    <points geometry={geometry} frustumCulled={false}>
+    <points geometry={geometry} frustumCulled={false} renderOrder={renderOrder} visible={visible}>
       {/* Fixed pixel size: the stars look the same however far the camera is. */}
       <pointsMaterial vertexColors size={1.7} sizeAttenuation={false} transparent opacity={0.9} depthWrite={false} toneMapped={false} />
     </points>

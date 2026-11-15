@@ -6,20 +6,22 @@
 //   mission  close to the Moon, turned to the site in the spotlight, the Moon set off-centre and
 //            the picture shifted so the site's marker and tag stay clear of the glass panels (see
 //            missionView.ts); the visitor can turn and zoom the Moon
-//   site     the dive to the site ("in"), and the climb back out ("out")
+//   site     the dive to the site ("in"), and the climb back out ("out"). At the site itself the
+//            camera belongs to the site's own rig (SiteRig.tsx), in a world measured in metres;
+//            on the way back this director takes it up again from low over the site
 // Visitors who prefer reduced motion get cuts instead of flights, and no sway or lean.
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import gsap from 'gsap';
 import * as THREE from 'three';
-import { actions, appStore, clamp } from '../state/app';
+import { actions, appStore, clamp, type Stage } from '../state/app';
 import { useStore } from '../state/store';
 import { normalizeLon360 } from '../util/geo';
 import { DAY_MS, SYNODIC_MONTH_DAYS } from '../util/time';
 import { earthSwing } from '../util/track';
 import { missionCameraLatitude, missionDistance as missionDistanceFor, missionFrame, placeInFrame } from './missionView';
-import { ORBIT_VIEW, orbitCameraLongitude, orbitDistance, orbitEarthSide } from './orbitView';
+import { MOON_CLIP, ORBIT_VIEW, orbitCameraLongitude, orbitDistance, orbitEarthSide } from './orbitView';
 import { geometryNow, toVector, type SceneData } from './sceneData';
 
 /** The parts of OrbitControls the director uses. */
@@ -81,6 +83,8 @@ export function CameraDirector({ data }: { data: SceneData }) {
   const first = useRef(true);
   /** The stage the camera was last sent to. */
   const arrivedAt = useRef<'orbit' | 'mission' | null>(null);
+  /** The stage this director last saw: coming back from the site, the camera is still in the site's world. */
+  const lastStage = useRef<Stage>(stage);
   /** True while the camera rests in its Orbit pose (and sways and leans there). */
   const holding = useRef(false);
   /** Degrees added to the Orbit pose: the slow sway, and the lean toward the pointer. */
@@ -180,21 +184,29 @@ export function CameraDirector({ data }: { data: SceneData }) {
 
   // Orbit <-> mission select, turning to a newly chosen site, and the climb back out of a site.
   useEffect(() => {
-    if (stage === 'site' || !controls) return;
+    if (stage === 'site') {
+      lastStage.current = 'site';
+      return;
+    }
+    if (!controls) return;
     if (appStore.get().flight === 'in') return;
+    const fromSite = lastStage.current === 'site';
+    lastStage.current = stage;
     const flyingOut = appStore.get().flight === 'out';
-    if (flyingOut && focusLat !== null && focusLon !== null) {
-      // Back from the terrain: start low over the site, the reverse of the dive.
-      const end = diveEnd(focusLat, focusLon);
-      camera.position.copy(end.position);
-      lookAt.current.copy(end.target);
+    // Back from the terrain, to mission select or straight to Orbit: the camera is still where the
+    // site left it, in metres. It starts again low over the site, the reverse of the dive.
+    const reseat = fromSite || flyingOut;
+    const over = reseat && focusLat !== null && focusLon !== null ? diveEnd(focusLat, focusLon) : null;
+    if (over) {
+      camera.position.copy(over.position);
+      lookAt.current.copy(over.target);
       view.current = { shiftX: 0, shiftY: 0, roll: 0 };
     }
     const target = stage;
     // In Orbit the pose depends on where Earth is. When that changes without a change of stage
     // (the data arriving at start-up, a resize), the camera is placed at once: it never swings
-    // Earth across the panels on its way.
-    const settle = target === 'orbit' && arrivedAt.current === 'orbit';
+    // Earth across the panels on its way. With no site to climb away from, it is placed at once too.
+    const settle = (target === 'orbit' && arrivedAt.current === 'orbit') || (fromSite && !over);
     arrivedAt.current = target;
     flyTo(poseFor(target), settle ? 0 : flyingOut ? 1.5 : target === 'mission' ? 1.15 : 1.0, flyingOut ? 'power2.inOut' : 'power3.inOut', () => {
       if (target === 'orbit') holding.current = true;
@@ -202,6 +214,9 @@ export function CameraDirector({ data }: { data: SceneData }) {
       if (flyingOut) actions.finishFlightOut();
     });
     return () => {
+      // A dive to the site that is under way is not this effect's to stop: a resize during the dive
+      // would otherwise leave the camera hanging until the flight's time limit.
+      if (appStore.get().flight === 'in') return;
       tween.current?.kill();
       flightTo.current = null;
       holding.current = false;
@@ -270,9 +285,16 @@ export function CameraDirector({ data }: { data: SceneData }) {
   // Every frame: place (in Orbit), aim, roll and shift the picture.
   const applied = useRef({ shiftX: NaN, shiftY: NaN, w: 0, h: 0 });
   useFrame(() => {
-    if (appStore.get().stage === 'site') return;
-    if (camera.fov !== ORBIT_VIEW.fov) {
+    if (appStore.get().stage === 'site') {
+      // The site has its own picture shift: the Moon's is written afresh on the way back.
+      applied.current.shiftX = NaN;
+      return;
+    }
+    // The site stage uses a wider view and clip planes in metres: the Moon's are put back.
+    if (camera.fov !== ORBIT_VIEW.fov || camera.near !== MOON_CLIP.near || camera.far !== MOON_CLIP.far) {
       camera.fov = ORBIT_VIEW.fov;
+      camera.near = MOON_CLIP.near;
+      camera.far = MOON_CLIP.far;
       camera.updateProjectionMatrix();
     }
     if (holding.current) orbitPosition(camera.position);

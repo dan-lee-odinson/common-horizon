@@ -3,11 +3,13 @@ import { useParallax } from './hud/parallax';
 import { MoonFallback } from './scene/MoonFallback';
 import { hasWebGL } from './scene/webgl';
 import { AssistantSheet } from './stages/Assistant';
+import { LanderReticle } from './stages/LanderReticle';
 import { LandingCard } from './stages/LandingCard';
 import { MissionHud } from './stages/MissionHud';
 import { OrbitHud } from './stages/OrbitHud';
 import { OrbitPreview, SitePlayback } from './stages/Playback';
 import { SiteHud } from './stages/SiteHud';
+import { SiteVeil } from './stages/SiteVeil';
 import { TopBar } from './stages/TopBar';
 import { actions, appStore } from './state/app';
 import { DataProvider, useData } from './state/data';
@@ -65,7 +67,10 @@ function Shell() {
       ) : (
         noScene
       )}
+      {webgl ? <SiteVeil /> : null}
       <div ref={hudRef} className="hud" inert={cardOpen}>
+        {/* Under every panel: the reticle that rides the landing point from the Moon down to the site. */}
+        {webgl ? <LanderReticle /> : null}
         <TopBar />
         {stage === 'orbit' ? <OrbitHud revealed={revealed} /> : null}
         {stage === 'mission' ? <MissionHud /> : null}

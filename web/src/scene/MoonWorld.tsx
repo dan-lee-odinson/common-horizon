@@ -6,7 +6,8 @@
 //   The Sun rides its ring at the longitude where it is overhead. Earth is a distant, larger body
 //   out along its true direction, joined to its bracket by a line. Sizes and distances are NOT to
 //   scale. Earth is never drawn between the camera and the Moon.
-//   Site markers, and a pulsing reticle on the site in the spotlight.
+//   Site markers, and a pulsing reticle on the site in the spotlight. (Both fade out as the camera
+//   dives to a site: the HUD's own reticle carries the landing point from there.)
 
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
@@ -282,14 +283,40 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
 
 function SiteMarkers({ data }: { data: SceneData }) {
   const stage = useStore(appStore, (s) => s.stage);
-  const interactive = stage === 'mission';
+  const diving = useStore(appStore, (s) => s.flight === 'in');
+  // During the dive to a site the markers cannot be picked: they are on their way out.
+  const interactive = stage === 'mission' && !diving;
   const colors = useMemo(() => ({ base: color('--ch-marker'), saved: color('--ch-marker-saved'), active: color('--ch-marker-active') }), []);
+
+  // The markers and the reticle are sized for the whole Moon. Near the end of the dive a marker
+  // would be a quarter of the picture across, so they fade out as the dive begins (the HUD's own
+  // reticle keeps the landing point marked) and come back with the Moon.
+  const group = useRef<THREE.Group>(null);
+  const fade = useRef({ k: diving ? 0 : 1, applied: 1 });
+  useEffect(() => {
+    const tween = gsap.to(fade.current, { k: diving ? 0 : 1, duration: data.reducedMotion ? 0 : 0.4, ease: 'power2.out' });
+    return () => {
+      tween.kill();
+    };
+  }, [diving, data.reducedMotion]);
+  useFrame(() => {
+    const f = fade.current;
+    if (f.k === 1 && f.applied === 1) return;
+    f.applied = f.k;
+    group.current?.traverse((node) => {
+      const base = node.userData.markerOpacity as number | undefined;
+      if (base === undefined) return;
+      ((node as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = base * f.k;
+    });
+  });
+
   return (
-    <group>
+    <group ref={group}>
       {data.sites.map((site) => {
         const active = site.id === data.focus?.id;
         const pos = toVector(site.lat, site.lon_east, MISSION_VIEW.markerRadius);
         const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), pos.clone().normalize());
+        const opacity = stage === 'orbit' && !active ? 0.55 : 1;
         return (
           <group key={site.id} position={pos} quaternion={quaternion}>
             {interactive ? (
@@ -312,11 +339,11 @@ function SiteMarkers({ data }: { data: SceneData }) {
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
             ) : null}
-            <mesh>
+            <mesh userData={{ markerOpacity: opacity }}>
               <circleGeometry args={[active ? 0.012 : 0.009, 20]} />
-              <meshBasicMaterial color={active ? colors.active : data.savedIds.has(site.id) ? colors.saved : colors.base} toneMapped={false} transparent opacity={stage === 'orbit' && !active ? 0.55 : 1} />
+              <meshBasicMaterial color={active ? colors.active : data.savedIds.has(site.id) ? colors.saved : colors.base} toneMapped={false} transparent opacity={opacity * fade.current.k} />
             </mesh>
-            {active ? <SiteReticle color={colors.active} pulsing={stage === 'mission' && !data.reducedMotion} size={stage === 'orbit' ? 0.2 : MISSION_VIEW.reticleSize} /> : null}
+            {active ? <SiteReticle color={colors.active} pulsing={stage === 'mission' && !data.reducedMotion} size={stage === 'orbit' ? 0.2 : MISSION_VIEW.reticleSize} fade={fade} /> : null}
           </group>
         );
       })}
@@ -325,12 +352,15 @@ function SiteMarkers({ data }: { data: SceneData }) {
 }
 
 /** The reticle on the spotlight site: drawn flat on the surface, with one ring pulsing outward. */
-function SiteReticle({ color: c, pulsing, size }: { color: THREE.Color; pulsing: boolean; size: number }) {
+function SiteReticle({ color: c, pulsing, size, fade }: { color: THREE.Color; pulsing: boolean; size: number; fade: RefObject<{ k: number }> }) {
   const material = useRef<THREE.ShaderMaterial>(null);
   const uniforms = useMemo(() => ({ uColor: { value: c }, uPulse: { value: -1 }, uOpacity: { value: 1 } }), [c]);
   const started = useMemo(() => performance.now(), []);
   useFrame(() => {
-    if (material.current) material.current.uniforms.uPulse.value = pulsing ? ((performance.now() - started) / 2400) % 1 : -1;
+    if (!material.current) return;
+    material.current.uniforms.uPulse.value = pulsing ? ((performance.now() - started) / 2400) % 1 : -1;
+    // Fades with the markers as the camera dives to the site.
+    material.current.uniforms.uOpacity.value = fade.current.k;
   });
   return (
     <mesh position={[0, 0, 0.002]} renderOrder={3}>

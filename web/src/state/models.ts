@@ -9,6 +9,7 @@
 // (the rover, or anything a backend adds later) is listed as "no model" and never drawn.
 
 import { useEffect, useState } from 'react';
+import { createStore } from './store';
 
 /** Catalog id -> model file name (without extension). */
 export const MODEL_FOR: Readonly<Record<string, string>> = {
@@ -93,11 +94,6 @@ export function loadModelMeta(modelId: string): Promise<ModelMeta | null> {
   return hit;
 }
 
-/** For tests: forget every description read so far. */
-export function clearModelCache(): void {
-  cache.clear();
-}
-
 /**
  * Model descriptions for a set of catalog items, by catalog id:
  *   undefined  still loading
@@ -126,3 +122,11 @@ export function useModelMetas(catalogIds: readonly string[]): ModelMetas {
   }, [key]);
   return metas;
 }
+
+/**
+ * Whether each chosen item's shape is in the 3D scene, by catalog id: being loaded, drawn, or not
+ * drawn because its file could not be loaded or did not match its description. The scene writes
+ * it; the hardware list reads it, so the list says so when something it names is not in the picture.
+ */
+export type ShapeState = 'loading' | 'ready' | 'failed';
+export const modelShapes = createStore<Readonly<Record<string, ShapeState>>>({});

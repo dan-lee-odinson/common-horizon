@@ -127,7 +127,10 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
   });
   await enterMission(page);
   const name = (await page.getByTestId('spotlight-name').textContent())!;
+  // One 3D space throughout: the same single canvas before the dive and at the site.
+  await expect(page.locator('canvas')).toHaveCount(1);
   await zoomIn(page);
+  await expect(page.locator('canvas')).toHaveCount(1);
   await expect(page.getByTestId('scene-title')).toHaveText(name);
   await expect(page.getByTestId('site-rank')).toContainText('Rank');
 
