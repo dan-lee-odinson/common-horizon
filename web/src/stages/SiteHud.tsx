@@ -29,7 +29,7 @@ import { hideAnchors } from '../scene/anchors';
 import { lookAtBody, lookAtLander, siteFrame, SITE_VIEW } from '../scene/siteView';
 import { actions, appStore, simClock, SPEEDS } from '../state/app';
 import { slopeContext, useData } from '../state/data';
-import { modelShapes, primaryLanderId, useModelMetas } from '../state/models';
+import { drawnAsPartOf, modelShapes, primaryLanderId, useModelMetas } from '../state/models';
 import { createStore, useStore } from '../state/store';
 import { useIsPhone, useShortWindow } from '../state/useMedia';
 import { litPeriods } from '../util/horizon';
@@ -155,7 +155,12 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   const fixed = siteStageQuantities({ site, landingMs, plannedLandingMs, stayEndMs: windowEndMs, stayDays, evaluation: focusRow?.evaluation ?? null, check: focusCheck });
   const result = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck, slopeContext(focus, d.landerSlopeLimitDeg));
   const dates = missionDates(launchUtcMs, slipDays, landingMs, landingGeometry);
-  const hardware = hardwareQuantities(hardwareChosen, catalogItems ?? [], models);
+  // The habitat's power loads are its own draw, not a second object: no row of their own while it is chosen.
+  const hardware = hardwareQuantities(
+    hardwareChosen.filter((h) => !drawnAsPartOf(h.id, hardwareChosen.map((c) => c.id))),
+    catalogItems ?? [],
+    models,
+  );
   const speeds = useMemo(() => speedQuantities(SPEEDS), []);
   const rings = useMemo(() => groundRingQuantities(SITE_VIEW.ringMinor, SITE_VIEW.ringMajor), []);
 

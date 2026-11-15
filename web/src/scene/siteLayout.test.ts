@@ -36,11 +36,15 @@ describe('where the hardware stands', () => {
     const layout = siteLayout(EXAMPLE, METAS);
     expect(layout.primaryLanderId).toBe('starship_hls');
     expect(layout.heightM).toBe(52);
-    expect(layout.noModel).toEqual(['hab_crewed']);
+    // The crewed habitat's power load is the habitat's own draw: no marker of its own.
+    expect(layout.noModel).toEqual([]);
     const of = (id: string) => layout.items.filter((i) => i.id === id);
     expect(of('starship_hls')).toHaveLength(1);
     expect(of('starship_hls')[0]).toMatchObject({ x: 0, z: 0, rotY: 0, height: 52, halfX: 4.5, halfZ: 4.5, modelId: 'starship-lander' });
-    // 40 m east; turned a quarter, so its footprint's sides swap (it is round, so they are equal).
+    // 40 m east; turned a quarter, so its footprint's sides swap.
+    expect(of('surface_habitat')[0].modelId).toBe('hab-module');
+    expect(of('surface_habitat')[0].halfX).toBeCloseTo(4.07 / 2, 9);
+    expect(of('surface_habitat')[0].halfZ).toBeCloseTo(7.551 / 2, 9);
     expect(of('surface_habitat')[0].x).toBeCloseTo(40, 9);
     expect(of('surface_habitat')[0].z).toBeCloseTo(0, 9);
     expect(Math.abs(of('surface_habitat')[0].rotY)).toBeCloseTo(Math.PI / 2, 12);
@@ -64,7 +68,7 @@ describe('where the hardware stands', () => {
     expect(count('jaxa_pressurized_rover')).toBe(1);
     expect(count('science_rover_recharge')).toBe(1);
     expect(count('hab_crewed')).toBe(0);
-    expect(layout.noModel).toEqual(['hab_crewed']);
+    expect(layout.noModel).toEqual([]);
     expect(new Set(layout.items.map((i) => i.key)).size).toBe(layout.items.length);
     // With both landers the Starship lander takes the landing point and the Griffin lander stands off.
     expect(layout.primaryLanderId).toBe('starship_hls');
@@ -121,7 +125,6 @@ describe('where the hardware stands', () => {
     expect(layout.markers.map((m) => [m.id, m.count])).toEqual([
       ['blue_moon_mk1', 1],
       ['comms_relay', 2],
-      ['hab_crewed', 1],
       ['keep_alive_heat', 1],
     ]);
     for (const m of layout.markers) {
@@ -144,10 +147,10 @@ describe('where the hardware stands', () => {
   it('leaves out an item whose description is still being read, and lists one that has none or an unknown one', () => {
     const loading = siteLayout(EXAMPLE, { ...METAS, starship_hls: undefined });
     expect(loading.items.some((i) => i.id === 'starship_hls')).toBe(false);
-    expect(loading.noModel).toEqual(['hab_crewed']);
+    expect(loading.noModel).toEqual([]);
     const failed = siteLayout(EXAMPLE, { ...METAS, starship_hls: null });
     expect(failed.items.some((i) => i.id === 'starship_hls')).toBe(false);
-    expect(failed.noModel).toEqual(['hab_crewed', 'starship_hls']);
+    expect(failed.noModel).toEqual(['starship_hls']);
     const unknown = siteLayout([{ id: 'drill', count: 2 }], {});
     expect(unknown.items).toEqual([]);
     expect(unknown.noModel).toEqual(['drill']);
@@ -197,5 +200,39 @@ describe('a body of the sky behind the hardware', () => {
     // The habitat stands 40 m east: from further east, level with it, it hides what lies due west.
     expect(hiddenByHardware({ x: 80, y: 4, z: 0 }, unit(270, 0), items)).toBe(true);
     expect(hiddenByHardware({ x: 80, y: 4, z: 0 }, unit(270, 0), [])).toBe(false);
+  });
+});
+
+describe('mission 1', () => {
+  // Starship HLS, the Surface Habitat, the 40 kWe fission unit and one solar array mast.
+  const MISSION_1 = [
+    { id: 'starship_hls', count: 1 },
+    { id: 'surface_habitat', count: 1 },
+    { id: 'fsp_40kwe', count: 1 },
+    { id: 'vsat', count: 1 },
+  ];
+
+  it('stands every piece apart by its footprint, the fission unit\u2019s radiator 13.5 m across', () => {
+    const layout = siteLayout(MISSION_1, METAS);
+    expect(layout.items.map((i) => i.id).sort()).toEqual(['fsp_40kwe', 'starship_hls', 'surface_habitat', 'vsat']);
+    const fission = layout.items.find((i) => i.id === 'fsp_40kwe')!;
+    expect(fission.modelId).toBe('fission-surface-power');
+    expect(2 * fission.halfX).toBeCloseTo(13.47, 2);
+    expect(2 * fission.halfZ).toBeCloseTo(13.5, 2);
+    for (let i = 0; i < layout.items.length; i++) {
+      for (let j = i + 1; j < layout.items.length; j++) {
+        const a = layout.items[i];
+        const b = layout.items[j];
+        expect(footprintGap(a, b), `${a.key} and ${b.key}`).toBeGreaterThanOrEqual(5);
+      }
+    }
+  });
+
+  it('with the habitat chosen, its power loads get no marker; without it they do', () => {
+    const withHabitat = siteLayout([...MISSION_1, { id: 'fission_40kwe', count: 1 }, { id: 'hab_crewed', count: 1 }, { id: 'hab_uncrewed', count: 1 }], METAS);
+    expect(withHabitat.markers).toEqual([]);
+    expect(withHabitat.noModel).toEqual([]);
+    const without = siteLayout([{ id: 'starship_hls', count: 1 }, { id: 'hab_crewed', count: 1 }], METAS);
+    expect(without.noModel).toEqual(['hab_crewed']);
   });
 });

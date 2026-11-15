@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import catalogJson from '../api/examples/catalog.json';
-import { MODEL_FOR, modelFor, modelUrl, parseModelMeta, primaryLanderId } from './models';
+import { drawnAsPartOf, MODEL_FOR, modelFor, modelUrl, parseModelMeta, primaryLanderId } from './models';
 
 function file(modelId: string): unknown {
   return JSON.parse(readFileSync(fileURLToPath(new URL(`../../public/${modelUrl(modelId, 'json')}`, import.meta.url)), 'utf8'));
@@ -16,8 +16,8 @@ describe('catalog items and their models', () => {
       starship_hls: 'starship-lander',
       griffin: 'griffin-lander',
       blue_moon_mk1: 'blue-moon-mk1',
-      surface_habitat: 'habitat-unit',
-      fsp_40kwe: 'fission-power-unit',
+      surface_habitat: 'hab-module',
+      fsp_40kwe: 'fission-surface-power',
       vsat: 'solar-array-mast',
       astrolab_clv1: 'crew-rover',
       jaxa_pressurized_rover: 'pressurized-rover',
@@ -88,5 +88,25 @@ describe('reading a model description', () => {
     expect(parseModelMeta({ ...good, dimensions_m: { width_x: 9, height_y: Number.NaN, depth_z: 9 } }, 'starship-lander')).toBeNull();
     expect(parseModelMeta(null, 'starship-lander')).toBeNull();
     expect(parseModelMeta('starship-lander', 'starship-lander')).toBeNull();
+  });
+});
+
+describe('power rows that are another item\u2019s own draw', () => {
+  it('are the Surface Habitat\u2019s while it is chosen, and stand alone without it', () => {
+    expect(drawnAsPartOf('hab_crewed', ['surface_habitat', 'hab_crewed'])).toBe(true);
+    expect(drawnAsPartOf('hab_uncrewed', ['hab_uncrewed', 'surface_habitat'])).toBe(true);
+    expect(drawnAsPartOf('hab_crewed', ['hab_crewed', 'starship_hls'])).toBe(false);
+    expect(drawnAsPartOf('surface_habitat', ['surface_habitat'])).toBe(false);
+    expect(drawnAsPartOf('toString', ['surface_habitat'])).toBe(false);
+    // The fission unit's power row is ticked with it (LINKED_HARDWARE): the same reactor.
+    expect(drawnAsPartOf('fission_40kwe', ['fsp_40kwe', 'fission_40kwe'])).toBe(true);
+    expect(drawnAsPartOf('fission_40kwe', ['fission_40kwe'])).toBe(false);
+  });
+
+  it('the two new models read the status words of an estimate', () => {
+    for (const id of ['hab-module', 'fission-surface-power']) {
+      const meta = parseModelMeta(JSON.parse(readFileSync(fileURLToPath(new URL(`../../public/${modelUrl(id, 'json')}`, import.meta.url)), 'utf8')), id)!;
+      expect(meta.status, id).toBe('our estimate, to be replaced by a published figure');
+    }
   });
 });

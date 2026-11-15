@@ -10,7 +10,7 @@
 // is the point (d sin b, -d cos b).
 
 import type { HardwareChoice } from '../api/types';
-import { isLanderModel, LANDER_MODELS, modelFor, primaryLanderId } from '../state/models';
+import { drawnAsPartOf, isLanderModel, LANDER_MODELS, modelFor, primaryLanderId } from '../state/models';
 import { DEG } from '../util/geo';
 
 /** What the layout needs of a model's description (see state/models.ts). */
@@ -93,9 +93,9 @@ const LANDER_SLOTS = {
 /** Places by model (see state/models.ts for which catalog item has which model). */
 const SLOTS: Readonly<Record<string, Slot | undefined>> = {
   // The habitat stands east of the lander, turned a quarter so its hatch faces it.
-  'habitat-unit': { bearingDeg: 90, distance: 40, quarterTurns: -1, pitch: 0 },
+  'hab-module': { bearingDeg: 90, distance: 40, quarterTurns: -1, pitch: 0 },
   // The fission unit stands well away to the north-west.
-  'fission-power-unit': { bearingDeg: 300, distance: 120, quarterTurns: 0, pitch: 0 },
+  'fission-surface-power': { bearingDeg: 300, distance: 120, quarterTurns: 0, pitch: 0 },
   // Solar masts stand in a row north of the lander, nine metres apart.
   'solar-array-mast': { bearingDeg: 0, distance: 45, quarterTurns: 0, pitch: 9 },
   // The rovers park round the lander: the crew rovers in a row to the south-south-west, the
@@ -154,7 +154,11 @@ export function siteLayout(choices: readonly HardwareChoice[], models: Readonly<
     const m = Object.hasOwn(models, id) ? models[id] : undefined;
     return m ?? null;
   };
-  const counted = choices.filter((c) => Number.isFinite(c.count) && c.count >= 1).map((c) => ({ id: c.id, count: Math.floor(c.count) }));
+  const chosenIds = choices.map((c) => c.id);
+  // A power row that is another chosen item's own draw (the habitat's loads) is not a second object.
+  const counted = choices
+    .filter((c) => Number.isFinite(c.count) && c.count >= 1 && !drawnAsPartOf(c.id, chosenIds))
+    .map((c) => ({ id: c.id, count: Math.floor(c.count) }));
   const primary = primaryLanderId(counted.filter((c) => known(c.id) !== null).map((c) => c.id));
   // The other kinds of lander, in the order of LANDER_MODELS: the first stands to the south-west, the next to the south-east.
   const rank = (id: string) => LANDER_MODELS.indexOf(modelFor(id) ?? '');

@@ -206,10 +206,12 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
   await expect(rings.locator('[data-q="ground_ring_minor"]')).toHaveText(/^10\s?m$/);
   await expect(rings.locator('[data-q="ground_ring_major"]')).toHaveText(/^100\s?m$/);
 
-  // The hardware of the example mission, with each model's height (the crewed habitat's power load has no model).
-  await expect(page.getByTestId('hardware-row')).toHaveCount(4);
+  // The hardware of the example mission, with each model's height. The crewed habitat's power load
+  // is the Surface Habitat's own draw: it has no row (and no marker) of its own.
+  await expect(page.getByTestId('hardware-row')).toHaveCount(3);
   await expect.poll(() => readout(page, 'hw_height:starship_hls')).toBe('52');
-  expect(await readout(page, 'hw_height:hab_crewed')).toBe('no model');
+  await expect(page.locator('[data-testid="hardware-row"][data-item="hab_crewed"]')).toHaveCount(0);
+  await expect(page.getByTestId('site-marker')).toHaveCount(0);
   expect(await readout(page, 'hw_count:vsat')).toBe('× 4');
   // It is drawn at true scale, and its place is said to be an illustration. Every shape has loaded:
   // no row says its item is missing from the picture.
@@ -1100,4 +1102,53 @@ test('site surface: when the picture cannot be loaded, the ground stays plain gr
   await expect(world).toHaveAttribute('data-site-surface', 'plain');
   await expect(page.getByTestId('site-ground-source')).toBeVisible();
   await expect(page.getByTestId('site-ground-surface')).toHaveCount(0);
+});
+
+// ---------- mission 1's hardware ----------
+
+/** Choose exactly these items, with these counts, in the mission planner. */
+async function chooseMission(page: Page, want: Readonly<Record<string, number>>) {
+  await page.getByTestId('edit-mission').click();
+  const planner = page.getByTestId('planner');
+  await expect(planner).toBeVisible();
+  const rows = await planner.getByTestId('hardware-row').all();
+  // Untick everything else first, then tick the wanted rows (a linked partner follows its row).
+  for (const row of rows) {
+    const box = row.locator('input[type="checkbox"]');
+    if (!Object.hasOwn(want, (await row.getAttribute('data-id'))!) && (await box.isChecked())) await box.setChecked(false, { force: true });
+  }
+  for (const row of rows) {
+    const id = (await row.getAttribute('data-id'))!;
+    if (!Object.hasOwn(want, id)) continue;
+    const box = row.locator('input[type="checkbox"]');
+    if (!(await box.isChecked())) await box.setChecked(true, { force: true });
+    const count = row.getByTestId('hardware-count');
+    if ((await count.count()) === 0) continue;
+    while (Number(await count.textContent()) > want[id]) await row.getByRole('button', { name: /^Fewer / }).click();
+  }
+  await page.keyboard.press('Escape');
+}
+
+test('site models: mission 1 at Shackleton ridge draws the habitation module and the fission unit, each with its height and status', async ({ page }) => {
+  await enterMission(page);
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  // The fission unit's power row is ticked with it (the planner links the two).
+  await chooseMission(page, { starship_hls: 1, surface_habitat: 1, fsp_40kwe: 1, fission_40kwe: 1, vsat: 1 });
+  await spotlight(page, 'Shackleton Connecting Ridge');
+  await zoomIn(page);
+  await expect(page.getByTestId('world')).toHaveAttribute('data-site-skyline', /view/);
+  // Heights and status words from each model's own description.
+  await expect.poll(() => readout(page, 'hw_height:surface_habitat')).toBe('4');
+  await expect.poll(() => readout(page, 'hw_height:fsp_40kwe')).toBe('6');
+  for (const id of ['surface_habitat', 'fsp_40kwe']) {
+    await expect(page.locator(`[data-testid="hardware-row"][data-item="${id}"]`)).toContainText('our estimate, to be replaced by a published figure');
+  }
+  // Every shape has loaded: no row says its item is loading or missing from the picture.
+  await expect(page.getByTestId('hardware-shape')).toHaveCount(0);
+  // The habitat's power loads and the reactor's power row are their own items' draw and output:
+  // no row and no marker of their own.
+  await expect(page.locator('[data-testid="hardware-row"][data-item^="hab_"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="hardware-row"][data-item="fission_40kwe"]')).toHaveCount(0);
+  await expect(page.getByTestId('hardware-row')).toHaveCount(4);
+  await expect(page.getByTestId('site-marker')).toHaveCount(0);
 });
