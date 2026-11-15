@@ -16,11 +16,25 @@ def test_generated_schema_is_valid_openapi(app):
 def test_schema_exposes_contract_endpoints_and_models(client):
     schema = client.get("/openapi.json").json()
 
-    assert set(schema["paths"]) == {"/health", "/api/v1/missions/evaluate"}
+    assert set(schema["paths"]) == {
+        "/health", "/api/v1/missions/evaluate", "/sites", "/catalog", "/check", "/evaluate", "/horizon"
+    }
+    for path in ("/check", "/evaluate"):
+        assert {"200", "422", "502", "503"} <= set(schema["paths"][path]["post"]["responses"])
     evaluate = schema["paths"]["/api/v1/missions/evaluate"]["post"]
     assert {"200", "422", "502", "503"} <= set(evaluate["responses"])
     components = schema["components"]["schemas"]
-    for name in ("LandingSite", "HardwareRequirements", "MissionEvaluation", "Timeseries", "ObstructionState"):
+    for name in (
+        "LandingSite",
+        "HardwareRequirements",
+        "MissionEvaluation",
+        "Timeseries",
+        "ObstructionState",
+        "SiteListResponse",
+        "CatalogResponse",
+        "CheckResponse",
+        "EvaluateResponse",
+    ):
         assert name in components
 
 

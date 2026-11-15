@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, missions
+from app.api import health, missions, website
 from app.api.errors import request_validation_error_handler
 from app.config import SERVICE_VERSION, Settings, get_settings
 from app.physics.factory import build_engine
@@ -47,6 +47,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(missions.router)
+    app.include_router(website.router)
+    app.include_router(__import__("app.api.website_horizon", fromlist=["router"]).router)
     return app
 
 
