@@ -1,0 +1,12 @@
+# Offline tools only: computing terrain horizon profiles (scripts/compute_horizon_profiles.py)
+# and checking them against the real sky (scripts/validate_horizon.py). NOT installed in the
+# Docker / Lambda image and NOT needed by the service or by its tests: tests that use these
+# packages skip themselves when a package is missing.
+#
+#   pip install -r requirements-dev.txt -r requirements-tools.txt
+#
+# Pinned for reproducibility. rasterio brings its own GDAL and PROJ and pulls in affine, attrs,
+# certifi, click and pyparsing.
+numpy==2.5.4
+rasterio==1.5.2
+spiceypy==8.4.0
