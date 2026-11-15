@@ -12,7 +12,7 @@ import { azElFromSubpoint, normalizeLon360 } from './geo';
 import { nextSunChange, sunAt, type SunChange } from './horizon';
 import { formatMargin, levelFromStatus, type PowerLevel } from './power';
 import { southPoleSeason, type PoleSeason } from './season';
-import { discLitFromEarth, type GeometryTrack } from './track';
+import { discLitFromEarth, earthSwing, type GeometryTrack } from './track';
 import { formatLtcOffsetMicros, formatSinceLanding, formatUtcMinute, ltcClock, ltcOffsetMicros, utcClock, type ClockParts } from './time';
 
 export type Tone = 'ink' | 'sun' | 'earth' | 'good' | 'warn' | 'bad' | 'muted';
@@ -143,15 +143,15 @@ export function skyQuantities(input: SkyInput): SkyQuantities {
 
   return {
     geometry,
-    subsolarLat: latitude('subsolar_lat', 'Sun overhead, latitude', geometry?.subsolar_lat ?? null, 'sun'),
-    subsolarLon: longitude('subsolar_lon', 'Sun overhead, longitude', geometry?.subsolar_lon_east ?? null, 'sun'),
-    subearthLat: latitude('subearth_lat', 'Earth overhead, latitude', geometry?.subearth_lat ?? null, 'earth'),
-    subearthLon: longitude('subearth_lon', 'Earth overhead, longitude', geometry?.subearth_lon_east ?? null, 'earth'),
-    sunAz: azimuth('sun_az', 'Sun azimuth', sun?.az ?? null, 'sun'),
-    sunEl: elevation('sun_el', 'Sun elevation', sun?.el ?? null, 'sun'),
-    earthAz: azimuth('earth_az', 'Earth azimuth', earth?.az ?? null, 'earth'),
-    earthEl: elevation('earth_el', 'Earth elevation', earth?.el ?? null, 'earth'),
-    discLit: geometry ? quantity('disc_lit', 'Moon disc lit, seen from Earth', discLitFromEarth(geometry) * 100, (discLitFromEarth(geometry) * 100).toFixed(1), '%') : missing('disc_lit', 'Moon disc lit, seen from Earth'),
+    subsolarLat: latitude('subsolar_lat', 'Overhead latitude', geometry?.subsolar_lat ?? null, 'sun'),
+    subsolarLon: longitude('subsolar_lon', 'Overhead longitude', geometry?.subsolar_lon_east ?? null, 'sun'),
+    subearthLat: latitude('subearth_lat', 'Overhead latitude', geometry?.subearth_lat ?? null, 'earth'),
+    subearthLon: longitude('subearth_lon', 'Overhead longitude', geometry?.subearth_lon_east ?? null, 'earth'),
+    sunAz: azimuth('sun_az', 'Azimuth', sun?.az ?? null, 'sun'),
+    sunEl: elevation('sun_el', 'Elevation', sun?.el ?? null, 'sun'),
+    earthAz: azimuth('earth_az', 'Azimuth', earth?.az ?? null, 'earth'),
+    earthEl: elevation('earth_el', 'Elevation', earth?.el ?? null, 'earth'),
+    discLit: geometry ? quantity('disc_lit', 'Moon lit, from Earth', discLitFromEarth(geometry) * 100, (discLitFromEarth(geometry) * 100).toFixed(1), '%') : missing('disc_lit', 'Moon lit, from Earth'),
     sunState: lit === null ? missing('sun_state', 'Site') : quantity('sun_state', 'Site', null, lit ? 'lit' : 'dark', '', lit ? 'sun' : 'muted'),
     nextChange: change
       ? quantity('next_change', change.kind === 'sunrise' ? 'Sunrise in' : 'Sunset in', change.hours, change.hours.toFixed(1), 'h', 'sun')
@@ -162,12 +162,30 @@ export function skyQuantities(input: SkyInput): SkyQuantities {
     utc,
     ltc,
     utcClock: utc ? quantity('utc', 'UTC', tMs, `${utc.date} ${utc.time}`, 'UTC') : missing('utc', 'UTC'),
-    ltcClock: ltc ? quantity('ltc', 'LTC, model value', tMs, `${ltc.date} ${ltc.time}.${ltc.fraction}`, 'LTC') : missing('ltc', 'LTC, model value'),
+    // The time of day only: the date is the UTC date above (the two differ by microseconds).
+    ltcClock: ltc ? quantity('ltc', 'LTC, model', tMs, `${ltc.time}.${ltc.fraction}`, 'LTC') : missing('ltc', 'LTC, model'),
     ltcOffset:
       landingMs !== null
         ? quantity('ltc_offset', 'LTC − UTC', ltcOffsetMicros(tMs, landingMs), formatLtcOffsetMicros(tMs, landingMs), 'µs')
         : missing('ltc_offset', 'LTC − UTC'),
     sinceLanding: landingMs !== null ? quantity('since_landing', 'Since landing', (tMs - landingMs) / 3_600_000, formatSinceLanding(tMs, landingMs), '') : missing('since_landing', 'Since landing'),
+  };
+}
+
+// ---------- Earth's swing over the stay ----------
+
+export interface SwingQuantities {
+  lon: Quantity;
+  lat: Quantity;
+}
+
+/** How far Earth's overhead point moves over the stay (libration), from the track. */
+export function swingQuantities(track: GeometryTrack | null, landingMs: number | null, stayEndMs: number | null): SwingQuantities {
+  const swing = earthSwing(track, landingMs, stayEndMs);
+  if (!swing) return { lon: missing('earth_swing_lon', 'Longitude swing, stay', 'earth'), lat: missing('earth_swing_lat', 'Latitude swing, stay', 'earth') };
+  return {
+    lon: quantity('earth_swing_lon', 'Longitude swing, stay', swing.lonSpan, swing.lonSpan.toFixed(2), '°', 'earth'),
+    lat: quantity('earth_swing_lat', 'Latitude swing, stay', swing.latSpan, swing.latSpan.toFixed(2), '°', 'earth'),
   };
 }
 
@@ -191,7 +209,7 @@ export interface MissionDates {
 export function missionDates(launchUtcMs: number, slipDays: number, landingMs: number | null, landingGeometry: Geometry | null): MissionDates {
   const season = landingGeometry ? southPoleSeason(landingGeometry.subsolar_lat) : null;
   return {
-    plannedLaunch: quantity('planned_launch', 'Planned launch', launchUtcMs, formatUtcMinute(launchUtcMs), 'UTC'),
+    plannedLaunch: quantity('planned_launch', 'Planned', launchUtcMs, formatUtcMinute(launchUtcMs), 'UTC'),
     launch: quantity('launch', 'Launch', launchUtcMs + slipDays * 86_400_000, formatUtcMinute(launchUtcMs + slipDays * 86_400_000), 'UTC'),
     delay: quantity('delay', 'Launch delay', slipDays, `+${slipDays}`, slipDays === 1 ? 'day' : 'days'),
     landing: landingMs === null ? missing('landing', 'Landing') : quantity('landing', 'Landing', landingMs, formatUtcMinute(landingMs), 'UTC'),

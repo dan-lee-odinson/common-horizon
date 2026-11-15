@@ -174,16 +174,14 @@
 
   /* ---------- the HUD space ---------- */
   /* Panels float in a shared 3D space. Wings tilt toward the viewer (never more than 8 degrees in
-     total: 6 here plus at most 1.5 from the pointer parallax). */
+     total: 6 here plus at most 1.5 from the pointer parallax). The HUD itself lets presses through
+     to the scene; only the panels and controls placed in its layers take them. */
   .hud {
     position: absolute;
     inset: 0;
     perspective: 1500px;
     perspective-origin: 50% 46%;
     pointer-events: none;
-  }
-  .hud > * {
-    pointer-events: auto;
   }
   .hud-layer {
     position: absolute;

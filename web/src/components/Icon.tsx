@@ -25,7 +25,11 @@ export type IconName =
   | 'zoom-out'
   | 'chevron-down'
   | 'chevron-up'
-  | 'chat';
+  | 'chat'
+  | 'reset'
+  | 'search'
+  | 'target'
+  | 'edit';
 
 const PATHS: Record<IconName, string> = {
   play: 'M7 5.5v13l11-6.5z',
@@ -53,6 +57,10 @@ const PATHS: Record<IconName, string> = {
   'chevron-down': 'M6 9l6 6 6-6',
   'chevron-up': 'M6 15l6-6 6 6',
   chat: 'M5 6.5h14v9H10l-4 3.5v-3.5H5z',
+  reset: 'M5 12a7 7 0 1 0 2.2-5.1M5 4.5v4.2h4.2',
+  search: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.3 15.3L20 20',
+  target: 'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5',
+  edit: 'M5 19h3.5L19 8.5 15.5 5 5 15.5zM13.5 7l3.5 3.5',
 };
 
 const FILLED = new Set<IconName>(['play', 'star-filled']);

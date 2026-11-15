@@ -114,3 +114,39 @@ export function discLitFromEarth(g: Geometry): number {
     Math.cos(g.subsolar_lat * rad) * Math.cos(g.subearth_lat * rad) * Math.cos((g.subsolar_lon_east - g.subearth_lon_east) * rad);
   return (1 + Math.max(-1, Math.min(1, cosAngle))) / 2;
 }
+
+export interface EarthSwing {
+  /** East longitudes of the two ends of the range, going east from min to max. */
+  lonMin: number;
+  lonMax: number;
+  latMin: number;
+  latMax: number;
+  /** Width of the longitude range and height of the latitude range, in degrees. */
+  lonSpan: number;
+  latSpan: number;
+}
+
+/**
+ * The range Earth's overhead point moves through between two instants (libration): sampled from
+ * the track every six hours. Null when the track does not cover the start.
+ */
+export function earthSwing(track: GeometryTrack | null, fromMs: number | null, toMs: number | null): EarthSwing | null {
+  if (!track || fromMs === null || toMs === null || fromMs < track.startMs || fromMs > track.endMs) return null;
+  const end = Math.min(toMs, track.endMs);
+  const centre = track.at(fromMs).subearth_lon_east;
+  let lo = 0;
+  let hi = 0;
+  let latMin = Infinity;
+  let latMax = -Infinity;
+  const step = 6 * 3_600_000;
+  for (let t = fromMs; ; t = Math.min(end, t + step)) {
+    const g = track.at(t);
+    const d = wrap180(g.subearth_lon_east - centre);
+    lo = Math.min(lo, d);
+    hi = Math.max(hi, d);
+    latMin = Math.min(latMin, g.subearth_lat);
+    latMax = Math.max(latMax, g.subearth_lat);
+    if (t >= end) break;
+  }
+  return { lonMin: normalizeLon360(centre + lo), lonMax: normalizeLon360(centre + hi), latMin, latMax, lonSpan: hi - lo, latSpan: latMax - latMin };
+}

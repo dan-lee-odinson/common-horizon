@@ -7,6 +7,19 @@ ranked for sunlight, Earth contact and power, and see how a launch delay ("slip"
 ranking. Every number comes from the Python backend in `backend/`. Until the backend is connected,
 the website runs on **example answers** (mock mode) so it can be shown and tested on its own.
 
+## Pictures
+
+The interface is one continuous 3D space in three stages. These pictures are taken from the running
+app on example data (`npm run screens`), at 1440 x 900.
+
+**Stage 1, Orbit.** The Moon with the Sun and Earth riding their rings, and the readouts running.
+
+![Stage 1, Orbit: the Moon inside a tilted ring system, with glass panels of Sun and Earth readouts](docs/screens/stage-1-orbit-1440x900.png)
+
+The landing card that opens over it on first load:
+
+![The landing card over the Orbit stage](docs/screens/landing-card-1440x900.png)
+
 ## Run it on your computer
 
 You need Node.js 22 or newer (it includes `npm`). Then, in a terminal:
@@ -36,6 +49,7 @@ Press `Ctrl+C` in the terminal to stop the server.
 | `npm run typecheck` | Checks the TypeScript types without building. |
 | `npm test` | Runs the unit tests (Vitest). |
 | `npm run test:e2e` | Builds, serves and runs the browser tests (Playwright) at a desktop and a phone width. |
+| `npm run screens` | Takes the pictures in `docs/screens/` from the running app, at 1440 x 900 and 390 x 844. |
 
 Before the first `npm run test:e2e` on a new computer, install the test browser once:
 
@@ -130,39 +144,92 @@ can pass these straight through:
 
 ## How the screen is organised
 
-* **Top bar** (always): launch date and time (UTC), slip 0 to +30 days, UTC / LTC switch and, in the
-  site scene, Play.
-* **Mission planner** (right; a drawer on phones): hardware rows, a typed **Battery storage** figure
-  (kWh), the power balance number (tap it for the day and night checks), stay length 1–365.25 days,
-  and the Earth link indicator. Beside the balance number the words name the check that limits it,
-  for example "power short at night". When the night check fails, the planner shows about how much
-  storage would cover the picked site's darkness. Try the nuclear generator, then solar panels with
-  batteries, at a site with long darkness and at one with short darkness.
-* **Assistant** (bottom, always): a one-line question box. Asking opens the conversation as a
-  semi-opaque panel floating over the bottom of the workspace, so nothing behind it moves or resizes.
-  It keeps the history of questions and answers (at least six lines tall, at most about 40 % of the
-  window, scrolling), has **Hide** (or Escape) and **Clear**, and new answers are announced to screen
-  readers. When hidden, a button beside the question box shows it again.
-* **View 1**: the Moon with Earth and the Sun in the directions the data gives. Earth is drawn at its
-  true size beside the Moon (3.67 times the Moon's diameter) and the Sun larger than Earth, both much
-  farther out than before; sizes and distances are still **not to scale**, and a note on screen says
-  so. Scroll the mouse wheel (or pinch, or use the + / − buttons) to zoom out until Earth and the Sun
-  are in view, and back in to the Moon. Edge arrows point to whichever is out of view. Sunlight on the
-  Moon (and on Earth) comes from the Sun's direction. Click the Moon (or "Show landing sites").
-* **View 2**: site markers and the floating, movable Sites pane (coordinates, presets, ranked list,
-  and the selected-site card with a compact horizon plot). Click a site once to highlight it. Its
-  card, and its label on the Moon, carry **Zoom in to this site**: the camera flies down to the site
-  (GSAP) and then the site scene opens. Clicking the highlighted site again does the same. Visitors
-  who prefer reduced motion get an instant switch.
-* **View 3**: the site scene (placeholder ground), "Back to Moon" (the camera starts over the site and
-  flies back out), zoom buttons and the horizon plot.
+One 3D space fills the window, and a head-up display (HUD) of translucent glass panels floats over
+it. The camera flies between three stages; nothing reloads. A bar across the top names the app,
+shows which stage you are in, carries the "Example data" badge while the app runs on example
+answers, and has **About**, which reopens the landing card.
+
+**Landing card.** On first load a glass card sits over stage 1 and says what the app is, what it is
+for and how to use it. **Begin**, Escape or a press outside closes it. It does not come back during
+the same visit (one browser tab); **About** opens it again. While it is open, Tab stays inside it.
+
+**Stage 1, Orbit.** The Moon, large and centred, inside a ring system that lies in the Moon's
+equatorial plane and is seen at an angle. From the inside out:
+
+* a **longitude scale** with a tick every 5 degrees (0, 90 E, 180 and 270 E are numbered);
+* the **Sun ring**: the Sun rides it at the longitude where the Sun is overhead on the Moon (that
+  point really does circle the Moon once each lunar day). The brighter arc is what the Sun has swept
+  since the landing, with an afterglow behind the Sun's line;
+* a **ring of days**: one segment for each day of the lunar day (29.53 days), lit for each day since
+  the landing;
+* **Earth's bracket**: not a ring, because Earth does not circle the Moon's sky. A short arc with
+  end caps spans the range that the longitude of Earth's overhead point really moves through over
+  the stay (its "swing", from the data layer), with a mark at where it is now.
+
+**Earth** itself is drawn as a distant, larger body out along its true direction from the Moon,
+joined to its bracket by a line. It is placed farther from the Moon than the camera ever goes in
+mission select and is only drawn while it is behind the Moon's centre as the camera sees it, so it
+can never come between the camera and the Moon or cover a site marker. Sizes and distances are
+**not to scale** (really Earth is about 221 Moon radii away and 3.67 times the Moon's diameter), and
+a line on screen says so.
+
+The camera looks from the side of the Moon away from Earth, so Earth stands behind the Moon and off
+to one side. Which side is chosen so that the camera sees as much of the Moon's sunlit half as it
+can at the landing; the panels arrange themselves around it. The camera sways a few degrees and
+leans a little with the pointer. The panels are laid out so the Sun on its ring, Earth and their
+tags never pass behind a glass panel (`src/scene/orbitView.test.ts` checks the arithmetic, and a
+browser test checks the real screen through a whole lunar day).
+
+The Sun lights the Moon from its own side, and the day-night line and both overhead points are
+marked on the surface. The Sun and Earth each carry a small tag with their longitude. A tag hides
+while its body is behind the Moon.
+
+Time previews forward on its own, 6 hours each second, from the landing through one lunar day, then
+starts again. **Pause preview** stops it and the **Preview** scrubber moves it by hand. The preview
+never changes the launch date. Four panels read out, once per frame:
+
+* **Sun**: latitude and longitude of the point where the Sun is overhead; from the selected site,
+  the Sun's azimuth and elevation, whether the site is lit, the hours to the next sunrise or sunset,
+  and a small graph of the Sun's elevation there over the lunar day;
+* **Earth**: the same overhead point for Earth, how far it swings in longitude and latitude over
+  the stay, Earth's azimuth and elevation from the selected site, the site's Earth link over the
+  stay, and the share of the Moon's disc that is lit as seen from Earth;
+* **Mission clock**: UTC, LTC (model value), the LTC offset in microseconds and the time since landing;
+* **Launch**: planned launch, launch delay, landing, and the season at the lunar south pole on the
+  landing date ("summer" while the Sun's overhead point is south of the lunar equator). Hover or tap
+  it for a one-line explanation.
+
+"The selected site" is the site you picked, or else the best-ranked site, or else the first preset.
+The one action here is **Enter mission select**. The Moon's surface pattern is a generated
+illustration, not a map; a line on screen says so.
+
+**Stage 2, Mission select** and **stage 3, Site** follow in the next commits of this branch.
+
+**Where the numbers come from.** Every readout shows a quantity from the API layer (in mock mode,
+the mock model): nothing on screen is random or made up, and a readout shows a dash until its data
+arrives. To follow the Sun and Earth through time, the website asks `POST /evaluate` once for each
+day of the window (one probe point, no hardware, launch moved a day at a time), reads the
+`geometry` of each answer and joins them with a smooth curve (`src/state/geometry.ts`,
+`src/util/track.ts`). Answers are cached, so changing the delay by a day asks for one new day. A
+real backend is asked six questions at a time. Earth's direction at a site is worked out from
+Earth's overhead point, which ignores parallax and is good to about 1 degree.
 
 **Time.** LTC (model value) = UTC + 56.02 microseconds for every day counted from the landing time.
-The lunar time standard is still being defined, so it is labelled as a model value.
+The rate is a published estimate (Ashby and Patla, 2024; see `SOURCES-web.md`). Counting from the
+landing is this app's own convention, and the lunar time standard is still being defined, so the
+clock is labelled as a model value.
 
 **Power colours.** Margin percent = (available − load) / available × 100, as in the planner module.
 Margin of 25 % or more: green. From 0 % up to 25 %: yellow (exactly 0 % counts as yellow). Below 0 %:
 red. The words next to the number repeat the meaning and name the limiting check.
+
+**Reduced motion.** Visitors whose system asks for reduced motion get no camera sway or lean, no
+flights (stages switch at once) and a preview that starts paused.
+
+**Type and colour.** Three type families, served from this site: Oxanium (titles and labels), Geist
+Mono (readouts) and Geist (chat and longer text). Every colour is a CSS variable in
+`src/styles/theme.css`. No text is smaller than 12 px, and text colours are checked to keep a
+contrast of at least 4.5 to 1 on the glass panels (`src/styles/contrast.test.ts`).
 
 ## Folder map
 
@@ -170,14 +237,21 @@ red. The words next to the number repeat the meaning and name the limiting check
 web/
   index.html               page shell
   src/main.tsx             start-up
-  src/App.tsx              layout: top bar, workspace, planner, assistant
+  src/App.tsx              the 3D space, the HUD over it and the landing card
   src/api/                 client.ts (network), types.ts (provisional), mock/, examples/
-  src/state/               app state, data loading, the four-state hook
-  src/components/          top bar, planner, sites pane, horizon plot, compare panel, assistant
-  src/scene/               3D Moon, 2D fallback, site scene, texture slot
-  src/util/                time (LTC), geometry (longitudes), power colours, ranking
-  src/styles/theme.css     every colour, as CSS variables (brand colours go here)
+  src/state/               app state, data loading, the geometry track loader, the four-state hook
+  src/stages/              the HUD of each stage, the top bar, the landing card, the clocks
+  src/hud/                 reusable HUD pieces: glass panel, readout, ring dial, reticle, line graph,
+                           drawer, sheet, leader lines, parallax
+  src/scene/               the 3D space: Moon world, ring system, camera director, 2D fallback
+  src/components/          icons and shared parts
+  src/util/                time (LTC), geometry, the Sun and Earth track, horizon reading, readout
+                           quantities, season, power colours, ranking
+  src/styles/              theme.css (every colour), fonts.css, index.css
+  src/assets/fonts/        the three font families and their licences
   e2e/path.spec.ts         the browser tests
+  e2e/screens.capture.ts   takes the pictures in docs/screens/
+  docs/screens/            pictures of the app
   public/textures/         slot for the Moon colour map (see its README)
 ```
 

@@ -10,7 +10,7 @@ import type { SiteRef } from '../api/types';
 import { clearGeometryCache, loadTrack } from '../state/geometry';
 import { azElFromSubpoint, wrap180 } from './geo';
 import { nextSunChange, sunAt } from './horizon';
-import { DASH, fixed, missionDates, siteQuantities, skyQuantities } from './quantities';
+import { DASH, fixed, missionDates, siteQuantities, skyQuantities, swingQuantities } from './quantities';
 import { DAY_MS, HOUR_MS, LTC_MICROSECONDS_PER_DAY, SYNODIC_MONTH_DAYS } from './time';
 import type { GeometryTrack } from './track';
 
@@ -101,7 +101,7 @@ describe('sky readouts come from the data layer', () => {
     expect(q.ltcOffset.value).toBeCloseTo(3.25 * LTC_MICROSECONDS_PER_DAY, 9);
     expect(q.ltcOffset.text).toBe('+182.07');
     expect(q.ltcOffset.unit).toBe('µs');
-    expect(q.ltcClock.text).toBe('2027-02-18 21:00:00.000182');
+    expect(q.ltcClock.text).toBe('21:00:00.000182');
     expect(q.sinceLanding.text).toBe('+3 d 06 h');
   });
 
@@ -115,6 +115,33 @@ describe('sky readouts come from the data layer', () => {
     // Outside the track the readouts are blank too: the track does not extrapolate into a readout.
     const outside = skyQuantities({ track, tMs: track.endMs + DAY_MS, landingMs: LANDING, site: null, horizon: null });
     expect(outside.subsolarLon.text).toBe(DASH);
+  });
+});
+
+describe('Earth swing over the stay', () => {
+  it('is the range of the mock model’s Earth overhead point, sampled across the stay', () => {
+    const stayEnd = LANDING + 14 * DAY_MS;
+    let lonMin = Infinity;
+    let lonMax = -Infinity;
+    let latMin = Infinity;
+    let latMax = -Infinity;
+    const centre = geometryAt(LANDING).subearth_lon_east;
+    for (let t = LANDING; t <= stayEnd; t += HOUR_MS) {
+      const g = geometryAt(t);
+      const d = wrap180(g.subearth_lon_east - centre);
+      lonMin = Math.min(lonMin, d);
+      lonMax = Math.max(lonMax, d);
+      latMin = Math.min(latMin, g.subearth_lat);
+      latMax = Math.max(latMax, g.subearth_lat);
+    }
+    const q = swingQuantities(track, LANDING, stayEnd);
+    expect(Math.abs(q.lon.value! - (lonMax - lonMin))).toBeLessThan(0.15);
+    expect(Math.abs(q.lat.value! - (latMax - latMin))).toBeLessThan(0.15);
+    expect(q.lon.text).toBe(q.lon.value!.toFixed(2));
+    expect(q.lon.unit).toBe('°');
+    // A small range: Earth stays near one place in the Moon's sky.
+    expect(q.lon.value!).toBeLessThan(20);
+    expect(swingQuantities(null, LANDING, stayEnd).lon.text).toBe(DASH);
   });
 });
 

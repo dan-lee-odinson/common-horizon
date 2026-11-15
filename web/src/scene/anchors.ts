@@ -7,18 +7,24 @@ export interface Anchor {
   y: number;
   /** False when the thing is off screen, behind the camera or hidden behind the Moon. */
   visible: boolean;
+  /** Radius of the thing on screen, in pixels (0 for a point). */
+  r: number;
 }
 
-export type AnchorName = 'sun' | 'earth' | 'subsolar' | 'subearth' | 'site' | 'lander' | 'moon';
+export type AnchorName = 'sun' | 'earth' | 'subsolar' | 'subearth' | 'site' | 'lander' | 'moon' | 'lon0' | 'lon90' | 'lon180' | 'lon270';
 
 export const anchors: Record<AnchorName, Anchor> = {
-  sun: { x: 0, y: 0, visible: false },
-  earth: { x: 0, y: 0, visible: false },
-  subsolar: { x: 0, y: 0, visible: false },
-  subearth: { x: 0, y: 0, visible: false },
-  site: { x: 0, y: 0, visible: false },
-  lander: { x: 0, y: 0, visible: false },
-  moon: { x: 0, y: 0, visible: false },
+  sun: { x: 0, y: 0, visible: false, r: 0 },
+  earth: { x: 0, y: 0, visible: false, r: 0 },
+  subsolar: { x: 0, y: 0, visible: false, r: 0 },
+  subearth: { x: 0, y: 0, visible: false, r: 0 },
+  site: { x: 0, y: 0, visible: false, r: 0 },
+  lander: { x: 0, y: 0, visible: false, r: 0 },
+  moon: { x: 0, y: 0, visible: false, r: 0 },
+  lon0: { x: 0, y: 0, visible: false, r: 0 },
+  lon90: { x: 0, y: 0, visible: false, r: 0 },
+  lon180: { x: 0, y: 0, visible: false, r: 0 },
+  lon270: { x: 0, y: 0, visible: false, r: 0 },
 };
 
 export function hideAnchors(...names: AnchorName[]): void {
