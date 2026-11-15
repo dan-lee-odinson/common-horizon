@@ -1,17 +1,9 @@
-# Moon texture slot
+# Textures
 
-This folder is reserved for the Moon's surface colour map.
+`moon/` holds the Moon's surface maps, made from NASA's CGI Moon Kit (NASA's Scientific
+Visualization Studio). Its own `README.md` gives the source, the credit, the checksums of the
+downloads and what was changed to make each file. Those files are used as they are and are not
+edited here.
 
-Planned source: NASA's CGI Moon Kit colour map (NASA's Scientific Visualization Studio, item 4720).
-Credit line to show: "NASA's Scientific Visualization Studio".
-
-The download was blocked in the environment where the website was built, so the Moon is a plain
-grey sphere for now. To switch the texture on:
-
-1. Save two equirectangular JPEG images of the colour map here, with longitude 0° in the centre of
-   the image and north at the top:
-   * `moon-color-2k.jpg` (2048 × 1024, used on phones)
-   * `moon-color-4k.jpg` (4096 × 2048, used on desktop)
-2. In `web/src/scene/textures.ts`, set `enabled: true`.
-3. Run `npm run build` and check the Moon in the browser. The credit line appears under the Moon.
-4. Add the file names, the source page and the licence to `web/SOURCES-web.md`.
+The website loads the 4096 x 2048 pair on desktop and the 2048 x 1024 pair on phones
+(`web/src/scene/textures.ts`), from its own files only.

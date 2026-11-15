@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SiteEvaluation } from '../api/types';
-import { movedText, rankRows } from './ranking';
+import { movedText, rankRows, rankWindow } from './ranking';
 
 function ev(site_id: string, score: number): SiteEvaluation {
   return {
@@ -39,5 +39,28 @@ describe('ranking with a slip', () => {
     expect(movedText(2)).toBe('up 2 places');
     expect(movedText(-1)).toBe('down 1 place');
     expect(movedText(0)).toBe('no change');
+  });
+});
+
+describe('a short window of the ranking', () => {
+  const rows = Array.from({ length: 17 }, (_, i) => ({ siteId: `s${i + 1}` }));
+  const ids = (list: { siteId: string }[]) => list.map((r) => r.siteId).join(' ');
+
+  it('shows the top of the list when no site is chosen', () => {
+    expect(ids(rankWindow(rows, null, 5))).toBe('s1 s2 s3 s4 s5');
+    expect(ids(rankWindow(rows, 'not-ranked', 5))).toBe('s1 s2 s3 s4 s5');
+  });
+
+  it('keeps the chosen site in view, centred where it can be', () => {
+    expect(ids(rankWindow(rows, 's9', 5))).toBe('s7 s8 s9 s10 s11');
+    expect(ids(rankWindow(rows, 's1', 5))).toBe('s1 s2 s3 s4 s5');
+    expect(ids(rankWindow(rows, 's17', 5))).toBe('s13 s14 s15 s16 s17');
+    expect(ids(rankWindow(rows, 's16', 5))).toBe('s13 s14 s15 s16 s17');
+  });
+
+  it('never shows more than the window, and shows a short list whole', () => {
+    expect(rankWindow(rows, 's9', 5)).toHaveLength(5);
+    expect(ids(rankWindow(rows.slice(0, 3), 's2', 5))).toBe('s1 s2 s3');
+    expect(rankWindow([], null, 5)).toEqual([]);
   });
 });

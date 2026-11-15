@@ -1,0 +1,267 @@
+// Reading a horizon answer (POST /horizon): where the Sun is at a time, when it next rises or sets
+// behind the terrain, and the lit and dark periods of the window.
+//
+// The answer's own "above" / "hidden" words are the authority. Between two samples whose words
+// differ, the moment of change is placed where the Sun's height crosses the terrain skyline (the
+// Sun followed along a straight line between the two samples, over the skyline as the answer
+// gives it), so a sunrise is not snapped to the sample grid.
+//
+// How finely anything here is known depends on the samples, so each reading says so. A sunrise or
+// sunset gives the spacing of the two samples it falls between (`sampleGapHours`), and the Sun's
+// position gives how far a straight line between its two samples can be from the truth
+// (`uncertaintyDeg`). The readouts use these to choose how many digits to show, or to show none:
+// a time read between samples four hours apart is not shown to a tenth of an hour.
+
+import type { HorizonResponse, SunPathPoint } from '../api/types';
+import { normalizeLon360, sampleProfile, wrap180 } from './geo';
+import { HOUR_MS } from './time';
+
+export interface SunNow {
+  az: number;
+  el: number;
+  /** True when the Sun is above the terrain skyline. */
+  above: boolean;
+  /**
+   * How far az and el can be from the Sun's true direction because they were read off a straight
+   * line between two samples, in degrees (an upper estimate). 0 at either end of the path, where
+   * it is the end sample itself; Infinity when it cannot be judged.
+   */
+  uncertaintyDeg: number;
+}
+
+export interface SunChange {
+  kind: 'sunrise' | 'sunset';
+  atMs: number;
+  /** Hours from the asked time to the change. */
+  hours: number;
+  /** Hours between the two samples the change falls between: its time is not known more finely than this. */
+  sampleGapHours: number;
+  /**
+   * True when the Sun's height crosses the skyline between those two samples, so the time is read
+   * off that crossing. False when the two heights are on the same side (the words changed but the
+   * heights did not): the change is then placed mid-way and is only known to the sample spacing.
+   */
+  interpolated: boolean;
+}
+
+export interface Period {
+  start: number;
+  end: number;
+  lit: boolean;
+}
+
+interface Crossing {
+  atMs: number;
+  /** The state after the crossing. */
+  toAbove: boolean;
+  /** Time between the two samples around the crossing. */
+  gapMs: number;
+  /** True when the heights above the skyline have opposite signs at those two samples. */
+  interpolated: boolean;
+}
+
+interface Prepared {
+  /** The samples whose time can be read, in the answer's order. Every reading is taken from these. */
+  path: SunPathPoint[];
+  /** Their times, in milliseconds: times[i] belongs to path[i]. */
+  times: number[];
+  crossings: Crossing[];
+  startsAbove: boolean;
+}
+
+const prepared = new WeakMap<HorizonResponse, Prepared>();
+
+/**
+ * The Sun's height above the terrain skyline at a sample. Not a number when the sample has no real
+ * direction or the answer has no skyline: the sample still counts for its lit or dark word, but no
+ * crossing is read off it.
+ */
+function heightAboveSkyline(data: HorizonResponse, p: SunPathPoint): number {
+  if (!Array.isArray(data.skyline) || data.skyline.length === 0) return Number.NaN;
+  return Number.isFinite(p.az) && Number.isFinite(p.el) ? p.el - sampleProfile(data.skyline, p.az) : Number.NaN;
+}
+
+/**
+ * Where between two samples the Sun's height above the skyline passes zero, as a share of the way
+ * from the first (0) to the second (1). The heights at the two samples have opposite signs.
+ *
+ * The Sun is followed along the straight line between the two samples and the skyline is read
+ * under it all the way: the answer carries the skyline in full, so its shape between the two
+ * samples is known. That places a sunrise behind a peak where the peak is, not where a straight
+ * line between the two end heights would put it. When the height passes zero more than once on the
+ * way, the first passing is taken.
+ */
+function crossingFraction(data: HorizonResponse, a: SunPathPoint, b: SunPathPoint, ma: number, mb: number): number {
+  const turn = wrap180(b.az - a.az);
+  const rise = b.el - a.el;
+  const height = (f: number) => a.el + rise * f - sampleProfile(data.skyline, a.az + turn * f);
+  // One look at least every half degree of azimuth, so no skyline point is stepped over.
+  const steps = Math.min(64, Math.max(8, Math.ceil(Math.abs(turn) * 2)));
+  const above = ma > 0;
+  let lo = 0;
+  for (let k = 1; k <= steps; k++) {
+    const f = k / steps;
+    const m = k === steps ? mb : height(f);
+    if (m > 0 !== above) {
+      let hi = f;
+      for (let n = 0; n < 24; n++) {
+        const mid = (lo + hi) / 2;
+        if (height(mid) > 0 === above) lo = mid;
+        else hi = mid;
+      }
+      return (lo + hi) / 2;
+    }
+    lo = f;
+  }
+  // Not reached while the two end heights have opposite signs; the straight-line value is the fallback.
+  return ma / (ma - mb);
+}
+
+function prepare(data: HorizonResponse): Prepared {
+  const hit = prepared.get(data);
+  if (hit) return hit;
+  const path: SunPathPoint[] = [];
+  const times: number[] = [];
+  for (const p of data.sun_path) {
+    const t = Date.parse(p.t);
+    // A sample whose time cannot be read is left out: nothing can be placed by it, and a change
+    // beside it is placed between the readable samples around it.
+    if (!Number.isFinite(t)) continue;
+    path.push(p);
+    times.push(t);
+  }
+  const crossings: Crossing[] = [];
+  for (let i = 0; i + 1 < path.length; i++) {
+    const a = path[i];
+    const b = path[i + 1];
+    if (a.state === b.state) continue;
+    const ma = heightAboveSkyline(data, a);
+    const mb = heightAboveSkyline(data, b);
+    // Opposite signs: the height above the skyline passes zero between the samples. Never so when
+    // either height is missing: the change is then placed mid-way, like any other without a crossing.
+    const interpolated = ma * mb < 0;
+    const f = interpolated ? crossingFraction(data, a, b, ma, mb) : 0.5;
+    const gapMs = times[i + 1] - times[i];
+    crossings.push({ atMs: times[i] + f * gapMs, toAbove: b.state === 'above', gapMs, interpolated });
+  }
+  const out: Prepared = { path, times, crossings, startsAbove: path.length > 0 && path[0].state === 'above' };
+  prepared.set(data, out);
+  return out;
+}
+
+function aboveAt(p: Prepared, tMs: number): boolean {
+  let above = p.startsAbove;
+  for (const c of p.crossings) {
+    if (c.atMs > tMs) break;
+    above = c.toAbove;
+  }
+  return above;
+}
+
+/**
+ * How far a reading off the straight line between samples i and i + 1 can be from the Sun's true
+ * direction, in degrees. It is judged by how much the path bends at those two samples (the change
+ * in step from one sample to the next, in height and in azimuth): half the largest bend. On a
+ * smooth stretch that is about four times the real error. It still holds where the Sun passes
+ * almost straight overhead and its height turns sharply between two samples, which is where a
+ * straight line is furthest out. Infinity when neither sample has a neighbour on both sides to
+ * judge the bend by. Assumes evenly spaced samples, as the answer gives them.
+ */
+function lineUncertaintyDeg(path: readonly SunPathPoint[], i: number): number {
+  let worst = -1;
+  for (const k of [i, i + 1]) {
+    if (k < 1 || k + 1 >= path.length) continue;
+    const bendEl = path[k - 1].el - 2 * path[k].el + path[k + 1].el;
+    const bendAz = wrap180(path[k + 1].az - path[k].az) - wrap180(path[k].az - path[k - 1].az);
+    worst = Math.max(worst, Math.abs(bendEl), Math.abs(bendAz));
+  }
+  return worst < 0 || !Number.isFinite(worst) ? Infinity : worst / 2;
+}
+
+/**
+ * Sample times of the Sun's path, in milliseconds (cached per answer). One for each sample of
+ * `sun_path`, in order; a sample whose time cannot be read is left out.
+ */
+export function sunPathTimes(data: HorizonResponse): readonly number[] {
+  return prepare(data).times;
+}
+
+/** Sun position at a time, interpolated between samples. Null when the answer has no readable path. */
+export function sunAt(data: HorizonResponse, tMs: number): SunNow | null {
+  const p = prepare(data);
+  const times = p.times;
+  const n = times.length;
+  if (n === 0) return null;
+  let i = 0;
+  let j = n - 1;
+  if (tMs <= times[0]) j = 0;
+  else if (tMs >= times[n - 1]) i = n - 1;
+  else {
+    while (j - i > 1) {
+      const m = (i + j) >> 1;
+      if (times[m] <= tMs) i = m;
+      else j = m;
+    }
+  }
+  const hi = Math.max(i, j);
+  const a = p.path[i];
+  const b = p.path[hi];
+  const span = times[hi] - times[i];
+  const f = span > 0 ? (tMs - times[i]) / span : 0;
+  return {
+    az: normalizeLon360(a.az + wrap180(b.az - a.az) * f),
+    el: a.el + (b.el - a.el) * f,
+    above: aboveAt(p, Math.min(times[n - 1], Math.max(times[0], tMs))),
+    uncertaintyDeg: hi === i ? 0 : lineUncertaintyDeg(p.path, i),
+  };
+}
+
+/** The next sunrise or sunset after a time, or null when the Sun does not change inside the window. */
+export function nextSunChange(data: HorizonResponse, tMs: number): SunChange | null {
+  const p = prepare(data);
+  for (const c of p.crossings) {
+    if (c.atMs > tMs) {
+      return { kind: c.toAbove ? 'sunrise' : 'sunset', atMs: c.atMs, hours: (c.atMs - tMs) / HOUR_MS, sampleGapHours: c.gapMs / HOUR_MS, interpolated: c.interpolated };
+    }
+  }
+  return null;
+}
+
+/** Lit and dark periods across the whole window, in order. */
+export function litPeriods(data: HorizonResponse): Period[] {
+  const p = prepare(data);
+  const n = p.times.length;
+  if (n === 0) return [];
+  const out: Period[] = [];
+  let start = p.times[0];
+  let lit = p.startsAbove;
+  for (const c of p.crossings) {
+    out.push({ start, end: c.atMs, lit });
+    start = c.atMs;
+    lit = c.toAbove;
+  }
+  out.push({ start, end: p.times[n - 1], lit });
+  return out;
+}
+
+function niceStep(range: number): number {
+  for (const s of [1, 2, 5, 10, 15, 30]) if (range / s <= 6) return s;
+  return 30;
+}
+
+/** Spacing of the height grid lines for a height range. */
+export function elevationStep(range: number): number {
+  return niceStep(range);
+}
+
+/** The height range a plot of this data needs: terrain, the Sun's path and Earth's box. */
+export function naturalElRange(data: HorizonResponse): { min: number; max: number } {
+  const skyMin = Math.min(...data.skyline.map((p) => p.el));
+  const skyMax = Math.max(...data.skyline.map((p) => p.el));
+  const sunMax = data.sun_path.length ? Math.max(...data.sun_path.map((p) => p.el)) : 0;
+  const earthTop = data.earth_box ? data.earth_box.el_max : -90;
+  const min = Math.floor(Math.min(-2, skyMin - 0.5));
+  const rawMax = Math.max(skyMax + 2, earthTop + 1, Math.min(sunMax + 1, 90), 6);
+  const step = niceStep(rawMax - min);
+  return { min, max: Math.min(90, Math.ceil(rawMax / step) * step) };
+}

@@ -1,16 +1,24 @@
 @import 'tailwindcss';
 @import './theme.css';
+@import './fonts.css';
 
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  /* Three families only: display for titles and labels, mono for readouts, sans for chat and long text. */
+  --font-display: 'Oxanium', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   /* Motion tokens: strong ease-out for things entering or responding, ease-in-out for things
-     moving on screen, and an iOS-like curve for drawers. */
+     moving on screen, and an iOS-like curve for drawers and sheets. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --breakpoint-md: 48rem;
+  --breakpoint-lg: 70rem;
 }
+
+/* A short window (a laptop screen about 720 px tall): `short:` utilities tighten the tall panels
+   of mission select so everything still fits without scrolling. */
+@custom-variant short (@media (max-height: 820px));
 
 @layer base {
   html,
@@ -20,13 +28,25 @@
   }
   body {
     margin: 0;
-    background: var(--ch-bg);
+    background: var(--ch-space);
     color: var(--ch-ink);
     font-family: var(--font-sans);
-    font-size: 14px;
-    line-height: 1.4;
+    font-size: 15px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overflow: hidden;
+    /* No rubber-band scroll or pull-to-refresh behind the scene. */
+    overscroll-behavior: none;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
   button,
   input,
@@ -37,12 +57,12 @@
   }
   button {
     cursor: pointer;
+    background: none;
+    border: 0;
+    padding: 0;
   }
   button:disabled {
     cursor: default;
-  }
-  .btn:disabled {
-    opacity: 0.45;
   }
   input,
   textarea {
@@ -51,61 +71,268 @@
   * {
     scrollbar-color: var(--ch-line-strong) transparent;
     scrollbar-width: thin;
+    -webkit-tap-highlight-color: transparent;
   }
   :focus-visible {
     outline: 2px solid var(--ch-focus);
     outline-offset: 2px;
   }
-  input[type='range'] {
-    accent-color: var(--ch-accent);
-  }
-  input[type='checkbox'] {
-    accent-color: var(--ch-accent);
-  }
   ::selection {
-    background: var(--ch-accent-soft);
+    background: rgb(95 230 245 / 0.3);
+    color: var(--ch-ink);
+  }
+  ::placeholder {
+    color: var(--ch-muted);
+    opacity: 1;
   }
 }
 
 @layer components {
+  /* ---------- type roles ---------- */
   .num {
+    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+    font-feature-settings: 'zero' 0;
   }
-  .panel {
-    background: var(--ch-surface);
-    border: 1px solid var(--ch-line);
+  /* Small caps-style label over a readout or a control group. */
+  .label {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ch-muted);
   }
+  .title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.08;
+  }
+  /* A panel's own heading: the same voice as a label, one step stronger. */
+  .panel-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ch-ink);
+  }
+
+  /* ---------- glass ---------- */
+  /* A translucent panel. What is behind it is blurred and dimmed first, then tinted, so text on it
+     keeps its contrast even when the sunlit Moon passes behind. */
   .glass {
-    background: var(--ch-glass);
+    position: relative;
+    background:
+      linear-gradient(142deg, var(--ch-glass-sheen), transparent 42%),
+      var(--ch-glass);
     border: 1px solid var(--ch-line);
-    -webkit-backdrop-filter: blur(10px) saturate(1.1);
-    backdrop-filter: blur(10px) saturate(1.1);
-    box-shadow: 0 12px 32px var(--ch-shadow);
+    border-radius: 6px;
+    -webkit-backdrop-filter: blur(18px) brightness(var(--ch-glass-dim)) saturate(1.25);
+    backdrop-filter: blur(18px) brightness(var(--ch-glass-dim)) saturate(1.25);
+    box-shadow:
+      inset 0 1px 0 rgb(190 246 255 / 0.1),
+      0 26px 60px -22px var(--ch-shadow),
+      0 0 52px -16px var(--ch-glow);
   }
+  /* In a tilted wing the blur and dimming of the backdrop cannot be counted on: seen in a browser,
+     a tilted panel sometimes shows the lit scene through undimmed. So a wing's glass is denser and
+     its text keeps 4.5 to 1 by the tint alone (styles/contrast.test.ts, e2e/hud.spec.ts). */
+  .wing-l .glass,
+  .wing-r .glass {
+    background:
+      linear-gradient(142deg, var(--ch-glass-sheen), transparent 42%),
+      var(--ch-glass-wing);
+  }
+  .glass-strong {
+    background:
+      linear-gradient(142deg, var(--ch-glass-sheen), transparent 42%),
+      var(--ch-glass-strong);
+  }
+  /* Corner brackets: four short L-shaped strokes just outside the panel's corners. */
+  .brackets::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    pointer-events: none;
+    --b: var(--ch-cyan);
+    --l: 12px;
+    background:
+      linear-gradient(var(--b), var(--b)) top left / var(--l) 1px no-repeat,
+      linear-gradient(var(--b), var(--b)) top left / 1px var(--l) no-repeat,
+      linear-gradient(var(--b), var(--b)) top right / var(--l) 1px no-repeat,
+      linear-gradient(var(--b), var(--b)) top right / 1px var(--l) no-repeat,
+      linear-gradient(var(--b), var(--b)) bottom left / var(--l) 1px no-repeat,
+      linear-gradient(var(--b), var(--b)) bottom left / 1px var(--l) no-repeat,
+      linear-gradient(var(--b), var(--b)) bottom right / var(--l) 1px no-repeat,
+      linear-gradient(var(--b), var(--b)) bottom right / 1px var(--l) no-repeat;
+    opacity: 0.85;
+  }
+  .brackets-sun::before {
+    --b: var(--ch-sun);
+  }
+  .brackets-earth::before {
+    --b: var(--ch-earth);
+  }
+  .brackets-bad::before {
+    --b: var(--ch-bad);
+  }
+  .hairline {
+    height: 1px;
+    background: linear-gradient(90deg, var(--ch-line-strong), var(--ch-line) 35%, transparent);
+  }
+
+  /* ---------- the HUD space ---------- */
+  /* Panels float in a shared 3D space. Wings tilt toward the viewer (never more than 8 degrees in
+     total: 6 here plus at most 1.5 from the pointer parallax). The HUD itself lets presses through
+     to the scene; only the panels and controls placed in its layers take them. */
+  .hud {
+    position: absolute;
+    inset: 0;
+    perspective: 1500px;
+    perspective-origin: 50% 46%;
+    pointer-events: none;
+  }
+  /* A layer is one flat plane: it leans with the pointer and its wings tilt inside it, and the
+     result is drawn flat. A layer must never keep its children in 3D (transform-style:
+     preserve-3d). A tilted wing would then be drawn apart from the scene, so the glass inside it
+     would find nothing behind it to blur and dim and its text would lose its contrast over a
+     bright scene; and a button that shrinks when pressed could end up behind its holder for the
+     pointer, and the press be lost. (e2e/hud.spec.ts checks the dimming.) The layer gives its own
+     perspective to the wings, so they still lean toward the viewer. */
+  .hud-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    perspective: 1500px;
+    perspective-origin: 50% 46%;
+  }
+  .hud-layer > * {
+    pointer-events: auto;
+  }
+  .wing-l {
+    transform: rotateY(6deg) translateZ(0);
+    transform-origin: 0% 50%;
+  }
+  .wing-r {
+    transform: rotateY(-6deg) translateZ(0);
+    transform-origin: 100% 50%;
+  }
+  .tilt-back {
+    transform: rotateX(5deg);
+    transform-origin: 50% 100%;
+  }
+
+  /* ---------- readouts ---------- */
+  .readout {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  .readout-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    font-size: 19px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--ch-ink);
+    white-space: nowrap;
+  }
+  .readout-value[data-size='sm'] {
+    font-size: 15px;
+  }
+  .readout-value[data-size='lg'] {
+    font-size: 28px;
+    letter-spacing: -0.02em;
+  }
+  .readout-value[data-size='xl'] {
+    font-size: clamp(30px, 3.1vw, 44px);
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+  }
+  /* In a short window the largest figures step down, so the panels that carry them stay compact. */
+  @media (max-height: 820px) {
+    .readout-value[data-size='xl'] {
+      font-size: clamp(28px, 2.6vw, 34px);
+    }
+  }
+  .readout-unit {
+    font-size: max(12px, 0.6em);
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--ch-ink-2);
+    margin-left: 0.3em;
+  }
+  /* Readout tones are set by data-tone so running readouts can change tone without a re-render. */
+  [data-tone='sun'] {
+    color: var(--ch-sun);
+  }
+  [data-tone='earth'] {
+    color: var(--ch-earth-text);
+  }
+  [data-tone='good'] {
+    color: var(--ch-good);
+  }
+  [data-tone='warn'] {
+    color: var(--ch-warn);
+  }
+  [data-tone='bad'] {
+    color: var(--ch-bad-text);
+  }
+  [data-tone='muted'] {
+    color: var(--ch-muted);
+  }
+  .tone-sun {
+    color: var(--ch-sun);
+  }
+  .tone-earth {
+    color: var(--ch-earth-text);
+  }
+  .tone-good {
+    color: var(--ch-good);
+  }
+  .tone-warn {
+    color: var(--ch-warn);
+  }
+  .tone-bad {
+    color: var(--ch-bad-text);
+  }
+  .tone-muted {
+    color: var(--ch-muted);
+  }
+
+  /* ---------- controls ---------- */
   .btn {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.375rem;
-    min-height: 2rem;
-    padding: 0 0.7rem;
-    border-radius: 0.5rem;
+    gap: 0.5rem;
+    min-height: 2.25rem;
+    padding: 0 0.85rem;
     border: 1px solid var(--ch-line-strong);
-    background: var(--ch-surface-2);
+    border-radius: 4px;
+    background: rgb(95 230 245 / 0.06);
     color: var(--ch-ink);
+    font-family: var(--font-display);
     font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
     transition:
-      background-color 150ms ease,
-      border-color 150ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease,
       transform 160ms var(--ease-out);
   }
-  @media (hover: hover) and (pointer: fine) {
-    .btn:hover:not(:disabled) {
-      background: var(--ch-surface-3);
-    }
-    .btn-primary:hover:not(:disabled) {
-      background: var(--ch-focus);
-    }
+  .btn:disabled {
+    opacity: 0.45;
   }
   .btn:active:not(:disabled) {
     transform: scale(0.97);
@@ -114,53 +341,711 @@
     background: var(--ch-accent);
     border-color: var(--ch-accent);
     color: var(--ch-accent-ink);
-    font-weight: 600;
+    box-shadow:
+      0 8px 26px -10px var(--ch-glow),
+      0 0 34px -8px var(--ch-glow);
+  }
+  .btn-lg {
+    min-height: 3rem;
+    padding: 0 1.4rem;
+    font-size: 14px;
+    letter-spacing: 0.12em;
+  }
+  .btn-quiet {
+    border-color: transparent;
+    background: transparent;
+    color: var(--ch-ink-2);
   }
   .btn-icon {
-    width: 2rem;
+    width: 2.25rem;
     padding: 0;
   }
-  .field {
-    min-height: 2rem;
-    padding: 0 0.5rem;
-    border-radius: 0.5rem;
-    border: 1px solid var(--ch-line-strong);
-    background: var(--ch-surface-2);
+  .btn[aria-pressed='true'],
+  .btn[aria-expanded='true'] {
+    border-color: var(--ch-accent);
+    background: var(--ch-accent-soft);
+    color: var(--ch-accent-strong);
   }
-  .label {
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--ch-muted);
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled) {
+      background: rgb(95 230 245 / 0.14);
+      border-color: var(--ch-accent);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--ch-accent-strong);
+      border-color: var(--ch-accent-strong);
+    }
+    /* A pressed primary button (Pause while playing) has light text on a dark fill. It keeps that
+       fill under the pointer: the light hover fill would hide its own light text. */
+    .btn-primary[aria-pressed='true']:hover:not(:disabled) {
+      background: rgb(95 230 245 / 0.14);
+      border-color: var(--ch-accent);
+    }
+    .btn-quiet:hover:not(:disabled) {
+      background: rgb(95 230 245 / 0.08);
+      border-color: var(--ch-line);
+      color: var(--ch-ink);
+    }
   }
-  /* The assistant's conversation: floats over the workspace, never pushes it. At most about 40 % of
-     the window height; with content, at least six lines tall (13 px text, 1.45 line height). */
-  .chat-panel {
-    max-height: 40vh;
-    max-height: 40dvh;
+  /* A button that floats over the scene by itself, not on a panel: it carries its own glass, so
+     its label keeps its contrast when the sunlit Moon passes behind it. */
+  .btn-glass {
     background: var(--ch-glass-strong);
-    -webkit-backdrop-filter: blur(12px) saturate(1.1);
-    backdrop-filter: blur(12px) saturate(1.1);
-    box-shadow: 0 -12px 32px var(--ch-shadow);
+    -webkit-backdrop-filter: blur(12px) brightness(var(--ch-glass-dim));
+    backdrop-filter: blur(12px) brightness(var(--ch-glass-dim));
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-glass:hover:not(:disabled) {
+      background:
+        linear-gradient(rgb(95 230 245 / 0.14), rgb(95 230 245 / 0.14)),
+        var(--ch-glass-strong);
+    }
+  }
+  .field {
+    min-height: 2.25rem;
+    padding: 0 0.6rem;
+    border: 1px solid var(--ch-line-strong);
+    border-radius: 4px;
+    background: rgb(2 8 14 / 0.55);
+    color: var(--ch-ink);
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+  .field:focus-visible {
+    outline: 2px solid transparent;
+    border-color: var(--ch-focus);
+    box-shadow: 0 0 0 3px rgb(95 230 245 / 0.2);
+  }
+  .field[aria-invalid='true'] {
+    border-color: var(--ch-bad);
+  }
+  /* A two- or three-way switch (Preset / Custom coordinates, UTC / LTC, speeds). */
+  .seg {
+    display: inline-flex;
+    padding: 2px;
+    gap: 2px;
+    border: 1px solid var(--ch-line-strong);
+    border-radius: 4px;
+    background: rgb(2 8 14 / 0.5);
+  }
+  .seg > button {
+    min-height: 2rem;
+    padding: 0 0.75rem;
+    border-radius: 2px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ch-ink-2);
+    white-space: nowrap;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease;
+  }
+  .seg > button[aria-checked='true'],
+  .seg > button[aria-pressed='true'] {
+    background: var(--ch-accent);
+    color: var(--ch-accent-ink);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .seg > button:not([aria-checked='true'], [aria-pressed='true']):hover {
+      color: var(--ch-ink);
+      background: rgb(95 230 245 / 0.1);
+    }
+  }
+  /* Checkbox drawn as a small squared target. */
+  .check {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    border: 1px solid var(--ch-line-strong);
+    border-radius: 3px;
+    background: rgb(2 8 14 / 0.55);
+    display: inline-grid;
+    place-content: center;
+    cursor: pointer;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease;
+  }
+  .check::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    background: var(--ch-accent-ink);
+    clip-path: polygon(12% 52%, 0 66%, 38% 100%, 100% 22%, 86% 10%, 37% 70%);
+    transform: scale(0.6);
+    opacity: 0;
+    transition:
+      transform 140ms var(--ease-out),
+      opacity 140ms ease;
+  }
+  .check:checked {
+    background: var(--ch-accent);
+    border-color: var(--ch-accent);
+  }
+  .check:checked::after {
+    transform: scale(1);
+    opacity: 1;
+  }
+  .check:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  /* Range input drawn as an instrument scrubber: a hairline track and a squared, glowing caret. */
+  .scrub {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 2.75rem;
+    margin: 0;
+    background: transparent;
+    cursor: ew-resize;
+    touch-action: pan-y;
+  }
+  .scrub::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--ch-line-strong);
+  }
+  .scrub::-moz-range-track {
+    height: 2px;
+    background: var(--ch-line-strong);
+  }
+  .scrub::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 24px;
+    margin-top: -11px;
+    border: 0;
+    border-radius: 2px;
+    background: var(--ch-accent);
+    box-shadow:
+      0 0 0 5px rgb(95 230 245 / 0.14),
+      0 4px 18px -2px var(--ch-glow);
+    transition: transform 160ms var(--ease-out);
+  }
+  .scrub::-moz-range-thumb {
+    width: 14px;
+    height: 24px;
+    border: 0;
+    border-radius: 2px;
+    background: var(--ch-accent);
+    box-shadow:
+      0 0 0 5px rgb(95 230 245 / 0.14),
+      0 4px 18px -2px var(--ch-glow);
+  }
+  .scrub:active::-webkit-slider-thumb {
+    transform: scaleY(1.12);
+  }
+  .scrub:focus-visible {
+    outline: none;
+  }
+  .scrub:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--ch-focus);
+    outline-offset: 3px;
+  }
+  .scrub:focus-visible::-moz-range-thumb {
+    outline: 2px solid var(--ch-focus);
+    outline-offset: 3px;
+  }
+
+  /* A small word in a box: Example data, pass, fail. */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 1.5rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--ch-line-strong);
+    border-radius: 3px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ch-ink-2);
+    white-space: nowrap;
+  }
+  /* Coloured tags carry a dark under-layer, so the word keeps its contrast whatever is behind. */
+  .tag-good {
+    border-color: rgb(79 227 180 / 0.55);
+    color: var(--ch-good);
+    background:
+      linear-gradient(rgb(79 227 180 / 0.08), rgb(79 227 180 / 0.08)),
+      var(--ch-tag-under);
+  }
+  .tag-bad {
+    border-color: rgb(255 122 77 / 0.6);
+    color: var(--ch-bad-text);
+    background:
+      linear-gradient(var(--ch-bad-soft), var(--ch-bad-soft)),
+      var(--ch-tag-under);
+  }
+  .tag-warn {
+    border-color: rgb(255 194 61 / 0.55);
+    color: var(--ch-warn);
+    background:
+      linear-gradient(var(--ch-sun-soft), var(--ch-sun-soft)),
+      var(--ch-tag-under);
+  }
+
+  /* ---------- drawer and sheet ---------- */
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: var(--ch-scrim);
+    transition: opacity 240ms ease;
+  }
+  /* Side drawer: slides in on the iOS-like curve, leaves faster than it arrives. */
+  /* Visibility switches at once on the way in (so focus can move inside straight away) and only
+     after the slide on the way out. */
+  .drawer {
+    pointer-events: auto;
+    transition:
+      transform 220ms var(--ease-drawer),
+      opacity 180ms ease,
+      visibility 0s linear 220ms;
+  }
+  .drawer[data-open='true'] {
+    transition:
+      transform 340ms var(--ease-drawer),
+      opacity 200ms ease,
+      visibility 0s;
+  }
+  /* The assistant's history. At most 40 % of the window height; with content, at least six lines
+     tall (15 px text, 1.5 line height). In a short window it stops lower still, so a band of the
+     scene stays open between the mission bar and the history for the spotlight site's marker: the
+     reticle is about 17.5 % of the height across, and --scene-top is where the bar ends (measured
+     in mission select; 17rem until then). 12.25rem keeps the six lines whatever the height. */
+  .chat-panel {
+    max-height: min(40vh, max(12.25rem, calc(82.5vh - var(--scene-top, 17rem) - 6.5rem)));
+    max-height: min(40dvh, max(12.25rem, calc(82.5dvh - var(--scene-top, 17rem) - 6.5rem)));
   }
   /* The log is a flex item: this explicit minimum (no min-h-0 utility on it, which would win over a
      component rule) lets it shrink to six lines and scroll beyond that. */
   .chat-log {
-    line-height: 1.45;
-    min-height: calc(6 * 1.45em + 1rem);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    min-height: calc(6 * 1.5em + 1rem);
   }
-  /* Panels and scenes that appear: a short fade with a small lift. */
-  .enter {
-    animation: ch-enter 220ms var(--ease-out) both;
+
+  /* ---------- updating ---------- */
+  /* Figures that are being worked out again stay on screen, a little dimmed, until the new answer
+     lands; the panel around them carries aria-busy. Quiet on purpose: nothing blanks and nothing
+     spins over the data. The short delay keeps an answer that lands at once from flickering. */
+  .settling {
+    transition: opacity 160ms ease;
   }
-  .enter-fade {
-    animation: ch-fade 240ms var(--ease-out) both;
+  [aria-busy='true'] .settling {
+    opacity: 0.62;
+    transition: opacity 220ms ease 120ms;
   }
-  .skeleton {
-    background: linear-gradient(90deg, var(--ch-surface-2), var(--ch-surface-3), var(--ch-surface-2));
+
+  /* ---------- the site stage ---------- */
+  /* The wings stop where the console begins (its top is measured: see stages/SiteHud.tsx). */
+  .site-wing {
+    max-height: calc(var(--site-console-top, 100vh) - 8rem - 0.75rem);
+  }
+  .site-wing-r {
+    max-height: calc(var(--site-console-top, 100vh) - 4.75rem - 0.75rem);
+  }
+  /* Panels without glass of their own (inside a sheet): a rule between one and the next. */
+  .site-section + .site-section {
+    border-top: 1px solid var(--ch-line);
+    padding-top: 0.75rem;
+  }
+  /* "Before landing" (and the place kept for it) shows only while the clock is inside the launch delay. */
+  .site-hud[data-phase='stay'] .site-before {
+    display: none;
+  }
+  /* Phones: the dock along the bottom. (The sheet that rests on it is styled at the end of this file.) */
+  .site-dock {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  /* The speed switch holds bare figures: narrower buttons than a switch of words. */
+  .seg > button.site-speed {
+    min-width: 2.5rem;
+    padding: 0 0.6rem;
+  }
+
+  /* ---------- horizon plot markers ---------- */
+  /* Placed by transform once per frame. They show where a body is, not how large it looks. */
+  .hz-mark {
+    position: absolute;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    will-change: transform;
+  }
+  .hz-sun {
+    width: 11px;
+    height: 11px;
+    margin: -5.5px 0 0 -5.5px;
+    border-radius: 50%;
+    background: var(--ch-sun);
+    box-shadow:
+      0 0 0 1.5px var(--ch-space),
+      0 0 10px 1px var(--ch-sun-glow);
+  }
+  /* The terrain hides the Sun: a hollow, dashed dot. */
+  .hz-sun[data-state='dark'] {
+    background: var(--ch-space);
+    border: 1.5px dashed var(--ch-sun);
+    box-shadow: none;
+  }
+  /* A direction with no lit or dark word: hollow, solid. */
+  .hz-sun[data-state='unknown'] {
+    background: var(--ch-space);
+    border: 1.5px solid var(--ch-sun);
+    box-shadow: none;
+  }
+  /* Below the plotted range: a chevron on the bottom edge, at the Sun's compass direction. */
+  .hz-sun[data-below='true'] {
+    margin-top: -9px;
+    border: 0;
+    border-radius: 0;
+    background: var(--ch-sun);
+    box-shadow: none;
+    clip-path: polygon(0 0, 50% 45%, 100% 0, 100% 40%, 50% 100%, 0 40%);
+  }
+  .hz-earth {
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border-radius: 50%;
+    border: 1.5px solid var(--ch-earth);
+    background: var(--ch-earth-soft);
+  }
+
+  /* ---------- stay timeline (the scrubber) ---------- */
+  .stay {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .stay-head {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    height: 16px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .stay-head .num {
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .stay-head-start {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stay-head-landing {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+  }
+  .stay-head-end {
+    flex: none;
+    margin-left: auto;
+    color: var(--ch-accent);
+  }
+  /* The lane takes the pointer: 44 px tall, so it is a full touch target. */
+  .stay-lane {
+    position: relative;
+    height: 44px;
+    cursor: ew-resize;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .stay-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 15px;
+    height: 14px;
+    overflow: hidden;
+    background: var(--ch-space);
+    outline: 1px solid var(--ch-line-strong);
+  }
+  /* Lit: full height, solid. Dark: a low hollow outline. Shape carries the state as well as colour. */
+  .stay-period {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    min-width: 1px;
+  }
+  .stay-period[data-lit='true'] {
+    background: var(--ch-sun);
+  }
+  .stay-period[data-lit='false'] {
+    top: 4px;
+    bottom: 4px;
+    background: var(--ch-dark-period);
+    box-shadow: inset 0 0 0 1px var(--ch-line-strong);
+  }
+  .stay-swatch-dark {
+    background: var(--ch-dark-period);
+    box-shadow: inset 0 0 0 1px var(--ch-line-strong);
+  }
+  /* Before the landing (the launch delay): hatched over, so it reads as outside the stay. */
+  .stay-lead {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(135deg, rgb(2 5 11 / 0.82) 0 3px, rgb(2 5 11 / 0.3) 3px 6px);
+    border-right: 1px solid var(--ch-ink);
+  }
+  /* The stay: a bracket under the bar, from the landing to the end. */
+  .stay-bracket {
+    position: absolute;
+    right: 0;
+    top: 33px;
+    height: 5px;
+    border: solid var(--ch-accent);
+    border-width: 0 1.5px 1.5px;
+  }
+  /* The planned landing, when the launch slipped: a dashed marker at the lane's start. */
+  .stay-ghost {
+    position: absolute;
+    left: 0;
+    top: 7px;
+    bottom: 5px;
+    width: 0;
+    border-left: 2px dashed var(--ch-ink-2);
+  }
+  /* As wide as the lane and moved by translateX(percent), so its left edge is at an instant. */
+  .stay-slide {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    will-change: transform;
+  }
+  .stay-notch {
+    position: absolute;
+    left: -0.5px;
+    top: 11px;
+    width: 1px;
+    height: 22px;
+    background: var(--ch-ink-2);
+  }
+  /* The needle: light with dark edges, so it reads over amber and over the dark bar alike. */
+  .stay-needle {
+    position: absolute;
+    left: -1.5px;
+    top: 9px;
+    bottom: 5px;
+    width: 3px;
+    border-radius: 1px;
+    background: var(--ch-ink);
+    box-shadow: 0 0 0 1px var(--ch-accent-ink);
+  }
+  /* Its cap sits in its own lane above the bar (cyan on amber would not read). */
+  .stay-cap {
+    position: absolute;
+    left: -6px;
+    top: 0;
+    width: 12px;
+    height: 10px;
+    background: var(--ch-accent);
+    clip-path: polygon(0 0, 100% 0, 100% 45%, 50% 100%, 0 45%);
+    transform-origin: 50% 100%;
+    transition: transform 140ms var(--ease-out);
+  }
+  .stay-lane:active .stay-cap {
+    transform: scale(1.25);
+  }
+  .stay-flag {
+    position: absolute;
+    left: 11px;
+    top: -2px;
+    font-size: 12px;
+    line-height: 14px;
+    color: var(--ch-ink);
+    white-space: nowrap;
+  }
+  .stay-handle[data-side='left'] .stay-flag {
+    left: auto;
+    right: calc(100% + 11px);
+  }
+  /* The native slider, laid over the lane for the keyboard and for screen readers. */
+  .stay-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .stay-input:focus-visible ~ .stay-handle .stay-needle {
+    outline: 2px solid var(--ch-focus);
+    outline-offset: 2px;
+  }
+  .stay-input:focus-visible ~ .stay-handle .stay-cap {
+    background: var(--ch-focus);
+  }
+  .stay-scale {
+    position: relative;
+    height: 18px;
+  }
+  .stay-tick {
+    position: absolute;
+    top: 0;
+    width: 0;
+  }
+  .stay-tick::before {
+    content: '';
+    position: absolute;
+    left: -0.5px;
+    top: 0;
+    width: 1px;
+    height: 4px;
+    background: var(--ch-line-strong);
+  }
+  .stay-tick[data-landing]::before {
+    height: 6px;
+    background: var(--ch-ink-2);
+  }
+  .stay-tick > span {
+    position: absolute;
+    left: 0;
+    top: 7px;
+    transform: translateX(-50%);
+    font-size: 12px;
+    line-height: 11px;
+    color: var(--ch-muted);
+    white-space: nowrap;
+  }
+  .stay-tick:first-child > span {
+    transform: none;
+  }
+  /* Read-only and small: the comparison sheet. */
+  .stay[data-compact] .stay-lane {
+    height: 26px;
+    cursor: default;
+    touch-action: auto;
+  }
+  .stay[data-compact] .stay-bar {
+    top: 6px;
+    height: 10px;
+  }
+  .stay[data-compact] .stay-period[data-lit='false'] {
+    top: 2.5px;
+    bottom: 2.5px;
+  }
+  .stay[data-compact] .stay-bracket {
+    top: 19px;
+    height: 4px;
+  }
+  .stay[data-compact] .stay-ghost {
+    top: 2px;
+    bottom: 5px;
+  }
+  .stay[data-compact] .stay-needle {
+    top: 2px;
+    bottom: 5px;
+    width: 2px;
+    left: -1px;
+  }
+  /* No answer yet: the lane waits, and takes no pointer. */
+  .stay[data-disabled] .stay-lane {
+    cursor: default;
+  }
+  .stay[data-disabled] .stay-bar {
+    background: linear-gradient(90deg, rgb(95 230 245 / 0.06), rgb(95 230 245 / 0.16), rgb(95 230 245 / 0.06));
     background-size: 200% 100%;
     animation: ch-shimmer 1.4s linear infinite;
-    border-radius: 0.375rem;
+  }
+  .stay[data-disabled] .stay-handle,
+  .stay[data-disabled] .stay-bracket {
+    opacity: 0;
+  }
+
+  /* ---------- reticle ---------- */
+  .reticle-pulse {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ch-pulse 2.4s var(--ease-out) infinite;
+  }
+
+  /* ---------- states ---------- */
+  .skeleton {
+    background: linear-gradient(90deg, rgb(95 230 245 / 0.06), rgb(95 230 245 / 0.16), rgb(95 230 245 / 0.06));
+    background-size: 200% 100%;
+    animation: ch-shimmer 1.4s linear infinite;
+    border-radius: 3px;
+  }
+  .enter-fade {
+    animation: ch-fade 260ms var(--ease-out) both;
+  }
+}
+
+/* Touch screens and phone widths: every control is at least 44 px tall and wide, and text boxes
+   are 16 px so a phone does not zoom the page when one takes focus. */
+@media (pointer: coarse), (max-width: 767px) {
+  .btn,
+  .field {
+    min-height: 2.75rem;
+  }
+  .btn-lg {
+    min-height: 3rem;
+  }
+  .btn-icon {
+    min-width: 2.75rem;
+  }
+  .field {
+    font-size: 16px;
+  }
+  .seg {
+    min-height: 3rem;
+  }
+  .seg > button {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  /* The box stays small; its hit area is 44 px. */
+  .check {
+    position: relative;
+    width: 22px;
+    height: 22px;
+  }
+  .check::before {
+    content: '';
+    position: absolute;
+    inset: -11px;
+  }
+  .scrub::-webkit-slider-thumb {
+    width: 22px;
+    height: 30px;
+    margin-top: -14px;
+    box-shadow:
+      0 0 0 11px rgb(95 230 245 / 0.14),
+      0 4px 18px -2px var(--ch-glow);
+  }
+  .scrub::-moz-range-thumb {
+    width: 22px;
+    height: 30px;
+    box-shadow:
+      0 0 0 11px rgb(95 230 245 / 0.14),
+      0 4px 18px -2px var(--ch-glow);
   }
 }
 
@@ -173,15 +1058,21 @@
   }
 }
 
-@keyframes ch-enter {
+@keyframes ch-fade {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
 }
 
-@keyframes ch-fade {
+/* One ring leaves the reticle, growing and fading: "this is the selected site". */
+@keyframes ch-pulse {
   from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  70%,
+  to {
+    transform: scale(2.3);
     opacity: 0;
   }
 }
@@ -194,10 +1085,88 @@
   .btn:active:not(:disabled) {
     transform: none;
   }
-  .enter {
-    animation-name: ch-fade;
+  /* A drawer or sheet fades; its position changes while it is invisible. */
+  .drawer {
+    transition:
+      opacity 180ms ease,
+      visibility 0s linear 180ms,
+      transform 0s linear 180ms;
   }
-  [data-motion='slide'] {
-    transition-property: visibility !important;
+  .drawer[data-open='true'] {
+    transition:
+      opacity 200ms ease,
+      visibility 0s,
+      transform 0s;
   }
+  .check::after {
+    transition: none;
+  }
+  .scrub:active::-webkit-slider-thumb {
+    transform: none;
+  }
+  .reticle-pulse {
+    animation: none;
+    opacity: 0;
+  }
+  .stay-cap {
+    transition: none;
+  }
+  .stay-lane:active .stay-cap {
+    transform: none;
+  }
+  .stay[data-disabled] .stay-bar {
+    animation: none;
+  }
+}
+
+/* Forced colours (high contrast modes): states drawn with backgrounds get system colours. */
+@media (forced-colors: active) {
+  .check::after {
+    background: CanvasText;
+  }
+  .check:checked,
+  .seg > button[aria-checked='true'],
+  .seg > button[aria-pressed='true'] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  /* The timeline's periods are drawn with backgrounds: lit is a solid block, dark an outline. */
+  .stay-period[data-lit='true'] {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+  .stay-period[data-lit='false'] {
+    background: Canvas;
+    box-shadow: inset 0 0 0 1px CanvasText;
+    forced-color-adjust: none;
+  }
+  .stay-needle,
+  .stay-cap,
+  .hz-sun {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+}
+
+/* Site stage on phones: the sheet rests on top of the dock (whose height is measured) and leaves
+   the upper part of the scene in view. Outside the layers above, so it outranks the drawer's own
+   placement at the bottom edge. */
+.site-sheet {
+  bottom: var(--site-dock, 0px);
+  max-height: 62%;
+}
+
+/* Carried over for the screens that are not rebuilt yet; removed as each one is replaced. */
+.panel {
+  background: var(--ch-surface);
+  border: 1px solid var(--ch-line);
+}
+.chat-panel {
+  background: var(--ch-glass-strong);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  backdrop-filter: blur(12px) saturate(1.1);
+}
+.enter {
+  animation: ch-fade 220ms var(--ease-out) both;
 }

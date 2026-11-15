@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, missions
+from app.api import health, horizons, missions, website, website_horizon
 from app.api.errors import request_validation_error_handler
 from app.config import SERVICE_VERSION, Settings, get_settings
 from app.physics.factory import build_engine
@@ -36,16 +36,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # get_physics_engine reads this, so an app serves the engine its own settings chose, not the environment's.
     app.state.physics_engine = engine
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
+    # Exact, normalised origins only (see app.config); no wildcard, no credentials.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
+        allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type"],
         expose_headers=["X-Data-Source"],
     )
     app.include_router(health.router)
     app.include_router(missions.router)
-    app.include_router(__import__("app.api.horizons", fromlist=["router"]).router)
+    app.include_router(website.router)
+    app.include_router(website_horizon.router)
+    app.include_router(horizons.router)
     return app
 
 
