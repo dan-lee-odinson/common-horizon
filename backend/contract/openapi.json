@@ -1388,7 +1388,7 @@
             "maximum": 24.0,
             "minimum": 0.016666666666666666,
             "title": "Step Hours",
-            "description": "Wanted spacing of sun_path samples, hours (one minute to one day). Rounded to whole minutes, and coarsened when the window would need more than 2000 samples (see time_step_s)."
+            "description": "Wanted spacing of sun_path samples, hours (one minute to one day). Rounded to whole minutes, and coarsened when the window would need more than 4000 samples (see time_step_s)."
           }
         },
         "additionalProperties": false,

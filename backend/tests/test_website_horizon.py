@@ -12,7 +12,8 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.main import create_app
 from app.models.results import TerrainSkyline
-from app.models.website_horizon import HORIZON_MAX_SAMPLES
+from app.models import limits
+from app.models.website_horizon import HORIZON_MAX_SAMPLES, HORIZON_MAX_WINDOW_DAYS
 from app.physics.factory import get_physics_engine
 from app.physics.horizon.profile import HorizonProfile
 from app.physics.interface import EngineInfo, PhysicsEngineUnavailable, SimulationRequest, SimulationResult
@@ -24,6 +25,10 @@ URL = "/horizon"
 WEB_API = Path(__file__).resolve().parents[2] / "web" / "src" / "api"
 SHACKLETON = {"id": "shackleton-ridge", "name": "Shackleton Connecting Ridge", "lat": -89.684, "lon_east": 196.739}
 START, END = "2027-02-15T15:00:00Z", "2027-03-01T15:00:00Z"  # 14 days
+
+
+def iso(moment: datetime) -> str:
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def body(**changes):
@@ -161,7 +166,7 @@ def test_west_longitudes_are_normalised_and_sent_signed(app, client):
         ({"start_utc": "not a time"}, "start_utc"),
         ({"end_utc": START}, "body"),  # start not before end
         ({"end_utc": "2027-02-14T15:00:00Z"}, "body"),
-        ({"end_utc": "2028-02-17T15:00:00Z"}, "body"),  # 367 days
+        ({"end_utc": "2028-03-17T21:00:01Z"}, "body"),  # one second over 395.25 days
         ({"start_utc": "1999-12-31T00:00:00Z", "end_utc": "2000-01-02T00:00:00Z"}, "body"),
         ({"start_utc": "2099-12-31T00:00:00Z", "end_utc": "2100-01-01T00:00:01Z"}, "body"),
         ({"step_hours": 0}, "step_hours"),
@@ -195,9 +200,37 @@ def test_missing_site_is_a_422(client):
     assert client.post(URL, json=request).status_code == 422
 
 
-def test_a_366_day_window_up_to_the_last_allowed_instant_is_accepted(client):
-    response = client.post(URL, json=body(start_utc="2099-01-01T00:00:00Z", end_utc="2100-01-01T00:00:00Z"))
+def test_the_longest_window_up_to_the_last_allowed_instant_is_accepted(client):
+    # 395.25 days (the longest stay plus the longest launch delay), ending at the last allowed instant.
+    response = client.post(URL, json=body(start_utc="2098-12-01T18:00:00Z", end_utc="2100-01-01T00:00:00Z"))
     assert response.status_code == 200
+
+
+def test_the_window_limit_is_the_longest_stay_plus_the_longest_launch_delay():
+    assert HORIZON_MAX_WINDOW_DAYS == limits.STAY_DURATION_MAX_DAYS + limits.LAUNCH_DELAY_MAX_DAYS == 395.25
+
+
+@pytest.mark.parametrize("slip_days", [1, 30])
+def test_the_website_window_for_the_longest_stay_with_a_launch_delay_is_accepted(client, slip_days):
+    """Regression (review of PR #19): the website asks from the planned landing to the end of the
+    delayed stay (web/src/state/data.tsx), so a 365.25-day stay with a one-day delay is a 366.25-day
+    window. It was refused with 422 while /evaluate accepted the same mission."""
+    planned_landing = datetime(2027, 1, 1, tzinfo=UTC)
+    end = planned_landing + timedelta(days=slip_days) + timedelta(days=limits.STAY_DURATION_MAX_DAYS)
+    request = body(start_utc=iso(planned_landing), end_utc=iso(end), step_hours=14.75)
+
+    response = client.post(URL, json=request)
+
+    assert response.status_code == 200
+    answer = response.json()
+    assert len(answer["sun_path"]) <= HORIZON_MAX_SAMPLES
+    assert answer["sun_path"][0]["t"] == iso(planned_landing)
+
+
+def test_a_window_one_minute_over_the_limit_is_a_422(client):
+    start = datetime(2027, 1, 1, tzinfo=UTC)
+    end = start + timedelta(days=HORIZON_MAX_WINDOW_DAYS, minutes=1)
+    assert client.post(URL, json=body(start_utc=iso(start), end_utc=iso(end))).status_code == 422
 
 
 def test_engine_unavailable_is_503_and_broken_engine_output_is_502(app, client):
@@ -211,7 +244,20 @@ def test_engine_unavailable_is_503_and_broken_engine_output_is_502(app, client):
 # ---------------------------------------------------------------- work bound
 
 
-def test_more_than_2000_samples_are_coarsened_in_whole_minutes_with_a_warning(app, client):
+def test_the_website_largest_request_keeps_the_spacing_it_asked_for(app, client):
+    """The website asks for at most 3,600 steps in one request (150 days at one hour, see
+    web/src/state/horizonLoad.ts). That must come back at the spacing asked for, not coarsened."""
+    engine = use(app, Engine())
+    start = datetime(2027, 1, 1, tzinfo=UTC)
+
+    answer = client.post(URL, json=body(start_utc=iso(start), end_utc=iso(start + timedelta(days=150)), step_hours=1)).json()
+
+    assert answer["time_step_s"] == 3600 and engine.calls[0].time_step_s == 3600
+    assert len(answer["sun_path"]) == 3601 <= HORIZON_MAX_SAMPLES
+    assert not any("Sampled every" in w for w in answer["warnings"])
+
+
+def test_more_samples_than_the_bound_are_coarsened_in_whole_minutes_with_a_warning(app, client):
     engine = use(app, Engine())
 
     answer = client.post(URL, json=body(start_utc="2027-01-01T00:00:00Z", end_utc="2028-01-02T00:00:00Z")).json()

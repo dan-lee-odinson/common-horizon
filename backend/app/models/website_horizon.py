@@ -15,10 +15,15 @@ from app.models.results import DataProvenance
 from app.models.types import UtcDatetime
 from app.models.website import SiteRef, _InputModel, _OutputModel, parse_iso_utc
 
-# The longest window one request may ask for.
-HORIZON_MAX_WINDOW_DAYS = 366
+# The longest window one request may ask for. The website asks from the planned landing to the end of
+# the delayed stay, so the window is the stay plus the launch delay: the longest stay /evaluate accepts
+# plus the longest delay it accepts (365.25 + 30 = 395.25 days).
+HORIZON_MAX_WINDOW_DAYS = limits.STAY_DURATION_MAX_DAYS + limits.LAUNCH_DELAY_MAX_DAYS
 # At most this many Sun path samples per request; a finer step is coarsened in whole minutes.
-HORIZON_MAX_SAMPLES = 2_000
+# The website asks for up to 3,600 steps in one request (STEPS_PER_REQUEST in
+# web/src/state/horizonLoad.ts, sized for an answer of at most 4,000 points), so the bound is 4,000:
+# the website gets the spacing it asked for.
+HORIZON_MAX_SAMPLES = 4_000
 
 SunState = Literal["above", "hidden"]
 SkylineSource = Literal["stored_profile", "smooth_sphere"]

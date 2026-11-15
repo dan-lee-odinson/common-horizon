@@ -144,7 +144,7 @@ sky the Earth moves through. One physics run through the same `PhysicsEngine` in
 **Request** (`HorizonRequest`):
 - `site` is `{id, name, lat, lon_east}`, with the same limits as `/evaluate` (`lon_east` normalised to 0–360).
 - `start_utc` and `end_utc` need an explicit timezone. `start_utc` must be before `end_utc`.
-- The window is at most 366 days, between 2000-01-01 and 2100-01-01.
+- The window is at most 395.25 days, between 2000-01-01 and 2100-01-01. That is the longest stay `/evaluate` accepts (365.25 days) plus the longest launch delay (30 days), because the website asks from the planned landing to the end of the delayed stay.
 - `step_hours` runs from one minute to 24 hours and is rounded to whole minutes.
 
 **Response** (`HorizonResponse`):
@@ -161,9 +161,9 @@ sky the Earth moves through. One physics run through the same `PhysicsEngine` in
 - Added beside the website's fields, as on `/evaluate`: `time_step_s` (the step used), `skyline_source`, `provenance` and `warnings`. The `X-Data-Source` header is set too.
 
 **Work bound:**
-- At most 2,000 Sun path samples per request.
+- At most 4,000 Sun path samples per request. The website asks for up to 3,600 steps in one request (150 days at one hour), so its requests keep the spacing they ask for.
 - A finer `step_hours` is coarsened in whole minutes, and `time_step_s` and a warning say so.
-- For example, 366 days get a 15,840 s step.
+- For example, a 366-day window asked for at one minute gets a 7,920 s step (3,994 samples).
 
 **Errors:**
 - 422: invalid input, with the same error shape as `/evaluate`.
