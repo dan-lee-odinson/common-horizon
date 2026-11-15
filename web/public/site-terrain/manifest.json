@@ -1,0 +1,313 @@
+{
+ "format": "common-horizon/site-terrain",
+ "format_version": 1,
+ "what": "Heights around each preset site, in meters above the horizontal plane through the site. Row 0 is the north edge, column 0 the west edge. Little-endian 32-bit floats, row by row.",
+ "source": "NASA Moon Trek (https://trek.nasa.gov/moon/), LOLA elevation layers, subset service https://trek.nasa.gov/moon/TrekWS/rest/transform/latlon/subset/stream/tiff",
+ "fetched_utc": "2026-11-15T19:04:57Z",
+ "sites": {
+  "shackleton-ridge": {
+   "latitude_deg": -89.684,
+   "longitude_east_deg": 196.739,
+   "near": {
+    "file": "shackleton-ridge.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_SPole875_5mp_v04",
+    "layer_pixel_m": 5.0,
+    "site_elevation_m": 1728.2,
+    "min_m": -324.6,
+    "max_m": 3.6
+   },
+   "far": {
+    "file": "shackleton-ridge.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_SPole45_100mp_v04",
+    "layer_pixel_m": 100.0,
+    "site_elevation_m": 1723.7,
+    "min_m": -5067.3,
+    "max_m": 206.8,
+    "curvature": "included"
+   }
+  },
+  "nobile": {
+   "latitude_deg": -85.42088,
+   "longitude_east_deg": 31.6218,
+   "near": {
+    "file": "nobile.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_SPole75_30mp_v04",
+    "layer_pixel_m": 30.0,
+    "site_elevation_m": 6416.2,
+    "min_m": -147.8,
+    "max_m": 46.6
+   },
+   "far": {
+    "file": "nobile.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_SPole45_100mp_v04",
+    "layer_pixel_m": 100.0,
+    "site_elevation_m": 6415.6,
+    "min_m": -8618.6,
+    "max_m": 341.4,
+    "curvature": "included"
+   }
+  },
+  "apollo-11": {
+   "latitude_deg": 0.67416,
+   "longitude_east_deg": 23.47314,
+   "near": {
+    "file": "apollo-11.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -1927.5,
+    "min_m": -12.0,
+    "max_m": 13.6
+   }
+  },
+  "apollo-12": {
+   "latitude_deg": -3.0128,
+   "longitude_east_deg": 336.5781,
+   "near": {
+    "file": "apollo-12.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -1429.3,
+    "min_m": -9.0,
+    "max_m": 12.5
+   }
+  },
+  "apollo-14": {
+   "latitude_deg": -3.64589,
+   "longitude_east_deg": 342.52806,
+   "near": {
+    "file": "apollo-14.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -1059.4,
+    "min_m": -10.4,
+    "max_m": 15.7
+   }
+  },
+  "apollo-15": {
+   "latitude_deg": 26.13239,
+   "longitude_east_deg": 3.6333,
+   "near": {
+    "file": "apollo-15.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -1925.6,
+    "min_m": -15.3,
+    "max_m": 8.2
+   }
+  },
+  "apollo-16": {
+   "latitude_deg": -8.9734,
+   "longitude_east_deg": 15.5011,
+   "near": {
+    "file": "apollo-16.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": 14.7,
+    "min_m": -31.6,
+    "max_m": 25.3
+   }
+  },
+  "apollo-17": {
+   "latitude_deg": 20.1911,
+   "longitude_east_deg": 30.7723,
+   "near": {
+    "file": "apollo-17.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -2626.8,
+    "min_m": -16.2,
+    "max_m": 16.7
+   }
+  },
+  "im-1-odysseus": {
+   "latitude_deg": -80.13,
+   "longitude_east_deg": 1.44,
+   "near": {
+    "file": "im-1-odysseus.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_SPole75_30mp_v04",
+    "layer_pixel_m": 30.0,
+    "site_elevation_m": 2591.2,
+    "min_m": -108.1,
+    "max_m": 142.6
+   },
+   "far": {
+    "file": "im-1-odysseus.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_SPole45_100mp_v04",
+    "layer_pixel_m": 100.0,
+    "site_elevation_m": 2589.1,
+    "min_m": -3638.6,
+    "max_m": 530.2,
+    "curvature": "included"
+   }
+  },
+  "im-2-athena": {
+   "latitude_deg": -84.7906,
+   "longitude_east_deg": 29.1957,
+   "near": {
+    "file": "im-2-athena.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_SPole75_30mp_v04",
+    "layer_pixel_m": 30.0,
+    "site_elevation_m": 5321.2,
+    "min_m": -33.4,
+    "max_m": 36.2
+   },
+   "far": {
+    "file": "im-2-athena.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_SPole45_100mp_v04",
+    "layer_pixel_m": 100.0,
+    "site_elevation_m": 5321.8,
+    "min_m": -6889.7,
+    "max_m": 1467.6,
+    "curvature": "included"
+   }
+  },
+  "blue-ghost-m1": {
+   "latitude_deg": 18.562,
+   "longitude_east_deg": 61.81,
+   "near": {
+    "file": "blue-ghost-m1.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -3652.8,
+    "min_m": -3.7,
+    "max_m": 7.4
+   }
+  },
+  "im-3-reiner-gamma": {
+   "latitude_deg": 7.585,
+   "longitude_east_deg": 301.275,
+   "near": {
+    "file": "im-3-reiner-gamma.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -1769.7,
+    "min_m": -20.3,
+    "max_m": 7.0
+   }
+  },
+  "blue-ghost-m2": {
+   "latitude_deg": -24.9,
+   "longitude_east_deg": 177.4,
+   "near": {
+    "file": "blue-ghost-m2.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -3577.9,
+    "min_m": -115.5,
+    "max_m": 12.8
+   }
+  },
+  "blue-ghost-m3": {
+   "latitude_deg": 36.56,
+   "longitude_east_deg": 319.28,
+   "near": {
+    "file": "blue-ghost-m3.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -475.8,
+    "min_m": -69.9,
+    "max_m": 58.7
+   }
+  },
+  "draper-cp12": {
+   "latitude_deg": -75.0,
+   "longitude_east_deg": 132.4,
+   "near": {
+    "file": "draper-cp12.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_SPole75_30mp_v04",
+    "layer_pixel_m": 30.0,
+    "site_elevation_m": -4637.5,
+    "min_m": -11.5,
+    "max_m": 7.0
+   },
+   "far": {
+    "file": "draper-cp12.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_SPole45_100mp_v04",
+    "layer_pixel_m": 100.0,
+    "site_elevation_m": -4637.9,
+    "min_m": -1207.7,
+    "max_m": 2012.9,
+    "curvature": "included"
+   }
+  },
+  "chandrayaan-3": {
+   "latitude_deg": -69.373,
+   "longitude_east_deg": 32.319,
+   "near": {
+    "file": "chandrayaan-3.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": 529.6,
+    "min_m": -6.5,
+    "max_m": 13.8
+   },
+   "far": {
+    "file": "chandrayaan-3.far.f32",
+    "posts": 257,
+    "spacing_m": 250.0,
+    "layer": "LRO_LOLA_DEM_SPole45_100mp_v04",
+    "layer_pixel_m": 100.0,
+    "site_elevation_m": 529.3,
+    "min_m": -1387.5,
+    "max_m": 1359.5,
+    "curvature": "included"
+   }
+  },
+  "slim": {
+   "latitude_deg": -13.316,
+   "longitude_east_deg": 25.251,
+   "near": {
+    "file": "slim.near.f32",
+    "posts": 129,
+    "spacing_m": 10.0,
+    "layer": "LRO_LOLA_DEM_Global_128ppd_v04",
+    "layer_pixel_m": 236.9,
+    "site_elevation_m": -927.3,
+    "min_m": -98.0,
+    "max_m": 104.4
+   }
+  }
+ }
+}
