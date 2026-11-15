@@ -1,0 +1,89 @@
+{
+  "id": "hab-module",
+  "name": "Habitation module (NASA concept)",
+  "file": "hab-module.glb",
+  "kind": "generated",
+  "status": "our estimate, to be replaced by a published figure",
+  "note": "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 7.551,
+    "height_y": 4,
+    "depth_z": 4.07
+  },
+  "dimension_sources": [
+    {
+      "dimension": "width_x",
+      "value_m": 7.551,
+      "meaning": "overall length (X, end to end, along the cylinder) of the finished shape",
+      "source": "measured on the finished shape, after scaling it evenly to the published height",
+      "status": "our estimate"
+    },
+    {
+      "dimension": "height_y",
+      "value_m": 4,
+      "meaning": "overall height on the surface, from the bottom of the frame to the top of the roof unit",
+      "source": "our estimate: NASA publishes no size for this concept (the image page, \"Conceptual Lunar Habitation Module\", gives none); 4.0 m makes the module about 7.6 m long and 4.1 m across",
+      "status": "our estimate, to be replaced by a published figure"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 4.07,
+      "meaning": "overall width (Z, side to side, across the cylinder) of the finished shape",
+      "source": "measured on the finished shape, after scaling it evenly to the published height",
+      "status": "our estimate"
+    }
+  ],
+  "generation": {
+    "picture": {
+      "description": "NASA artist's rendering of a conceptual lunar habitation module on the lunar surface (image page \"Conceptual Lunar Habitation Module\", https://www.nasa.gov/image-detail/corehab-beautyshot/); before sending, the picture was cropped to the module and everything outside it painted white",
+      "credit": "NASA",
+      "in_repository": false
+    },
+    "model": "TRELLIS.2",
+    "model_maker": "Microsoft",
+    "model_license": "MIT",
+    "endpoint": "fal-ai/trellis-2",
+    "service": "fal.ai",
+    "request_id": "01a1e143-da55-7b61-9587-b94811770222",
+    "date": "2026-11-15",
+    "settings": {
+      "seed": 42,
+      "resolution": 1024,
+      "texture_size": 1024,
+      "decimation_target": 18000,
+      "remesh": true
+    },
+    "cleanup": null
+  },
+  "triangles": 17513,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "The picture shows one end and one long side of the module, so the generator guessed the other end, the far side and the underside.",
+    "The open frame, its braces and the thin rails are rough or merged into the body, and some surfaces are torn.",
+    "The shaded space under the round end could not be told apart from shaded ground, so it was left in the picture; the frame there may come out more closed than it is.",
+    "No size is published for this concept: the 4.0 m height is our estimate, and the length and width are measured from the shape scaled to it.",
+    "All colours, textures and markings removed; one plain grey material."
+  ],
+  "finishing": {
+    "rotate_deg": [
+      0,
+      0,
+      0
+    ],
+    "drop_loose_parts_below": 0,
+    "flatten_below": 0,
+    "flattened_vertices": 0,
+    "input_file": "trellis2_76acbc406492433ebf67952196c7459f.glb",
+    "input_sha256": "6a2aca5fa02ba25fab259499bd5dce8a5ab9c9b519e86c561d9067230c0ea8cc",
+    "input_triangles": 17513,
+    "removed_loose_parts": {
+      "pieces": 0,
+      "triangles": 0
+    },
+    "scale_factor": 7.674282,
+    "material": "one neutral material; every texture, image, UV coordinate, per-vertex colour and original material removed"
+  },
+  "built_by": "tools/models/finish-model.mjs"
+}

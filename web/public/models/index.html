@@ -196,8 +196,8 @@
   <footer>
     <p>
       Code-built models are drawn by the scripts in <code>tools/models/</code>; imported and
-      generated models are finished (made plain, turned Y up, scaled to the published height and
-      stood on the origin) by <code>tools/models/finish-model.mjs</code>. Sources are listed in
+      generated models are finished (made plain, turned Y up, scaled to the published height, or
+      to our estimate where none is published, and stood on the origin) by <code>tools/models/finish-model.mjs</code>. Sources are listed in
       <code>tools/models/SOURCES-models.md</code>. 3D views use three.js. Sizes are checked by
       <code>npm run check</code> in <code>tools/models/</code>.
     </p>
@@ -206,7 +206,7 @@
 
 <script type="module">
   // Models in the order of the brief. Each has <id>.glb (shape) and <id>.json (facts) here.
-  const MODEL_IDS = ['starship-lander', 'habitat-unit', 'fission-power-unit', 'solar-array-mast', 'griffin-lander', 'blue-moon-mk1', 'viper-rover', 'crew-rover', 'pressurized-rover'];
+  const MODEL_IDS = ['starship-lander', 'habitat-unit', 'fission-power-unit', 'solar-array-mast', 'griffin-lander', 'blue-moon-mk1', 'viper-rover', 'crew-rover', 'pressurized-rover', 'hab-module'];
   const DIM_LABEL = { width_x: 'Width (x)', height_y: 'Height (y)', depth_z: 'Depth (z)' };
   const KIND_LABEL = { 'code-built': 'Code-built', imported: 'Imported CAD', generated: 'SI/AI-generated from a photo' };
   const BACKGROUND = 0x15171a;

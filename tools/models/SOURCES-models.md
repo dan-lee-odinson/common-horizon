@@ -32,6 +32,7 @@ read the source's own license or terms, it says "to check".
 | Crew rover (generated) | Length and width, for comparison only | about 4 m and 2.3 m | Same page | company figure (maker's own page) | Same as above | https://astrolab.space/2026/05/26/nasa-selects-astrolab-to-provide-lunar-rover-for-artemis-astronauts-return-to-the-moon/ |
 | Pressurized rover (generated) | Overall height | 4.85 m (L x W x H = 6.44 m x 4.84 m x 4.85 m) | JAXA Human Spaceflight Technology Directorate, progress report on the crewed pressurized rover (document 99-3, 29 September 2025, filed with the MEXT space development committee), page 8 | JAXA figure | Government committee document; cited figure only | https://www.mext.go.jp/content/20250929-mxt_uchukai01-000045059_005.pdf |
 | Pressurized rover (generated) | Length and width, for comparison only | 6.44 m and 4.84 m | Same report | JAXA figure | Same as above | https://www.mext.go.jp/content/20250929-mxt_uchukai01-000045059_005.pdf |
+| Habitation module (generated) | Overall height, bottom of the frame to the top of the roof unit | 4.0 m | None: NASA's image page "Conceptual Lunar Habitation Module" gives no size, and we found no published size for this concept | our estimate, to be replaced by a published figure | Our own estimate (this repository's Apache-2.0 license) | https://www.nasa.gov/image-detail/corehab-beautyshot/ (page opened 15 November 2026; no size on it) |
 
 ### Our own estimates and illustrations (not from any source)
 
@@ -57,6 +58,9 @@ These are listed in each model's JSON under `simplifications` as well.
   the wheels to the top of the mast. Crew rover: 2.535 m wide and 3.375 m long, against the
   maker's 2.3 m and 4 m. Pressurized rover:
   4.304 m wide and 6.854 m long, against JAXA's 4.84 m and 6.44 m.
+- **Habitation module (generated):** no size is published for this concept, so its 4.0 m
+  height is our own estimate as well; its 7.551 m length and 4.070 m width are measured from the
+  shape scaled to that height.
 
 ## Imported and generated models
 
@@ -71,6 +75,7 @@ the raw file's SHA-256, and generated models record the request id.
 | VIPER rover (`viper-rover`) | generated | NASA illustration ACD20-0047, "VIPER Drill" (2019 design), cropped to the rover | **Daniel Rutter, NASA Ames Research Center** | NASA image; NASA's media usage guidelines (no NASA insignia in our model) | TRELLIS.2 (`fal-ai/trellis-2`, Microsoft, MIT) on fal.ai, direct run, seed 42, resolution 1024, decimation target 18,000; `finish-model.mjs` | 01a1e06f-bb95-7f42-bc41-27cc7c445683, 15 November 2026 | "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data" |
 | Crew rover (`crew-rover`) | generated | A team member's own photo of a full-size display mockup of the rover (front view, exhibition, 8 November 2026); everything outside the vehicle painted white and the maker's name, flag decals and NASA insignia covered before sending | **Dan Lee-Odinson** (team member's own photo) | The team member's own photo, used with the photographer's permission; the photo is not published | TRELLIS.2 (`fal-ai/trellis-2`, Microsoft, MIT) on fal.ai, direct run, seed 42, resolution 1024, decimation target 18,000; `finish-model.mjs` | 01a1e07b-f7d0-7c83-84df-fbbd69871994, 15 November 2026 | "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data" |
 | Pressurized rover (`pressurized-rover`) | generated | A team member's own photo of a scale model of the rover in a display case (left side, exhibition, 8 November 2026); everything outside the model, including two people behind the case and two figurines, painted white before sending | **Dan Lee-Odinson** (team member's own photo of a scale model) | The team member's own photo, used with the photographer's permission; the photo is not published | TRELLIS.2 (`fal-ai/trellis-2`, Microsoft, MIT) on fal.ai, direct run, seed 42, resolution 1024, decimation target 18,000; `finish-model.mjs` | 01a1e085-3896-7211-8d26-39bed833541a, 15 November 2026 | "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data" |
+| Habitation module (`hab-module`) | generated | NASA rendering "Conceptual Lunar Habitation Module" (artist's rendering of a lunar habitation module on the lunar surface), cropped to the module, everything outside it painted white | **NASA** (credit line "Image Credit: NASA") | NASA image; NASA's media usage guidelines (no NASA insignia in our model; none is on the module in the picture) | TRELLIS.2 (`fal-ai/trellis-2`, Microsoft, MIT) on fal.ai, direct run, seed 42, resolution 1024, decimation target 18,000; `finish-model.mjs` | 01a1e143-da55-7b61-9587-b94811770222, 15 November 2026 | "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data" |
 
 ### Input pictures (none of them is in the repository)
 
@@ -79,6 +84,7 @@ the raw file's SHA-256, and generated models record the request id.
 | `viper-rover-2.jpg` (1920 by 1080), NASA image ACD20-0047, an illustration | VIPER rover | Daniel Rutter, NASA Ames Research Center | https://science.nasa.gov/image-detail/amf-acd20-0047/ | A 654 by 805 crop around the rover (sky, ground and the drill cuttings left in), with metadata removed, to TRELLIS.2 on fal.ai, 15 November 2026 |
 | `astrolab-1.jpg` (3072 by 4080), a team member's own phone photo | Crew rover | Dan Lee-Odinson | Own photo, exhibition, 8 November 2026; not published | A 1512 by 1392 crop of the vehicle only, everything else painted white and the markings on the vehicle covered with the colour around them (by a local Pillow script; no image model), location and all other metadata removed, to TRELLIS.2 on fal.ai, 15 November 2026 |
 | `jaxa-pressure-1.jpg` (3072 by 4080), a team member's own phone photo of a scale model | Pressurized rover | Dan Lee-Odinson | Own photo, exhibition, 8 November 2026; not published | A 1681 by 1330 crop of the scale model only, everything else (people, figurines, floor, reflections) painted white (by a local Pillow script; no image model), location and all other metadata removed, to TRELLIS.2 on fal.ai, 15 November 2026 |
+| `hab-module-2.png` (3840 by 2160), NASA rendering | Habitation module | NASA | https://www.nasa.gov/image-detail/corehab-beautyshot/ | A 1120 by 720 crop around the module, everything outside it (ground, sky, shadow) painted white (by a local Pillow script; no image model), the render metadata removed, to TRELLIS.2 on fal.ai, 15 November 2026. The shaded space under the module's round end was left in, because there shaded ground and the shaded module have the same dark grey |
 
 ## Libraries, tools and services
 
@@ -102,7 +108,7 @@ the raw file's SHA-256, and generated models record the request id.
 (https://huggingface.co/microsoft/TRELLIS.2-4B) also loads Meta's DINOv3 image encoder (DINOv3
 License) and, for a picture without transparency, a background-removal model: BRIA AI's
 RMBG-2.0 weights (CC BY-NC 4.0). fal.ai does not say whether its hosted version runs these; our
-three pictures had no transparency, so if it follows the published pipeline it did. A picture
+pictures had no transparency, so if it follows the published pipeline it did. A picture
 with a transparent background would skip that step.
 
 `finish-model.mjs` needs no new library: it reads the raw file with this folder's own GLB reader
@@ -157,3 +163,9 @@ Code reviewer agents, which did not write the work, then checked the rules, the 
 finished shapes and every source; their findings (among them Blue Moon's width, which is set by
 the top deck, not the legs, and VIPER resting on its drill) were fixed in the pull request. The
 generated shapes themselves are SI/AI-generated by TRELLIS.2 and say so in their note.
+
+Third batch (15 November 2026): also built with **Claude Code (Anthropic)**, running the Claude
+Opus 5.5 model. It masked the input picture with a local Pillow script (no image model), ran the
+TRELLIS.2 request listed above for the habitation module (one request, after a team member
+approved the masked picture), finished the model with `finish-model.mjs`, and added its rows
+here, its brief entry and its place on the review page.
