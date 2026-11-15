@@ -3,8 +3,10 @@
 // the body is behind the Moon. A tag sits on the side of its point that faces the Moon (or in a
 // fixed direction), so it never reaches toward the panels at the sides of the screen.
 
-import { useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
+import gsap from 'gsap';
 import { anchors, type AnchorName } from '../scene/anchors';
+import { prefersReducedMotion } from '../state/useMedia';
 import { useTicker } from '../hud/useTicker';
 import type { Quantity } from '../util/quantities';
 
@@ -34,6 +36,24 @@ export function AnchorTag({
   const ref = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const box = useRef({ w: 0, h: 0, age: 99 });
+  // New words change the tag's size: measure again on the next frame, not some frames later.
+  useLayoutEffect(() => {
+    box.current.age = 99;
+  }, [label, q?.text, q?.unit]);
+  // A fixed direction can change (the tag steps aside when a panel opens beside it): the tag then
+  // swings round its point instead of jumping. No swing for visitors who prefer reduced motion.
+  const fixed = typeof toward === 'number' ? toward : null;
+  const swing = useRef({ deg: fixed ?? 0 });
+  useEffect(() => {
+    if (fixed === null) return;
+    // The short way round.
+    const from = swing.current.deg;
+    const to = from + ((((fixed - from) % 360) + 540) % 360) - 180;
+    const turn = gsap.to(swing.current, { deg: to, duration: prefersReducedMotion() ? 0 : 0.3, ease: 'power3.out', overwrite: true });
+    return () => {
+      turn.kill();
+    };
+  }, [fixed]);
   useTicker(() => {
     const el = ref.current;
     if (!el) return;
@@ -61,8 +81,8 @@ export function AnchorTag({
       ux = dx / len;
       uy = dy / len;
     } else {
-      ux = Math.sin((toward * Math.PI) / 180);
-      uy = -Math.cos((toward * Math.PI) / 180);
+      ux = Math.sin((swing.current.deg * Math.PI) / 180);
+      uy = -Math.cos((swing.current.deg * Math.PI) / 180);
     }
     const reach = a.r + gap + (Math.abs(ux) * box.current.w) / 2 + (Math.abs(uy) * box.current.h) / 2;
     tag.style.transform = `translate(${(ux * reach - box.current.w / 2).toFixed(1)}px, ${(uy * reach - box.current.h / 2).toFixed(1)}px)`;

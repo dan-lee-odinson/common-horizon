@@ -28,6 +28,10 @@ export interface EvaluationBundle {
   /** The same evaluation with no delay, when a delay is set. */
   planned: EvaluateResponse | null;
   rows: RankedRow[];
+  /** True when the answer was worked out for a mission with hardware. Only then is it a ranking. */
+  forMission: boolean;
+  /** The stay, hardware and storage the answer was worked out for (see `missionKey`). */
+  mission: string;
 }
 
 export type KnownSite = SiteRef & Pick<Site, 'note' | 'default_hardware'> & { custom?: boolean };
@@ -38,6 +42,11 @@ export interface DataValue {
   catalog: AsyncResult<CatalogResponse>;
   evaluation: AsyncResult<EvaluationBundle>;
   check: AsyncResult<CheckResponse>;
+  /**
+   * The planner's check for the spotlight site, when it belongs to the ranking on screen (the same
+   * site, mission and landing). null while a newer check or a newer ranking is on its way.
+   */
+  focusCheck: CheckResponse | null;
   /** The focus site's horizon over the stay (planned landing to the end of the stay). */
   horizon: AsyncResult<HorizonResponse>;
   /** The reference site's horizon over one lunar day from the landing: the Orbit stage's window. */
@@ -56,6 +65,11 @@ export interface DataValue {
   reference: KnownSite | null;
   /** Ranked rows, best first. Empty until hardware is chosen and the evaluation answers. */
   rows: RankedRow[];
+  /**
+   * True while a newer ranking is on its way (the delay, the stay or the hardware changed) and the
+   * previous one is still on screen. Panels keep showing the previous ranking, marked as updating.
+   */
+  updating: boolean;
   hardwareChosen: HardwareChoice[];
   /** Battery storage typed in the planner, kWh (0 = none). */
   storageKwh: number;
@@ -70,7 +84,8 @@ export interface DataValue {
   orbitEndMs: number | null;
 }
 
-const DataContext = createContext<DataValue | null>(null);
+/** Exported so a test can render a panel with data it built itself. The app uses <DataProvider>. */
+export const DataContext = createContext<DataValue | null>(null);
 
 export function useData(): DataValue {
   const value = useContext(DataContext);
@@ -145,6 +160,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const hardwareChosen = useMemo(() => hardwareChoices(hardware), [hardware]);
 
   const siteRefs = useMemo<SiteRef[]>(() => allSites.map(({ id, name, lat, lon_east }) => ({ id, name, lat, lon_east })), [allSites]);
+  const missionKey = JSON.stringify([stayDays, hardwareChosen, storageKwh]);
   const evalKey = siteRefs.length ? JSON.stringify([siteRefs.map((s) => [s.id, s.lat, s.lon_east]), launchUtcMs, slipDays, stayDays, hardwareChosen, storageKwh]) : null;
 
   const evaluation = useAsync<EvaluationBundle>(
@@ -155,14 +171,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
         api.evaluate({ ...base, slip_days: slipDays }, signal),
         slipDays > 0 ? api.evaluate({ ...base, slip_days: 0 }, signal) : Promise.resolve(null),
       ]);
-      return { current, planned, rows: rankRows(current.results, planned?.results ?? null) };
+      return { current, planned, rows: rankRows(current.results, planned?.results ?? null), forMission: hardwareChosen.length > 0, mission: missionKey };
     },
     (b) => isEmpty.evaluate(b.current),
     150,
   );
 
-  // Rows are shown once hardware is chosen: a ranking of an empty mission would mean nothing.
-  const rows = useMemo(() => (hardwareChosen.length > 0 ? (evaluation.data?.rows ?? []) : []), [hardwareChosen.length, evaluation.data]);
+  // Rows are shown once hardware is chosen: a ranking of an empty mission would mean nothing. That
+  // also holds for an answer still on screen from before the hardware was chosen (at start-up the
+  // site list can arrive before the hardware list): it is never shown as "the previous ranking".
+  const rows = useMemo(
+    () => (hardwareChosen.length > 0 && evaluation.data?.forMission ? evaluation.data.rows : []),
+    [hardwareChosen.length, evaluation.data],
+  );
+  const updating = rows.length > 0 && (evaluation.refreshing || evaluation.status === 'waiting');
   const focus = highlighted ?? (rows.length > 0 ? (siteById.get(rows[0].siteId) ?? null) : null);
   const focusRow = focus ? (rows.find((r) => r.siteId === focus.id) ?? null) : null;
   const reference = focus ?? allSites[0] ?? null;
@@ -183,6 +205,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     120,
   );
 
+  const focusCheck = focusRow && check.status === 'answer' && !check.refreshing && evaluation.data?.mission === missionKey ? check.data : null;
+
   const horizon = useHorizonFor(focusRef, windowStartMs, windowEndMs);
 
   const referenceRef = useMemo<SiteRef | null>(
@@ -202,6 +226,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     catalog,
     evaluation,
     check,
+    focusCheck,
     horizon,
     orbitHorizon,
     track,
@@ -212,6 +237,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     focusRow,
     reference,
     rows,
+    updating,
     hardwareChosen,
     storageKwh,
     landingMs,

@@ -100,7 +100,9 @@ export function formatAmount(value: number | null | undefined, unit: string): st
   if (value === null || value === undefined || !Number.isFinite(value)) return '—';
   const abs = Math.abs(value);
   const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
-  return `${value.toLocaleString('en-US', { maximumFractionDigits: digits })} ${unit}`;
+  // Nothing is nothing: an amount that is zero, or rounds to it, is written "0", never "-0".
+  const shown = Number(value.toFixed(digits)) === 0 ? 0 : value;
+  return `${shown.toLocaleString('en-US', { maximumFractionDigits: digits })} ${unit}`;
 }
 
 /** Storage that covers a need, rounded up to a whole kWh so typing it always passes. */

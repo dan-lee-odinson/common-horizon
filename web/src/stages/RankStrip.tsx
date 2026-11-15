@@ -3,7 +3,13 @@
 // word. Click a row, or use the arrow keys, to move the spotlight through the whole ranking.
 //
 // When the launch delay reorders the ranking, rows that stay in view slide to their new places
-// (GSAP, from wherever they are on screen, so a second change mid-slide stays smooth).
+// (GSAP, from wherever they are on screen, so a second change mid-slide stays smooth). Moving the
+// spotlight through an unchanged ranking (a click, the arrow keys) does not animate: the rows are
+// simply the next ones, at once, however fast the keys come.
+//
+// While a newer ranking is on its way the strip stays as it is: the same rows, a little dimmed and
+// marked busy, still taking clicks and keys. It is never taken away and put back, so the keyboard
+// focus stays where the visitor left it.
 
 import { useLayoutEffect, useRef, type KeyboardEvent } from 'react';
 import gsap from 'gsap';
@@ -20,17 +26,26 @@ import { movedText, rankWindow, type RankedRow } from '../util/ranking';
 export const STRIP_ROWS = 5;
 
 export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
-  const { rows: ranked, siteById, focus, evaluation } = useData();
+  const { rows: ranked, siteById, focus, updating } = useData();
   const slipDays = useStore(appStore, (s) => s.slipDays);
   const saved = useStore(appStore, (s) => s.saved);
   const listRef = useRef<HTMLDivElement>(null);
   const lastTops = useRef(new Map<string, number>());
-  const strip = rankWindow(ranked, focus?.id ?? null, rows);
+  const lastSaid = useRef('');
+  const lastShown = useRef<string | null>(null);
   const at = focus ? ranked.findIndex((r) => r.siteId === focus.id) : -1;
+  // The rows shown are those around the spotlight site. A site with no row yet (a point typed in a
+  // moment ago, still being ranked) leaves the strip where it was, around the site shown before.
+  if (focus && at >= 0) lastShown.current = focus.id;
+  const strip = rankWindow(ranked, at >= 0 ? focus!.id : lastShown.current, rows);
 
+  const order = ranked.map((r) => r.siteId).join('|');
+  const lastOrder = useRef(order);
   useLayoutEffect(() => {
     const list = listRef.current;
     if (!list) return;
+    const reranked = lastOrder.current !== order;
+    lastOrder.current = order;
     const reduce = prefersReducedMotion();
     const next = new Map<string, number>();
     list.querySelectorAll<HTMLElement>('[data-site-id]').forEach((el) => {
@@ -38,13 +53,13 @@ export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
       const top = el.offsetTop;
       next.set(id, top);
       const prev = lastTops.current.get(id);
-      if (reduce || prev === undefined) return;
+      if (reduce || !reranked || prev === undefined) return;
       const shown = Number(gsap.getProperty(el, 'y')) || 0;
       const from = prev + shown - top;
-      if (Math.abs(from) > 0.5) gsap.fromTo(el, { y: from }, { y: 0, duration: 0.36, ease: 'power3.inOut', overwrite: true });
+      if (Math.abs(from) > 0.5) gsap.fromTo(el, { y: from }, { y: 0, duration: 0.3, ease: 'power3.inOut', overwrite: true });
     });
     lastTops.current = next;
-  }, [strip.map((r) => r.siteId).join('|')]);
+  }, [strip.map((r) => r.siteId).join('|'), order]);
 
   function select(row: RankedRow | undefined) {
     const site = row ? siteById.get(row.siteId) : undefined;
@@ -65,18 +80,29 @@ export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
 
   if (ranked.length === 0) return null;
   const first = ranked[0];
-  const announcement =
-    slipDays > 0 && evaluation.status === 'answer'
-      ? `Delay ${slipDays} ${slipDays === 1 ? 'day' : 'days'}: ${siteById.get(first.siteId)?.name ?? first.siteId} is now first${first.moved > 0 ? `, ${movedText(first.moved)}` : ''}.`
-      : '';
+  // Said once the ranking for the new delay has arrived, never from the previous ranking.
+  if (!updating) {
+    lastSaid.current =
+      slipDays > 0
+        ? `Delay ${slipDays} ${slipDays === 1 ? 'day' : 'days'}: ${siteById.get(first.siteId)?.name ?? first.siteId} is now first${first.moved > 0 ? `, ${movedText(first.moved)}` : ''}.`
+        : '';
+  }
+  const announcement = lastSaid.current;
+  // "01 to 05 of 17": the ranks of the first and last row shown, and of the last site ranked.
+  const last = ranked[ranked.length - 1];
+  const range = {
+    from: siteQuantities(strip[0].rank, strip[0].evaluation).rank,
+    to: siteQuantities(strip[strip.length - 1].rank, strip[strip.length - 1].evaluation).rank,
+    of: siteQuantities(last.rank, last.evaluation).rank,
+  };
 
   return (
-    <Glass as="section" brackets={false} className="flex flex-col gap-1.5 p-2.5" aria-label="Ranked sites" data-testid="rank-strip">
+    <Glass as="section" brackets={false} className="flex flex-col gap-1.5 p-2.5" aria-label="Ranked sites" aria-busy={updating} data-testid="rank-strip" data-panel>
       <div className="flex items-center justify-between gap-2 pl-1.5">
         <h3 className="panel-title m-0">Ranking</h3>
         <div className="flex items-center gap-1">
           <span className="num mr-1 text-[12px] text-muted" data-testid="strip-range">
-            {strip[0].rank} to {strip[strip.length - 1].rank} of {ranked.length}
+            {range.from.text} to {range.to.text} of {range.of.text}
           </span>
           <button type="button" className="btn btn-quiet btn-icon" aria-label="Spotlight the site ranked above" disabled={at <= 0} onClick={() => step(-1)} data-testid="strip-up">
             <Icon name="chevron-up" />
@@ -93,7 +119,7 @@ export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
         ref={listRef}
         role="listbox"
         aria-label={`Ranked sites, ${strip[0].rank} to ${strip[strip.length - 1].rank} of ${ranked.length}. Arrow keys move the spotlight.`}
-        aria-activedescendant={focus ? `strip-${focus.id}` : undefined}
+        aria-activedescendant={focus && at >= 0 ? `strip-${focus.id}` : undefined}
         tabIndex={0}
         className="relative flex flex-col gap-0.5 rounded-[3px] outline-offset-2"
         onKeyDown={onKeyDown}
@@ -114,7 +140,7 @@ export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
               aria-selected={active}
               data-site-id={row.siteId}
               data-testid="ranked-row"
-              className={`grid min-h-11 cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)_auto_3.25rem] items-center gap-x-2.5 rounded-[3px] border px-2 py-1 ${active ? 'border-line-strong bg-accent-soft' : 'border-transparent hover:bg-accent-soft'}`}
+              className={`settling grid min-h-11 cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)_auto_3.25rem] items-center gap-x-2.5 rounded-[3px] border px-2 py-1 short:min-h-10 ${active ? 'border-line-strong bg-accent-soft' : 'border-transparent hover:bg-accent-soft'}`}
               onClick={() => select(row)}
             >
               <span className="num text-[14px] text-ink-2" data-testid="row-rank">

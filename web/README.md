@@ -20,6 +20,15 @@ The landing card that opens over it on first load:
 
 ![The landing card over the Orbit stage](docs/screens/landing-card-1440x900.png)
 
+**Stage 2, Mission select.** One site in the spotlight, the ranked strip under it and the
+launch-delay scrubber, here with a delay of one week: the ranking has reordered.
+
+![Stage 2, Mission select: the spotlight panel and ranked strip at the left, the mission line and delay scrubber across the top, the Moon turned to the spotlight site](docs/screens/stage-2-mission-select-1440x900.png)
+
+The site drawer, slid in from its handle and open on the preset list:
+
+![The site drawer open at the right of mission select, listing the preset sites with their ranks](docs/screens/stage-2-drawer-1440x900.png)
+
 ## Run it on your computer
 
 You need Node.js 22 or newer (it includes `npm`). Then, in a terminal:
@@ -203,7 +212,18 @@ never changes the launch date. Four panels read out, once per frame:
 The one action here is **Enter mission select**. The Moon's surface pattern is a generated
 illustration, not a map; a line on screen says so.
 
-**Stage 2, Mission select** and **stage 3, Site** follow in the next commits of this branch.
+**Stage 2, Mission select.** The camera turns the Moon to one site and marks it with a reticle and a
+name tag. That site is the **spotlight**: the panel at the left gives its rank as a large numeral,
+its name, sunlight, score, Earth link, power margin, pass or fail with the reason, and **Zoom in to
+this site**. Under it a short **ranking** strip shows the rows around it: click one or use the arrow
+keys to move the spotlight; **Follow the best site** hands it back. Across the top, the mission in
+one line opens the **mission planner**, and the **launch delay** scrubber moves the landing: the
+ranking reorders and each row says how far its site moved; the planned launch never changes.
+Presets, coordinates and saved sites are in a glass **drawer** at the right, so a long list never
+buries the one site that matters; the **Mission Assistant** runs along the bottom. The picture
+shifts to keep the site's marker and tag clear of the open panels (`src/scene/missionView.ts`).
+
+**Stage 3, Site** follows in the next commits of this branch.
 
 **Where the numbers come from.** Every readout shows a quantity from the API layer (in mock mode,
 the mock model): nothing on screen is random or made up, and a readout shows a dash until its data
@@ -224,7 +244,8 @@ Margin of 25 % or more: green. From 0 % up to 25 %: yellow (exactly 0 % counts a
 red. The words next to the number repeat the meaning and name the limiting check.
 
 **Reduced motion.** Visitors whose system asks for reduced motion get no camera sway or lean, no
-flights (stages switch at once) and a preview that starts paused.
+flights (stages switch at once), a preview that starts paused and a ranking that reorders at once
+instead of sliding.
 
 **Type and colour.** Three type families, served from this site: Oxanium (titles and labels), Geist
 Mono (readouts) and Geist (chat and longer text). Every colour is a CSS variable in
@@ -239,14 +260,26 @@ web/
   src/main.tsx             start-up
   src/App.tsx              the 3D space, the HUD over it and the landing card
   src/api/                 client.ts (network), types.ts (provisional), mock/, examples/
-  src/state/               app state, data loading, the geometry track loader, the four-state hook
+  src/state/               app state, data loading, the geometry track loader, the four-state hook,
+                           assistant.ts (the assistant's conversation)
   src/stages/              the HUD of each stage, the top bar, the landing card, the clocks
+    MissionHud.tsx         mission select: where its panels sit, and what they leave of the window
+    Spotlight.tsx          the spotlight site: rank, name, readouts, pass or fail, zoom in
+    RankStrip.tsx          the short ranked strip under the spotlight
+    MissionBar.tsx         the mission in one line, the launch-delay scrubber, the dates
+    SeasonLine.tsx         "Lunar south pole: summer" with its note
+    SiteDrawer.tsx         the drawer: presets, coordinates, saved sites
+    MissionSheet.tsx       the mission planner sheet
+    Assistant.tsx          the Mission Assistant (along the bottom, or as a sheet)
+    SiteHud.tsx            the site stage's HUD (provisional)
   src/hud/                 reusable HUD pieces: glass panel, readout, ring dial, reticle, line graph,
                            drawer, sheet, leader lines, parallax
-  src/scene/               the 3D space: Moon world, ring system, camera director, 2D fallback
-  src/components/          icons and shared parts
+  src/scene/               the 3D space: Moon world, ring system, camera director, 2D fallback;
+                           orbitView.ts and missionView.ts (where things sit on screen, as arithmetic)
+  src/components/          icons, ComparePanel.tsx (saved sites side by side) and shared parts
   src/util/                time (LTC), geometry, the Sun and Earth track, horizon reading, readout
-                           quantities, season, power colours, ranking
+                           quantities, season, power colours, ranking, mission.ts (the one-line
+                           mission summary), storage.ts (battery entry)
   src/styles/              theme.css (every colour), fonts.css, index.css
   src/assets/fonts/        the three font families and their licences
   e2e/path.spec.ts         the browser tests

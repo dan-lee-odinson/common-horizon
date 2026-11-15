@@ -8,6 +8,10 @@
 //   fade    decoration: fades in place
 // One entrance per container: the children of a wing do not animate again inside it.
 // Visitors who prefer reduced motion get a plain, short fade of everything together.
+//
+// The entrance fades with opacity only and never hides a container (no `visibility: hidden`): a
+// hidden control refuses keyboard focus and drops out of the Tab order, so a key pressed while the
+// stage arrives would be lost. Controls work from the first frame; the entrance is only paint.
 
 import { useLayoutEffect, type RefObject } from 'react';
 import gsap from 'gsap';
@@ -23,20 +27,20 @@ export function useEntrance(rootRef: RefObject<HTMLElement | null>, play: boolea
         const all = root.querySelectorAll('[data-enter]');
         if (all.length === 0) return;
         if (context.conditions?.reduce) {
-          gsap.from(all, { autoAlpha: 0, duration: 0.2, ease: 'none', clearProps: 'opacity,visibility' });
+          gsap.from(all, { opacity: 0, duration: 0.2, ease: 'none', clearProps: 'opacity' });
           return;
         }
-        const tl = gsap.timeline({ delay, defaults: { ease: 'expo.out', clearProps: 'opacity,visibility,transform' } });
+        const tl = gsap.timeline({ delay, defaults: { ease: 'expo.out', clearProps: 'opacity,transform' } });
         const group = (kind: string) => Array.from(root.querySelectorAll(`[data-enter="${kind}"]`));
         const add = (kind: string, vars: gsap.TweenVars, at: number) => {
           const els = group(kind);
           if (els.length) tl.from(els, vars, at);
         };
-        add('lead', { autoAlpha: 0, y: 22, duration: 0.62 }, 0);
-        add('left', { autoAlpha: 0, x: -30, duration: 0.56 }, 0.07);
-        add('right', { autoAlpha: 0, x: 30, duration: 0.56 }, 0.12);
-        add('rise', { autoAlpha: 0, y: 12, duration: 0.5 }, 0.16);
-        add('fade', { autoAlpha: 0, duration: 0.45, ease: 'power1.out' }, 0.22);
+        add('lead', { opacity: 0, y: 22, duration: 0.62 }, 0);
+        add('left', { opacity: 0, x: -30, duration: 0.56 }, 0.07);
+        add('right', { opacity: 0, x: 30, duration: 0.56 }, 0.12);
+        add('rise', { opacity: 0, y: 12, duration: 0.5 }, 0.16);
+        add('fade', { opacity: 0, duration: 0.45, ease: 'power1.out' }, 0.22);
       },
       root,
     );

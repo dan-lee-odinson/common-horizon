@@ -19,17 +19,25 @@ test('stage 1: orbit', async ({ page }, info) => {
 
 test('stage 2: mission select', async ({ page }, info) => {
   const size = info.project.name;
+  const wide = size === '1440x900';
+  const view = page.viewportSize()!;
   await page.goto('/');
   await page.getByTestId('begin').click();
   await page.getByTestId('enter-mission').click();
-  await page.getByTestId('spotlight-name').waitFor();
+  await page.getByTestId(wide ? 'spotlight-name' : 'mission-hud').waitFor();
   // A week's delay: the ranking has reordered and the rows show how far each site moved.
   await page.getByTestId('slip').fill('7');
-  await page.waitForTimeout(5000);
+  if (wide) await page.getByTestId('moved').first().waitFor();
+  // The pointer rests in the middle, so the panels sit square; then the camera comes to rest on the new best site.
+  await page.mouse.move(view.width / 2, view.height / 2);
+  await page.waitForTimeout(6000);
   await page.screenshot({ path: `${DIR}/stage-2-mission-select-${size}.png` });
-  if (size === '1440x900') {
+  if (wide) {
+    // The site drawer, open on the preset list.
     await page.getByTestId('drawer-toggle').click();
-    await page.waitForTimeout(1200);
+    await page.getByTestId('preset').first().waitFor();
+    await page.mouse.move(view.width / 2, view.height / 2);
+    await page.waitForTimeout(2500);
     await page.screenshot({ path: `${DIR}/stage-2-drawer-${size}.png` });
   }
 });

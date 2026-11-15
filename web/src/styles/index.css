@@ -16,6 +16,10 @@
   --breakpoint-lg: 70rem;
 }
 
+/* A short window (a laptop screen about 720 px tall): `short:` utilities tighten the tall panels
+   of mission select so everything still fits without scrolling. */
+@custom-variant short (@media (max-height: 820px));
+
 @layer base {
   html,
   body,
@@ -234,6 +238,12 @@
     letter-spacing: -0.03em;
     line-height: 1.02;
   }
+  /* In a short window the largest figures step down, so the panels that carry them stay compact. */
+  @media (max-height: 820px) {
+    .readout-value[data-size='xl'] {
+      font-size: clamp(28px, 2.6vw, 34px);
+    }
+  }
   .readout-unit {
     font-size: max(12px, 0.6em);
     font-weight: 400;
@@ -352,6 +362,20 @@
       background: rgb(95 230 245 / 0.08);
       border-color: var(--ch-line);
       color: var(--ch-ink);
+    }
+  }
+  /* A button that floats over the scene by itself, not on a panel: it carries its own glass, so
+     its label keeps its contrast when the sunlit Moon passes behind it. */
+  .btn-glass {
+    background: var(--ch-glass-strong);
+    -webkit-backdrop-filter: blur(12px) brightness(var(--ch-glass-dim));
+    backdrop-filter: blur(12px) brightness(var(--ch-glass-dim));
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-glass:hover:not(:disabled) {
+      background:
+        linear-gradient(rgb(95 230 245 / 0.14), rgb(95 230 245 / 0.14)),
+        var(--ch-glass-strong);
     }
   }
   .field {
@@ -570,11 +594,14 @@
       opacity 200ms ease,
       visibility 0s;
   }
-  /* The assistant's history. At most about 40 % of the window height; with content, at least six
-     lines tall (15 px text, 1.5 line height). */
+  /* The assistant's history. At most 40 % of the window height; with content, at least six lines
+     tall (15 px text, 1.5 line height). In a short window it stops lower still, so a band of the
+     scene stays open between the mission bar and the history for the spotlight site's marker: the
+     reticle is about 17.5 % of the height across, and --scene-top is where the bar ends (measured
+     in mission select; 17rem until then). 12.25rem keeps the six lines whatever the height. */
   .chat-panel {
-    max-height: 40vh;
-    max-height: 40dvh;
+    max-height: min(40vh, max(12.25rem, calc(82.5vh - var(--scene-top, 17rem) - 6.5rem)));
+    max-height: min(40dvh, max(12.25rem, calc(82.5dvh - var(--scene-top, 17rem) - 6.5rem)));
   }
   /* The log is a flex item: this explicit minimum (no min-h-0 utility on it, which would win over a
      component rule) lets it shrink to six lines and scroll beyond that. */
@@ -583,6 +610,18 @@
     font-size: 15px;
     line-height: 1.5;
     min-height: calc(6 * 1.5em + 1rem);
+  }
+
+  /* ---------- updating ---------- */
+  /* Figures that are being worked out again stay on screen, a little dimmed, until the new answer
+     lands; the panel around them carries aria-busy. Quiet on purpose: nothing blanks and nothing
+     spins over the data. The short delay keeps an answer that lands at once from flickering. */
+  .settling {
+    transition: opacity 160ms ease;
+  }
+  [aria-busy='true'] .settling {
+    opacity: 0.62;
+    transition: opacity 220ms ease 120ms;
   }
 
   /* ---------- reticle ---------- */

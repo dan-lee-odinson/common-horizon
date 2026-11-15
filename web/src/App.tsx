@@ -52,7 +52,9 @@ function Shell() {
   const noScene = <FlatWorld />;
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-space" data-testid="app" data-stage={stage}>
+    // `overflow-clip`, not `overflow-hidden`: a drawer that is sliding in from beyond the edge must
+    // never let the whole stage be scrolled sideways (a Tab into it would do that otherwise).
+    <div className="relative h-dvh w-full overflow-clip bg-space" data-testid="app" data-stage={stage}>
       {webgl ? (
         <SceneBoundary fallback={noScene}>
           <Suspense fallback={null}>

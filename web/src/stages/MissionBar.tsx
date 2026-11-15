@@ -1,6 +1,7 @@
 // Across the top of mission select: the mission in one line (it opens the mission planner sheet),
 // and the launch-delay scrubber. Dragging the delay moves the landing along the lunar day, so the
-// ranking reorders and the spotlight updates.
+// ranking reorders and the spotlight updates. The planned launch is shown beside the landing and
+// never moves: the delay is added to it, it does not replace it.
 
 import { useId } from 'react';
 import { Icon } from '../components/Icon';
@@ -11,9 +12,10 @@ import { useData } from '../state/data';
 import { useStore } from '../state/store';
 import { missionSummary } from '../util/mission';
 import { missionDates } from '../util/quantities';
+import { SeasonLine } from './SeasonLine';
 
 export function MissionBar() {
-  const { catalog, hardwareChosen, storageKwh, landingMs, landingGeometry, evaluation } = useData();
+  const { catalog, hardwareChosen, storageKwh, landingMs, landingGeometry, updating } = useData();
   const launchUtcMs = useStore(appStore, (s) => s.launchUtcMs);
   const slipDays = useStore(appStore, (s) => s.slipDays);
   const stayDays = useStore(appStore, (s) => s.stayDays);
@@ -23,7 +25,7 @@ export function MissionBar() {
   const dates = missionDates(launchUtcMs, slipDays, landingMs, landingGeometry);
 
   return (
-    <Glass as="section" brackets={false} className="flex flex-col gap-2 px-4 pb-2 pt-2.5" aria-label="Mission and launch delay" data-testid="mission-bar">
+    <Glass as="section" brackets={false} className="flex flex-col gap-2 px-4 pb-2 pt-2.5" aria-label="Mission and launch delay" data-testid="mission-bar" data-panel>
       <div className="flex min-w-0 items-center gap-3">
         <p className="m-0 line-clamp-2 min-w-0 flex-1 break-words text-[14px] leading-snug text-ink" title={summary.text} data-testid="mission-summary">
           <span className="label mr-2 align-baseline">Mission</span>
@@ -65,26 +67,26 @@ export function MissionBar() {
         </div>
       </div>
 
-      <dl className="num m-0 flex flex-wrap items-baseline gap-x-5 gap-y-0.5 text-[13px] text-ink-2" aria-busy={evaluation.refreshing || undefined}>
-        <div className="flex items-baseline gap-1.5" data-q="launch">
-          <dt className="label">Launch</dt>
-          <dd className="m-0 text-ink">
-            <span data-q-text>{dates.launch.text}</span> <span data-q-unit>{dates.launch.unit}</span>
-          </dd>
-        </div>
-        <div className="flex items-baseline gap-1.5" data-q="landing">
-          <dt className="label">Landing</dt>
-          <dd className="m-0 text-ink">
-            <span data-q-text>{dates.landing.text}</span> <span data-q-unit>{dates.landing.unit}</span>
-          </dd>
-        </div>
-        <div className="flex items-baseline gap-1.5">
-          <dt className="label">South pole</dt>
-          <dd className="m-0 font-sans" data-tone={dates.seasonLine.tone} data-testid="mission-season">
-            {dates.seasonLine.text}
-          </dd>
-        </div>
-      </dl>
+      {/* The landing and the season belong to the ranking on screen: they dim with it while a newer one is on its way. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5" aria-busy={updating}>
+        <dl className="num m-0 flex flex-wrap items-baseline gap-x-4 gap-y-0.5 text-[13px] text-ink-2">
+          <div className="flex items-baseline gap-1.5" data-q={dates.plannedLaunch.key} title="The planned launch. The delay is added to it and never changes it.">
+            <dt className="label">
+              Planned<span className="sr-only"> launch</span>
+            </dt>
+            <dd className="m-0 text-ink" data-testid="planned-launch">
+              <span data-q-text>{dates.plannedLaunch.text}</span> <span data-q-unit>{dates.plannedLaunch.unit}</span>
+            </dd>
+          </div>
+          <div className="flex items-baseline gap-1.5" data-q={dates.landing.key}>
+            <dt className="label">Landing</dt>
+            <dd className="settling m-0 text-ink" data-testid="landing">
+              <span data-q-text>{dates.landing.text}</span> <span data-q-unit>{dates.landing.unit}</span>
+            </dd>
+          </div>
+        </dl>
+        <SeasonLine line={dates.seasonLine} season={dates.season} className="settling" />
+      </div>
     </Glass>
   );
 }

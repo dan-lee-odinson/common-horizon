@@ -80,7 +80,7 @@ export function AssistantDock({ className = '' }: { className?: string }) {
   }
 
   return (
-    <section ref={sectionRef} aria-label="Mission Assistant" className={`glass glass-strong flex flex-col ${className}`} data-testid="assistant" onKeyDown={onSectionKeyDown}>
+    <section ref={sectionRef} aria-label="Mission Assistant" className={`glass glass-strong flex flex-col ${className}`} data-testid="assistant" data-panel onKeyDown={onSectionKeyDown}>
       {log.length > 0 ? (
         <div ref={panelRef} id={ids.panel} role="region" aria-labelledby={ids.heading} hidden={!showPanel} className="chat-panel flex min-h-0 flex-col border-b border-line" data-testid="chat-panel">
           <div className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-1.5">

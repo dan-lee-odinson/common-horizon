@@ -26,13 +26,3 @@ export function useReducedMotion(): boolean {
 export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia(REDUCED_MOTION_QUERY).matches;
 }
-
-function subscribeResize(cb: () => void) {
-  window.addEventListener('resize', cb);
-  return () => window.removeEventListener('resize', cb);
-}
-
-/** The window's height in CSS pixels (for layouts that show fewer rows in a short window). */
-export function useWindowHeight(): number {
-  return useSyncExternalStore(subscribeResize, () => window.innerHeight, () => 900);
-}

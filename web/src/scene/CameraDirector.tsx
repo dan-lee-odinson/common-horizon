@@ -3,8 +3,9 @@
 //   orbit    back from the Moon, looking down on the ring system at an angle. The camera sits on
 //            the side away from Earth, turned so Earth stands behind the Moon and to the right;
 //            it sways a few degrees and leans a little with the pointer.
-//   mission  close to the Moon, turned to the site in the spotlight, the Moon set off-centre; the
-//            visitor can turn and zoom the Moon
+//   mission  close to the Moon, turned to the site in the spotlight, the Moon set off-centre and
+//            the picture shifted so the site's marker and tag stay clear of the glass panels (see
+//            missionView.ts); the visitor can turn and zoom the Moon
 //   site     the dive to the site ("in"), and the climb back out ("out")
 // Visitors who prefer reduced motion get cuts instead of flights, and no sway or lean.
 
@@ -17,6 +18,7 @@ import { useStore } from '../state/store';
 import { normalizeLon360 } from '../util/geo';
 import { DAY_MS, SYNODIC_MONTH_DAYS } from '../util/time';
 import { earthSwing } from '../util/track';
+import { missionCameraLatitude, missionDistance as missionDistanceFor, missionFrame, placeInFrame } from './missionView';
 import { ORBIT_VIEW, orbitCameraLongitude, orbitDistance, orbitEarthSide } from './orbitView';
 import { geometryNow, toVector, type SceneData } from './sceneData';
 
@@ -49,12 +51,6 @@ interface Pose {
   roll: number;
 }
 
-/** Distance at which a sphere of `radius` Moon radii just fits the given share of the view. */
-function fitDistance(radius: number, aspect: number, shareX: number, shareY: number): number {
-  const tanV = Math.tan((ORBIT_VIEW.fov * Math.PI) / 360);
-  return Math.max(radius / (tanV * aspect * shareX), radius / (tanV * shareY));
-}
-
 export function CameraDirector({ data }: { data: SceneData }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const size = useThree((s) => s.size);
@@ -64,7 +60,6 @@ export function CameraDirector({ data }: { data: SceneData }) {
   const { isPhone, reducedMotion } = data;
   const focusLat = data.focus?.lat ?? null;
   const focusLon = data.focus?.lon_east ?? null;
-  const aspect = size.width / Math.max(1, size.height);
   // Where Earth is overhead fixes which side the Orbit camera looks from: the middle of the range
   // its longitude swings through over the lunar day (so Earth stays in the frame all the way), or
   // its landing value until the track has arrived.
@@ -80,6 +75,8 @@ export function CameraDirector({ data }: { data: SceneData }) {
   /** The live picture shift and roll; tweened with the camera. */
   const view = useRef({ shiftX: 0, shiftY: 0, roll: 0 });
   const tween = useRef<gsap.core.Tween | null>(null);
+  /** The pose a flight is heading for, while one is under way. */
+  const flightTo = useRef<Pose | null>(null);
   const lookAt = useRef(new THREE.Vector3());
   const first = useRef(true);
   /** The stage the camera was last sent to. */
@@ -91,7 +88,12 @@ export function CameraDirector({ data }: { data: SceneData }) {
   const scratch = useMemo(() => new THREE.Vector3(), []);
 
   const orbitD = useMemo(() => orbitDistance(size.width, size.height, isPhone), [size.width, size.height, isPhone]);
-  const missionDistance = isPhone ? clamp(fitDistance(1, aspect, 0.86, 0.36), 3.2, 9) : clamp(fitDistance(1, aspect, 0.6, 0.86), 3.3, 6);
+  const missionDistance = missionDistanceFor(size.width, size.height, isPhone);
+  // Where the panels of mission select leave room for the spotlight site's marker and tag.
+  const frame = useStore(missionFrame, (s) => s);
+  const placement = placeInFrame(frame, size.width, size.height, focusLat);
+  const missionShiftX = isPhone ? 0 : Math.round(placement.shiftX);
+  const missionShiftY = isPhone ? Math.round(size.height * 0.2) : Math.round(placement.shiftY);
 
   function orbitPosition(out: THREE.Vector3): THREE.Vector3 {
     const d = drift.current;
@@ -104,14 +106,8 @@ export function CameraDirector({ data }: { data: SceneData }) {
     }
     // Face the spotlight site; otherwise the southern near side, where most sites are. Latitude is
     // limited so the camera never sits over a pole (its "up" is the Moon's axis).
-    const facing = focusLat !== null && focusLon !== null ? toVector(clamp(focusLat, -58, 58), focusLon) : toVector(-40, 20);
-    return {
-      position: facing.multiplyScalar(missionDistance),
-      target: new THREE.Vector3(),
-      shiftX: isPhone ? 0 : size.width * 0.13,
-      shiftY: isPhone ? size.height * 0.2 : 0,
-      roll: 0,
-    };
+    const facing = focusLat !== null && focusLon !== null ? toVector(missionCameraLatitude(focusLat), focusLon) : toVector(-40, 20);
+    return { position: facing.multiplyScalar(missionDistance), target: new THREE.Vector3(), shiftX: missionShiftX, shiftY: missionShiftY, roll: 0 };
   }
 
   function diveEnd(lat: number, lon: number): Pose {
@@ -127,7 +123,9 @@ export function CameraDirector({ data }: { data: SceneData }) {
    */
   function flyTo(to: Pose, duration: number, ease: string, onComplete?: () => void) {
     tween.current?.kill();
+    gsap.killTweensOf(view.current);
     holding.current = false;
+    flightTo.current = to;
     const startPos = camera.position.clone();
     const startH = Math.max(1e-3, startPos.length() - 1);
     const startDir = startPos.clone().normalize();
@@ -161,6 +159,7 @@ export function CameraDirector({ data }: { data: SceneData }) {
       onUpdate: apply,
       onComplete: () => {
         apply();
+        flightTo.current = null;
         onComplete?.();
       },
     });
@@ -204,10 +203,30 @@ export function CameraDirector({ data }: { data: SceneData }) {
     });
     return () => {
       tween.current?.kill();
+      flightTo.current = null;
       holding.current = false;
     };
     // Re-run when the destination changes, not on every camera move.
   }, [stage, focusLat, focusLon, controls, orbitD, missionDistance, isPhone, size.width, size.height, earthLon, earthSide]);
+
+  // Mission select: when a panel opens or closes (the drawer, the assistant's history), only the
+  // picture slides to keep the marker clear. The camera stays where it is, so a Moon the visitor
+  // has turned by hand is not turned back.
+  useEffect(() => {
+    // Not during the dive to the site: that flight ends with the picture centred on the site.
+    if (stage !== 'mission' || flight === 'in') return;
+    const flying = flightTo.current;
+    if (flying) {
+      // A flight is under way: it lands on the new shift.
+      flying.shiftX = missionShiftX;
+      flying.shiftY = missionShiftY;
+      return;
+    }
+    const slide = gsap.to(view.current, { shiftX: missionShiftX, shiftY: missionShiftY, duration: reducedMotion ? 0 : 0.5, ease: 'power3.out', overwrite: true });
+    return () => {
+      slide.kill();
+    };
+  }, [stage, flight, missionShiftX, missionShiftY, reducedMotion]);
 
   // "Zoom in to this site": dive to the site, then the terrain takes over.
   useEffect(() => {
@@ -219,6 +238,7 @@ export function CameraDirector({ data }: { data: SceneData }) {
     flyTo(diveEnd(focusLat, focusLon), 1.5, 'power2.in', actions.finishFlightIn);
     return () => {
       tween.current?.kill();
+      flightTo.current = null;
     };
   }, [flight, focusLat, focusLon, controls]);
 

@@ -15,6 +15,7 @@ export function Sheet({
   children,
   testId,
   wide = false,
+  fit = false,
   phone = false,
 }: {
   open: boolean;
@@ -25,13 +26,21 @@ export function Sheet({
   children: ReactNode;
   testId?: string;
   wide?: boolean;
+  /** With `wide`: only as wide as the content needs (never narrower than the plain sheet). */
+  fit?: boolean;
   phone?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayer(ref, open, onClose, { trap: true });
   const placement = phone
     ? 'inset-x-0 bottom-0 max-h-[90%] rounded-b-none border-x-0 border-b-0'
-    : `left-1/2 top-[4.75rem] max-h-[calc(100%-6.5rem)] ${wide ? 'w-[min(72rem,calc(100vw-3rem))]' : 'w-[min(36rem,calc(100vw-3rem))]'}`;
+    : `left-1/2 top-[4.75rem] max-h-[calc(100%-6.5rem)] ${
+        wide
+          ? fit
+            ? 'w-max min-w-[min(36rem,calc(100vw-3rem))] max-w-[min(72rem,calc(100vw-3rem))]'
+            : 'w-[min(72rem,calc(100vw-3rem))]'
+          : 'w-[min(36rem,calc(100vw-3rem))]'
+      }`;
   const closed = phone ? 'translateY(calc(100% + 24px))' : 'translate(-50%, 14px) scale(0.985)';
   const shown = phone ? 'none' : 'translate(-50%, 0)';
   return (

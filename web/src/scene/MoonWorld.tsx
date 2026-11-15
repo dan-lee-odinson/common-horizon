@@ -21,6 +21,7 @@ import { anchors, type AnchorName } from './anchors';
 import { cssColor } from './colors';
 import { glowTexture } from './glow';
 import { hiddenByMoon } from './occlusion';
+import { MISSION_VIEW } from './missionView';
 import { ORBIT_VIEW, ringRadii } from './orbitView';
 import { geometryNow, sceneTimeMs, toVector, type SceneData } from './sceneData';
 import { DISC_FRAGMENT, DISC_VERTEX, EARTH_FRAGMENT, EARTH_VERTEX, MOON_FRAGMENT, MOON_VERTEX, RETICLE_FRAGMENT, RETICLE_VERTEX } from './shaders';
@@ -287,7 +288,7 @@ function SiteMarkers({ data }: { data: SceneData }) {
     <group>
       {data.sites.map((site) => {
         const active = site.id === data.focus?.id;
-        const pos = toVector(site.lat, site.lon_east, 1.004);
+        const pos = toVector(site.lat, site.lon_east, MISSION_VIEW.markerRadius);
         const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), pos.clone().normalize());
         return (
           <group key={site.id} position={pos} quaternion={quaternion}>
@@ -315,7 +316,7 @@ function SiteMarkers({ data }: { data: SceneData }) {
               <circleGeometry args={[active ? 0.012 : 0.009, 20]} />
               <meshBasicMaterial color={active ? colors.active : data.savedIds.has(site.id) ? colors.saved : colors.base} toneMapped={false} transparent opacity={stage === 'orbit' && !active ? 0.55 : 1} />
             </mesh>
-            {active ? <SiteReticle color={colors.active} pulsing={stage === 'mission' && !data.reducedMotion} size={stage === 'orbit' ? 0.2 : 0.3} /> : null}
+            {active ? <SiteReticle color={colors.active} pulsing={stage === 'mission' && !data.reducedMotion} size={stage === 'orbit' ? 0.2 : MISSION_VIEW.reticleSize} /> : null}
           </group>
         );
       })}
@@ -388,7 +389,8 @@ function MoonAnchors({
     }
     if (g && shown.current.earth) place('earth', toVector(g.subearth_lat, g.subearth_lon_east, earthDistance, v), false, earthRadius);
     else anchors.earth.visible = false;
-    if (d.focus) place('site', toVector(d.focus.lat, d.focus.lon_east, 1.004, v), true);
+    // The spotlight site's anchor carries the radius of its reticle's outer ring, so its tag sits just outside.
+    if (d.focus) place('site', toVector(d.focus.lat, d.focus.lon_east, MISSION_VIEW.markerRadius, v), true, MISSION_VIEW.reticleSize * MISSION_VIEW.ringShare);
     else anchors.site.visible = false;
     place('moon', v.set(0, 0, 0), false, 1);
     // The four numbered marks of the longitude scale ring.

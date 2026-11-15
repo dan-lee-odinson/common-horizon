@@ -35,6 +35,7 @@ export function ComparePanel({ phone }: { phone: boolean }) {
       note={`${saved.length} saved. The horizon plots share one height scale.`}
       testId="compare-panel"
       wide
+      fit
       phone={phone}
     >
       {open ? (

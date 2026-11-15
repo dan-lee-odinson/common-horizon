@@ -13,6 +13,15 @@ const STAGES: { id: Stage; label: string }[] = [
   { id: 'site', label: 'Site' },
 ];
 
+/** The dark wash behind the bar: it fades out downward, into the scene. */
+const BACKING = 'linear-gradient(to bottom, rgb(2 5 11 / 0.82), rgb(2 5 11 / 0))';
+/**
+ * In mission select the sunlit Moon can pass behind the bar (the picture moves up when the
+ * assistant's history opens). There the wash holds to the foot of the bar's text before it fades,
+ * so the words keep their contrast.
+ */
+const BACKING_UNDER_MOON = 'linear-gradient(to bottom, rgb(2 5 11 / 0.9), rgb(2 5 11 / 0.72) 70%, rgb(2 5 11 / 0))';
+
 export function TopBar() {
   const stage = useStore(appStore, (s) => s.stage);
   const flight = useStore(appStore, (s) => s.flight);
@@ -30,7 +39,7 @@ export function TopBar() {
   }
 
   return (
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-14 items-center gap-x-5 px-5 max-md:gap-x-3 max-md:px-3" style={{ background: 'linear-gradient(to bottom, rgb(2 5 11 / 0.82), rgb(2 5 11 / 0))' }}>
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-14 items-center gap-x-5 px-5 max-md:gap-x-3 max-md:px-3" style={{ background: stage === 'mission' ? BACKING_UNDER_MOON : BACKING }}>
       <h1 className="pointer-events-auto m-0 shrink-0 font-display text-[15px] font-semibold uppercase tracking-[0.24em] text-ink max-md:text-[13px] max-md:tracking-[0.18em]">Common Horizon</h1>
 
       <nav aria-label="Stages" className="pointer-events-auto max-md:hidden">
