@@ -11,6 +11,7 @@ wherever the backend runs.
 
 import json
 import math
+import re
 from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -61,6 +62,17 @@ class HorizonProfile:
             raise ProfileError("a profile needs at least one azimuth")
         if self.max_distance_m and len(self.max_distance_m) != len(azimuths):
             raise ProfileError("max_distance_m must have one entry per azimuth")
+        if not (math.isfinite(self.latitude_deg) and -90.0 <= self.latitude_deg <= 90.0):
+            raise ProfileError("latitude_deg must be finite and in [-90, 90]")
+        if not math.isfinite(self.longitude_deg):
+            raise ProfileError("longitude_deg must be finite")
+        if not math.isfinite(self.site_height_m):
+            raise ProfileError("site_height_m must be finite")
+        if not (math.isfinite(self.observer_height_m) and self.observer_height_m >= 0.0):
+            raise ProfileError("observer_height_m must be finite and not negative")
+        for distance in self.max_distance_m:
+            if distance is not None and not (math.isfinite(distance) and distance >= 0.0):
+                raise ProfileError("max_distance_m values must be null or finite and not negative")
         for azimuth in azimuths:
             if not (math.isfinite(azimuth) and 0.0 <= azimuth < 360.0):
                 raise ProfileError("azimuth_deg values must be finite and in [0, 360)")
@@ -180,9 +192,11 @@ class HorizonProfile:
                 ),
                 metadata={key: value for key, value in document.items() if key not in own_fields},
             )
+        except ProfileError:
+            raise
         except KeyError as missing:
             raise ProfileError(f"horizon profile is missing the field {missing.args[0]!r}") from None
-        except TypeError as error:
+        except (TypeError, ValueError) as error:
             raise ProfileError(f"horizon profile has a field of the wrong type: {error}") from None
 
     @classmethod
@@ -227,7 +241,9 @@ def load_profile(path: str | Path) -> HorizonProfile:
 
 def load_site_profile(site_id: str, directory: str | Path = DEFAULT_PROFILE_DIR) -> HorizonProfile:
     """Read the stored profile of a preset site, ``<directory>/<site_id>.json``."""
-    if not site_id or any(character in site_id for character in "/\\.") or site_id != site_id.strip():
+    # Site ids are lower-case letters, digits and hyphens. Anything else (a path separator, a drive
+    # letter, a dot) could name a file outside the folder.
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", site_id):
         raise ProfileError(f"not a site id: {site_id!r}")
     return load_profile(Path(directory) / f"{site_id}.json")
 

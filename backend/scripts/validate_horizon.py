@@ -24,7 +24,7 @@ the skyline is the geometric dip):
 With ``--compare-dir`` it repeats this for profiles of the same sites computed
 from the 240 m model alone and reports the differences as an error estimate.
 
-    python backend/scripts/validate_horizon.py --kernel-dir D:/data/naif \\
+    python backend/scripts/validate_horizon.py --kernel-dir /path/to/naif \\
         --sites shackleton-ridge nobile --year 2027 \\
         --compare-dir backend/data/horizon_validation --compare-suffix .240m
 """

@@ -219,15 +219,29 @@ def test_sample_distances_skip_a_pixel_and_a_half_then_grow():
     distances = sample_distances(40.0, settings)
     assert distances[0] == 60.0  # 1.5 pixels: the observer's own cell is skipped
     steps = np.diff(distances)
-    assert steps.min() == pytest.approx(20.0)  # half a pixel near the site
-    assert np.all(steps[distances[:-1] <= 80_000.0] == pytest.approx(20.0))
+    assert np.all(steps > 0)
     assert np.all(np.diff(steps) >= -1e-9)  # steps never shrink with distance
+    # Close to the site: no step longer than 0.5 % of the distance, and none split finer than 0.5 m.
+    near = distances[:-1] < 4000.0
+    assert steps[0] == pytest.approx(0.5)
+    assert np.all(steps[near] <= np.maximum(0.5, 0.005 * distances[:-1][near]) + 1e-9)
+    assert steps[near].min() >= 0.5 - 1e-9
+    # From 4 km to 80 km: half a pixel.
+    middle = (distances[:-1] >= 4000.0) & (distances[:-1] <= 80_000.0)
+    assert np.all(np.abs(steps[middle] - 20.0) < 1e-9)
+    # Beyond: 25 m per 100 km, so 100 m at 400 km.
     assert steps.max() == pytest.approx(0.00025 * distances[-2], rel=1e-9)
-    assert steps.max() <= 100.0  # 25 m per 100 km: 100 m at 400 km
+    assert steps.max() <= 100.0
     assert distances[-1] <= 400_000.0 < distances[-1] + steps[-1] * 1.001
+    # Every point of the plain half-pixel sequence is still a sample: the near field only gains points.
+    plain = sample_distances(40.0, SamplingSettings(near_step_fraction=1.0))
+    assert plain[0] == 60.0 and np.diff(plain).min() == pytest.approx(20.0)
+    assert np.isin(plain, distances).all()
 
     coarse = sample_distances(240.0, settings)
-    assert coarse[0] == 360.0 and np.diff(coarse).min() == pytest.approx(120.0)
+    assert coarse[0] == 360.0
+    assert np.diff(coarse)[0] == pytest.approx(120.0 / 67)  # 120 m split so no part exceeds 0.5 % of 360 m
+    assert np.diff(coarse).max() == pytest.approx(120.0)
 
 
 def test_sample_distances_refuse_bad_settings():
@@ -237,6 +251,42 @@ def test_sample_distances_refuse_bad_settings():
         sample_distances(40.0, SamplingSettings(max_range_m=10.0))
     with pytest.raises(ValueError):
         sample_distances(40.0, SamplingSettings(step_growth=-1.0))
+    with pytest.raises(ValueError):
+        sample_distances(40.0, SamplingSettings(near_step_fraction=0.0))
+    with pytest.raises(ValueError):
+        sample_distances(40.0, SamplingSettings(near_step_floor_m=0.0))
+
+
+def _rolling_ground(latitude_deg: float, longitude_deg: float) -> FunctionTerrain:
+    """Gentle bumps 8 m high and a few hundred metres across, the kind of ground that sets a near skyline."""
+    up, east, north = (np.asarray(vector) for vector in local_frame(latitude_deg, longitude_deg))
+
+    def height(vectors):
+        x, y = (vectors @ east) * R, (vectors @ north) * R
+        near = np.arccos(np.clip(vectors @ up, -1.0, 1.0)) * R < 20_000.0
+        bumps = 8.0 * (np.sin(x / 35.0) * np.cos(y / 45.0) + np.sin((x + y) / 60.0))
+        return np.where(near, bumps, 0.0)
+
+    return FunctionTerrain(height, 40.0, 16.0)
+
+
+def test_near_field_steps_are_fine_enough_to_have_converged():
+    # For an observer 2 m up, the elevation of ground 60 to 300 m away changes by about half a degree
+    # in 20 m. The skyline must not depend on where the samples happen to fall.
+    terrain = _rolling_ground(-85.0, 30.0)
+    stored_settings = compute_profile(terrain, -85.0, 30.0)
+    twice_as_fine = compute_profile(
+        terrain, -85.0, 30.0, settings=SamplingSettings(near_step_fraction=0.0025, near_step_floor_m=0.25)
+    )
+    half_pixel_only = compute_profile(terrain, -85.0, 30.0, settings=SamplingSettings(near_step_fraction=1.0))
+
+    change = np.abs(twice_as_fine.horizon_elevation_deg - stored_settings.horizon_elevation_deg)
+    assert change.max() < 0.005  # converged: halving the steps moves no ray by 0.005 degrees
+    # The split keeps every point of the plain half-pixel sequence, so it can only raise a maximum.
+    assert np.all(stored_settings.horizon_elevation_deg >= half_pixel_only.horizon_elevation_deg - 1e-12)
+    assert np.all(twice_as_fine.horizon_elevation_deg >= half_pixel_only.horizon_elevation_deg - 1e-12)
+    # Plain half-pixel steps would have been visibly too low on this ground.
+    assert (stored_settings.horizon_elevation_deg - half_pixel_only.horizon_elevation_deg).max() > 0.05
 
 
 def test_array_bound_matches_the_scalar_bound():
@@ -279,14 +329,14 @@ def test_data_that_ends_after_the_stopping_rule_is_met_is_not_flagged():
 
 
 def test_data_that_ends_before_the_stopping_rule_is_met_is_flagged():
-    # Data only within 1.01 km, east half only beyond that out to 5 km. West rays run out before the
+    # Data only within 1 km, east half only beyond that out to 5 km. West rays run out before the
     # tangent point: their value is the best of the data they had, and they are flagged.
     site = np.asarray(unit_from_lat_lon(20.0, 30.0))
     east = np.asarray(local_frame(20.0, 30.0)[1])
 
     def height(vectors):
         distance = np.arccos(np.clip(vectors @ site, -1.0, 1.0)) * R
-        has_data = (distance <= 1010.0) | ((distance <= 5000.0) & (vectors @ east > 0))
+        has_data = (distance <= 1002.0) | ((distance <= 5000.0) & (vectors @ east > 0))
         return np.where(has_data, 0.0, np.nan)
 
     result = compute_profile(FunctionTerrain(height, 40.0, 0.0), 20.0, 30.0)

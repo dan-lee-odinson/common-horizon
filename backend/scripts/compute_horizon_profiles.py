@@ -9,8 +9,8 @@ files of NASA Goddard PGDA product 90 in a folder outside the repository (see
 
 Run from the repository root (or anywhere; paths are resolved from this file)::
 
-    python backend/scripts/compute_horizon_profiles.py --dem-dir D:/data/lola --sites shackleton-ridge nobile
-    python backend/scripts/compute_horizon_profiles.py --dem-dir D:/data/lola --check-georeferencing
+    python backend/scripts/compute_horizon_profiles.py --dem-dir /path/to/lola --sites shackleton-ridge nobile
+    python backend/scripts/compute_horizon_profiles.py --dem-dir /path/to/lola --check-georeferencing
 
 Each site is written to ``backend/data/horizon/<site_id>.json``. Site coordinates
 are read from ``web/src/api/examples/sites.json`` (only read). The 40 m model is
@@ -148,6 +148,7 @@ def build_document(
     elevation = result.horizon_elevation_deg
     site_radius = MOON_RADIUS_M + result.site_height_m
     sources_used = sorted({int(source) for source in result.max_source if source != NO_DATA})
+    at_first_sample = result.max_distance_m == result.sample_distances_m[0]
     if coarse:
         quality = "COARSE: computed from the 240 m model alone; near-field terrain within 360 m is skipped"
     else:
@@ -171,6 +172,7 @@ def build_document(
             "rays_ran_out_of_data": int(result.ran_out_of_data.sum()),
             "rays_reached_max_range": int(result.reached_max_range.sum()),
             "rays_without_any_data": int((result.max_source == NO_DATA).sum()),
+            "rays_with_skyline_at_first_sample": int(at_first_sample.sum()),
             "models_supplying_the_skyline": [model_records[index]["file"] for index in sources_used],
         },
         "elevation_models": model_records,
@@ -180,6 +182,10 @@ def build_document(
             "first_sample_m": float(result.sample_distances_m[0]),
             "near_field_skipped_m": float(result.sample_distances_m[0]),
             "min_step_m": settings.min_step_pixels * pixel_size_m,
+            "near_field_steps": (
+                "close to the site each step is split so that none is longer than near_step_fraction of the "
+                "distance, down to near_step_floor_m"
+            ),
             "samples_per_ray_at_most": int(result.sample_distances_m.size),
             "interpolation": "bilinear between pixel centres",
             "stopping_rule": (
@@ -194,11 +200,14 @@ def build_document(
                 "ran_out_of_data: samples without elevation data came before the stopping rule was met, so "
                 "farther terrain that might have been higher is not in the value. reached_max_range: the ray "
                 "was walked to max_range_m. max_source: index into elevation_models of the model that gave "
-                "the skyline point, -1 if the ray had no data at all (the value is then the smooth-sphere dip)."
+                "the skyline point, -1 if the ray had no data at all (the value is then the smooth-sphere dip). "
+                "at_first_sample: the skyline point is the very first sample, at the edge of the skipped near "
+                "field, so nearer terrain that was skipped on purpose might have stood higher."
             ),
             "ran_out_of_data": [bool(flag) for flag in result.ran_out_of_data],
             "reached_max_range": [bool(flag) for flag in result.reached_max_range],
             "max_source": [int(source) for source in result.max_source],
+            "at_first_sample": [bool(flag) for flag in at_first_sample],
             "stop_distance_m": _round_list(result.stop_distance_m, 1),
         },
     }
@@ -349,6 +358,12 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--step-growth", type=float, default=SamplingSettings.step_growth)
     parser.add_argument("--max-range-km", type=float, default=SamplingSettings.max_range_m / 1000.0)
     parser.add_argument(
+        "--near-skip-pixels",
+        type=float,
+        default=SamplingSettings.near_skip_pixels,
+        help="distance of the first sample in pixels; for sensitivity studies, stored profiles use the default",
+    )
+    parser.add_argument(
         "--check-georeferencing", action="store_true", help="print the files' georeferencing, test it, exit"
     )
     return parser.parse_args(argv)
@@ -402,6 +417,7 @@ def main(argv: list[str] | None = None) -> int:
         azimuth_step_deg=arguments.azimuth_step_deg,
         step_growth=arguments.step_growth,
         max_range_m=arguments.max_range_km * 1000.0,
+        near_skip_pixels=arguments.near_skip_pixels,
     )
 
     for site_id, site_name, latitude, longitude in targets:

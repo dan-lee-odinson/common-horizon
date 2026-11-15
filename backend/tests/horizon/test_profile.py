@@ -104,6 +104,23 @@ def test_profiles_outside_the_conventions_are_refused(azimuths, elevations):
         _profile(azimuths, elevations)
 
 
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"latitude_deg": math.nan},
+        {"latitude_deg": 91.0},
+        {"longitude_deg": math.inf},
+        {"site_height_m": math.nan},
+        {"observer_height_m": -1.0},
+        {"observer_height_m": math.inf},
+        {"max_distance_m": (math.nan, 10.0)},
+    ],
+)
+def test_site_fields_outside_the_conventions_are_refused(override):
+    with pytest.raises(ProfileError):
+        _profile([0.0, 90.0], [1.0, 1.0], **override)
+
+
 def test_max_distance_must_match_the_azimuths():
     with pytest.raises(ProfileError):
         _profile([0.0, 90.0], [1.0, 1.0], max_distance_m=(100.0,))
@@ -129,7 +146,7 @@ def test_json_round_trip(tmp_path):
     assert load_site_profile("test", tmp_path) == profile
 
 
-@pytest.mark.parametrize("site_id", ["../secret", "a/b", "a\\b", "", " x", "x.json"])
+@pytest.mark.parametrize("site_id", ["../secret", "a/b", "a\\b", "", " x", "x.json", "C:zz", "Nobile", "a b", "-x"])
 def test_site_ids_that_are_not_plain_names_are_refused(site_id, tmp_path):
     with pytest.raises(ProfileError):
         load_site_profile(site_id, tmp_path)
@@ -143,6 +160,9 @@ def test_site_ids_that_are_not_plain_names_are_refused(site_id, tmp_path):
         lambda document: document.pop("horizon_elevation_deg"),
         lambda document: document.pop("site_height_m"),
         lambda document: document.update(azimuth_deg=None),
+        lambda document: document.update(horizon_elevation_deg=["high", 2.0]),
+        lambda document: document.update(site_height_m="unknown"),
+        lambda document: document.update(max_distance_m=[100.0, -5.0]),
     ],
 )
 def test_broken_profile_files_are_refused(change, tmp_path):
@@ -184,6 +204,42 @@ def test_summary_properties():
     assert (profile.min_elevation_deg, profile.max_elevation_deg, profile.mean_elevation_deg) == (-1.0, 5.0, 2.0)
 
 
+def test_the_six_site_profiles_are_stored():
+    # Without this, an empty folder would leave the per-file checks below with nothing to check.
+    stored = {path.stem for path in STORED_PROFILES}
+    expected = {"shackleton-ridge", "nobile", "im-2-athena", "im-1-odysseus", "draper-cp12", "chandrayaan-3"}
+    assert expected <= stored
+
+
+def test_far_skyline_from_shackleton_ridge_is_mons_mouton():
+    # Mons Mouton (IAU gazetteer: 84.6 S, 31 E) rises 6 km above the datum some 173 km from the site.
+    # On the polar map (x = rho sin(lon), y = rho cos(lon)) its bearing from the site works out to about
+    # 193 degrees. The only skyline points farther than 150 km must lie in that direction. This uses the
+    # stored profile alone, so it checks the direction of the real terrain wherever the tests run.
+    stored = load_site_profile("shackleton-ridge")
+
+    def map_xy(latitude, longitude):
+        rho = 2.0 * 1737.4 * math.tan(math.radians(90.0 + latitude) / 2.0)
+        return rho * math.sin(math.radians(longitude)), rho * math.cos(math.radians(longitude))
+
+    site_x, site_y = map_xy(stored.latitude_deg, stored.longitude_deg)
+    peak_x, peak_y = map_xy(-84.6, 31.0)
+    longitude = math.radians(stored.longitude_deg)
+    north = (math.sin(longitude), math.cos(longitude))  # away from the pole
+    east = (math.cos(longitude), -math.sin(longitude))  # toward growing east longitude
+    dx, dy = peak_x - site_x, peak_y - site_y
+    bearing = math.degrees(math.atan2(dx * east[0] + dy * east[1], dx * north[0] + dy * north[1])) % 360.0
+    assert bearing == pytest.approx(193.5, abs=1.0)
+
+    far = [
+        azimuth
+        for azimuth, distance in zip(stored.azimuth_deg, stored.max_distance_m, strict=True)
+        if distance is not None and distance > 150_000.0
+    ]
+    assert far, "expected some skyline points beyond 150 km"
+    assert all(abs(azimuth - bearing) < 15.0 for azimuth in far)
+
+
 @pytest.mark.parametrize("path", STORED_PROFILES, ids=lambda path: path.stem)
 def test_stored_profile_follows_the_contract_and_names_its_sources(path):
     profile = load_profile(path)
@@ -206,8 +262,13 @@ def test_stored_profile_follows_the_contract_and_names_its_sources(path):
             assert distance is None
         else:
             assert sampling["first_sample_m"] <= distance <= sampling["max_range_m"]
-    for key in ("ran_out_of_data", "reached_max_range", "max_source", "stop_distance_m"):
+    for key in ("ran_out_of_data", "reached_max_range", "max_source", "at_first_sample", "stop_distance_m"):
         assert len(coverage[key]) == 720
+    # The skyline points that sit on the edge of the skipped near field are flagged and counted.
+    at_edge = [distance == sampling["first_sample_m"] for distance in profile.max_distance_m]
+    assert coverage["at_first_sample"] == at_edge
+    assert document["summary"]["rays_with_skyline_at_first_sample"] == sum(at_edge)
+    assert sampling["near_step_fraction"] == 0.005 and sampling["near_step_floor_m"] == 0.5
 
     # Provenance: NASA LOLA files of PGDA product 90 with their citation, and nothing machine-specific.
     assert "10.3847/PSJ/acf3e1" in document["citation"]

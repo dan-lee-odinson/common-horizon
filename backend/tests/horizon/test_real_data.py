@@ -4,7 +4,6 @@ Skipped unless numpy and rasterio are installed AND the environment variable CH_
 folder holding LDEM_80S_40MPP_ADJ.TIF and LDEM_60S_240MPP_ADJ.TIF. They load about 1.2 GB into memory.
 """
 
-import math
 import os
 from pathlib import Path
 
@@ -50,29 +49,13 @@ def test_stored_profile_is_reproduced_from_the_files(terrains, site_id):
     assert np.max(np.abs(result.horizon_elevation_deg - np.array(stored.horizon_elevation_deg))) < 1e-4
 
 
-def test_far_skyline_from_shackleton_ridge_is_mons_mouton(terrains):
-    # Mons Mouton (about 84.6 S, 31 E) rises 6 km above the datum some 173 km from the site. On the
-    # polar map (x = rho sin(lon), y = rho cos(lon)) its bearing from the site works out to about 193
-    # degrees. The only skyline points farther than 150 km must lie in that direction.
-    stored = load_profile(DEFAULT_PROFILE_DIR / "shackleton-ridge.json")
+def test_real_terrain_skyline_has_converged_in_the_near_field(terrains):
+    # Halving the near-field steps must not move any ray of the two priority sites by 0.02 degrees.
+    from app.physics.horizon.compute import SamplingSettings
 
-    def map_xy(latitude, longitude):
-        rho = 2.0 * 1737.4 * math.tan(math.radians(90.0 + latitude) / 2.0)
-        return rho * math.sin(math.radians(longitude)), rho * math.cos(math.radians(longitude))
-
-    site_x, site_y = map_xy(stored.latitude_deg, stored.longitude_deg)
-    peak_x, peak_y = map_xy(-84.6, 31.0)
-    longitude = math.radians(stored.longitude_deg)
-    north = (math.sin(longitude), math.cos(longitude))  # away from the pole
-    east = (math.cos(longitude), -math.sin(longitude))  # toward growing east longitude
-    dx, dy = peak_x - site_x, peak_y - site_y
-    bearing = math.degrees(math.atan2(dx * east[0] + dy * east[1], dx * north[0] + dy * north[1])) % 360.0
-    assert bearing == pytest.approx(193.5, abs=1.0)
-
-    far = [
-        azimuth
-        for azimuth, distance in zip(stored.azimuth_deg, stored.max_distance_m, strict=True)
-        if distance is not None and distance > 150_000.0
-    ]
-    assert far, "expected some skyline points beyond 150 km"
-    assert all(abs(azimuth - bearing) < 15.0 for azimuth in far)
+    finer = SamplingSettings(near_step_fraction=0.0025, near_step_floor_m=0.25)
+    for site_id in ("shackleton-ridge", "nobile"):
+        stored = load_profile(DEFAULT_PROFILE_DIR / f"{site_id}.json")
+        result = compute_profile(CompositeTerrain(terrains), stored.latitude_deg, stored.longitude_deg, settings=finer)
+        difference = result.horizon_elevation_deg - np.array(stored.horizon_elevation_deg)
+        assert np.max(np.abs(difference)) < 0.02

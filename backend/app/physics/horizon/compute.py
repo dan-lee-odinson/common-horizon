@@ -21,7 +21,12 @@ THE NEAREST PIXEL AND A HALF OF TERRAIN IS SKIPPED ON PURPOSE, so that the
 observer's own cell (whose interpolated surface can rise above a 2 m observer on
 a slope) does not block the view. Terrain closer than that is not in the profile.
 From there the step is ``min_step_pixels`` (0.5) pixels and grows with distance as
-``step_growth * distance`` once that is larger.
+``step_growth * distance`` once that is larger. Close to the site each of those
+steps is split further, so that no step is longer than ``near_step_fraction``
+(0.005) of the distance, down to ``near_step_floor_m`` (0.5 m): for an observer
+2 m up, the elevation of ground 60 to 300 m away changes by about half a degree
+in 20 m, and half-pixel steps alone would miss the highest point of the
+interpolated surface there. Beyond 4 km (40 m pixels) the split no longer applies.
 
 Stopping. A ray stops when no terrain still ahead could beat the current maximum,
 judged with the elevation model's highest value (terrain at that height, at the
@@ -30,6 +35,7 @@ A ray that meets samples without elevation data before that rule is met is
 flagged ``ran_out_of_data``: its skyline is the highest of the data it did have.
 """
 
+import math
 from dataclasses import asdict, dataclass
 from typing import Protocol
 
@@ -65,6 +71,8 @@ class SamplingSettings:
     near_skip_pixels: float = 1.5  # first sample; nearer terrain is skipped (see the module docstring)
     min_step_pixels: float = 0.5  # step near the site, in pixels of the finest model
     step_growth: float = 0.00025  # step = max(min step, step_growth * distance): 25 m per 100 km
+    near_step_fraction: float = 0.005  # close to the site no step is longer than this share of the distance
+    near_step_floor_m: float = 0.5  # ... but steps are never split finer than this
     max_range_m: float = 400_000.0
     chunk_steps: int = 256  # distance samples handled per numpy pass; has no effect on the result
 
@@ -89,17 +97,31 @@ class ProfileResult:
 
 
 def sample_distances(pixel_size_m: float, settings: SamplingSettings) -> np.ndarray:
-    """Great-circle distances of the samples along a ray, metres, increasing."""
+    """Great-circle distances of the samples along a ray, metres, increasing.
+
+    The main sequence starts at the near-field skip and advances by half a pixel, or by
+    ``step_growth * distance`` once that is larger. Each of its steps is then split into equal
+    parts where needed to keep the near-field rule (see the module docstring); the points of the
+    main sequence are always kept.
+    """
     if pixel_size_m <= 0 or settings.min_step_pixels <= 0 or settings.near_skip_pixels <= 0:
         raise ValueError("pixel size, minimum step and near-field skip must be positive")
     if settings.step_growth < 0:
         raise ValueError("step_growth must not be negative")
+    if settings.near_step_fraction <= 0 or settings.near_step_floor_m <= 0:
+        raise ValueError("near_step_fraction and near_step_floor_m must be positive")
     minimum_step = settings.min_step_pixels * pixel_size_m
     distances = []
     distance = settings.near_skip_pixels * pixel_size_m
     while distance <= settings.max_range_m:
-        distances.append(distance)
-        distance += max(minimum_step, settings.step_growth * distance)
+        step = max(minimum_step, settings.step_growth * distance)
+        longest_allowed = max(settings.near_step_floor_m, settings.near_step_fraction * distance)
+        parts = max(1, math.ceil(step / longest_allowed - 1e-9))
+        for part in range(parts):
+            sample = distance + step * part / parts
+            if sample <= settings.max_range_m:
+                distances.append(sample)
+        distance += step
     if not distances:
         raise ValueError("max_range_m is closer than the first sample")
     return np.asarray(distances, dtype=np.float64)
