@@ -284,7 +284,15 @@ describe('where the camera comes to rest', () => {
     expect(up).toBeLessThan(11);
     expect(arrivalPitch({ az: 90, el: 1 }, up)).toBe(9);
     expect(arrivalPitch({ az: 90, el: 3.7 }, up)).toBeCloseTo(up - 3.7, 12);
-    expect(arrivalPitch({ az: 90, el: 9 }, up)).toBe(3);
+    // Lower than three degrees only where the Sun then fits (here just under nine degrees up), down to one degree.
+    expect(arrivalPitch({ az: 90, el: 9 }, up)).toBeCloseTo(up - 9, 12);
+    expect(arrivalPitch({ az: 90, el: 9 }, up)).toBeGreaterThanOrEqual(1);
+    expect(arrivalPitch({ az: 90, el: up - 0.5 }, up)).toBe(3);
+    expect(arrivalPitch({ az: 90, el: 15 }, up)).toBe(3);
+    // A picture with less height (a panel across the bottom): a Sun four and a half degrees up still fits.
+    const less = clearUpDeg(355, 900, 42);
+    expect(arrivalPitch({ az: 90, el: 4.4 }, less)).toBeCloseTo(less - 4.4, 12);
+    expect(arrivalPitch({ az: 90, el: 4.4 }, less)).toBeLessThan(3);
     // A high Sun, a Sun well below level, or none: the usual nine degrees.
     expect(arrivalPitch({ az: 90, el: 40 }, up)).toBe(9);
     expect(arrivalPitch({ az: 90, el: -20 }, up)).toBe(9);
@@ -292,7 +300,7 @@ describe('where the camera comes to rest', () => {
     // With the pitch chosen so, a Sun up to seven degrees high is no higher in the picture than the clear part reaches.
     for (const el of [0.5, 2, 3.7, 6, 7]) expect(arrivalPitch({ az: 0, el }, up) + el).toBeLessThanOrEqual(up + 1e-9);
     expect(restPose({ ...base, pitchDeg: 4 }).polarDeg).toBe(86);
-    expect(restPose({ ...base, pitchDeg: 0 }).polarDeg).toBe(87);
+    expect(restPose({ ...base, pitchDeg: 0 }).polarDeg).toBe(89);
     expect(restPose({ ...base, pitchDeg: 30 }).polarDeg).toBe(81);
   });
 

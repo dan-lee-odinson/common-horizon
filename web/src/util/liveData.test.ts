@@ -171,6 +171,18 @@ describe('a pass with the slope not checked', () => {
     expect(siteQuantities(1, evaluation({ slope_deg: null })).slope.value).toBeNull();
   });
 
+  it('uses slope_source as the slope’s label when the answer gives one, else the requirement’s name', () => {
+    const source = 'slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek)';
+    const requirements = [{ requirement: 'landing slope', passed: null, detail: `Slope 6.58 deg (${source}); no published slope limit for Starship HLS, so no pass or fail.` }];
+    const q = siteQuantities(1, evaluation({ slope_deg: 6.58, slope_source: source, requirements }));
+    expect(q.slope).toMatchObject({ label: source, value: 6.58, text: '6.6', unit: '°' });
+    expect(q.slopeDetail).toContain('so no pass or fail.');
+    // Absent, null or empty: the fallback.
+    expect(siteQuantities(1, evaluation({ slope_deg: 6.58, requirements })).slope.label).toBe('Landing slope');
+    expect(siteQuantities(1, evaluation({ slope_deg: 6.58, slope_source: null, requirements })).slope.label).toBe('Landing slope');
+    expect(siteQuantities(1, evaluation({ slope_deg: 6.58, slope_source: '  ', requirements })).slope.label).toBe('Landing slope');
+  });
+
   it('keeps the backend’s order: a pass without the slope check stays where the backend ranked it', () => {
     const rows = rankRows(
       [

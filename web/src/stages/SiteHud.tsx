@@ -12,7 +12,7 @@
 // scene. So the picture and the numbers cannot disagree. Nothing here re-renders while time runs: the readouts
 // are rewritten in place once per frame, and only when the instant has changed.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { SiteRef } from '../api/types';
 import { AsyncView } from '../components/AsyncView';
 import { Icon } from '../components/Icon';
@@ -83,6 +83,15 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   const isPhone = useIsPhone();
   const short = useShortWindow();
   const rootRef = useRef<HTMLDivElement>(null);
+  // In a short window the Data checks band would take too much of the picture: it is shown on request.
+  const [checksShown, setChecksShown] = useState(false);
+  const checksButton = useRef<HTMLButtonElement>(null);
+  const checksId = useId();
+  const band = !short || checksShown;
+  const hideChecks = () => {
+    setChecksShown(false);
+    checksButton.current?.focus();
+  };
 
   const site = useMemo<SiteRef | null>(() => (focus ? { id: focus.id, name: focus.name, lat: focus.lat, lon_east: focus.lon_east } : null), [focus]);
   // The answer on hand can still be the previous site's while the new one loads: it is not this site's sky.
@@ -206,8 +215,20 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       {TERRAIN_NOT_INCLUDED}
     </span>
   ) : null;
-  const checks = (bare: boolean) => (
-    <SiteChecks site={site} evaluation={focusRow?.evaluation ?? null} horizon={horizonData} check={d.horizonsCheck.data ?? null} landingMs={landingMs} slope={result.slope} slopeNote={result.slopeNote} slopeDetail={result.slopeDetail} bare={bare} />
+  const checks = (layout: 'band' | 'bare', onHide?: () => void) => (
+    <SiteChecks
+      site={site}
+      evaluation={focusRow?.evaluation ?? null}
+      horizon={horizonData}
+      check={d.horizonsCheck.data ?? null}
+      moonTrek={d.moonTrekCheck.data ?? null}
+      landingMs={landingMs}
+      slope={result.slope}
+      slopeNote={result.slopeNote}
+      slopeDetail={result.slopeDetail}
+      layout={layout}
+      onHide={onHide}
+    />
   );
   const plotLabel = `Horizon plot for ${name}: compass direction across, height above level upward. It shows the terrain skyline, the Sun’s path from ${slipDays > 0 ? 'the planned landing' : 'the landing'} to the end of the stay (solid where the Sun is above the skyline, dashed where the terrain hides it) and the part of the sky Earth moves through. The running figures are in the Sun and Earth panels.`;
   // The legend names the height where the plot's scale changes, when this site's plot has two bands.
@@ -382,7 +403,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             {sunPanel({ bare: true })}
             {earthPanel({ bare: true })}
             {hardwarePanel({ bare: true })}
-            {checks(true)}
+            {checks('bare')}
           </div>
         </Drawer>
 
@@ -462,6 +483,19 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
               <span className="max-[1439px]:hidden">Reset view</span>
             </button>
           ) : null}
+          {webgl && short ? (
+            <button
+              ref={checksButton}
+              type="button"
+              className="btn btn-glass shrink-0"
+              aria-expanded={checksShown}
+              aria-controls={checksShown ? checksId : undefined}
+              onClick={() => setChecksShown((v) => !v)}
+              data-testid="site-checks-show"
+            >
+              Data checks
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -477,7 +511,6 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       <div className="hud-layer" data-depth="0.9">
         <div className="site-wing wing-l absolute left-5 top-[8rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="left" data-site-zone="left">
           {sunPanel()}
-          {checks(false)}
         </div>
       </div>
 
@@ -499,9 +532,25 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             </div>
             {plot(short ? 180 : 260, 'hero', 45)}
             <SkyLegend scaleBreak={scaleBreak} delayed={slipDays > 0} />
+            {checks('bare')}
           </Glass>
         </div>
       )}
+
+      {/* Data checks: a band between the wings, resting on the console. The 3D picture is framed above it. */}
+      {webgl && band ? (
+        <div className="hud-layer">
+          <div
+            id={checksId}
+            className="absolute left-[22.5rem] right-[22.5rem] flex flex-col justify-end max-lg:left-[18.5rem] max-lg:right-[18.5rem]"
+            style={{ bottom: 'calc(100% - var(--site-console-top, 100%) + 0.75rem)' }}
+            data-enter="rise"
+            data-site-zone="checks"
+          >
+            {checks('band', short ? hideChecks : undefined)}
+          </div>
+        </div>
+      ) : null}
 
       {/* The console: sky and time. The plot sits directly above the timeline that scrubs it.
           This layer does not drift with the pointer: the needle stays under the hand that drags it. */}
@@ -563,6 +612,9 @@ function useSiteFrame(rootRef: RefObject<HTMLDivElement | null>, isPhone: boolea
       const right = zone('right');
       const base = zone(isPhone ? 'dock' : 'console');
       const baseTop = base ? layoutBox(base, root).top : height;
+      // The Data checks band rests on the console between the wings: the picture is framed above it.
+      const checks = isPhone ? null : zone('checks');
+      const checksTop = checks && checks.offsetHeight > 0 ? layoutBox(checks, root).top : baseTop;
       siteFrame.set({
         measured: width > 0 && height > 0,
         width,
@@ -570,7 +622,7 @@ function useSiteFrame(rootRef: RefObject<HTMLDivElement | null>, isPhone: boolea
         left: left ? layoutBox(left, root).right : 0,
         right: right ? layoutBox(right, root).left : width,
         top: top ? layoutBox(top, root).bottom : 0,
-        bottom: baseTop,
+        bottom: Math.min(baseTop, checksTop),
       });
       root.style.setProperty('--site-console-top', `${baseTop}px`);
       root.style.setProperty('--site-dock', `${Math.max(0, height - baseTop)}px`);
@@ -578,7 +630,7 @@ function useSiteFrame(rootRef: RefObject<HTMLDivElement | null>, isPhone: boolea
     measure();
     // Sizes change with the window, when a panel's rows change and when the fonts arrive.
     const observer = new ResizeObserver(measure);
-    for (const el of [root, zone('top'), zone('left'), zone('right'), zone('console'), zone('dock')]) if (el) observer.observe(el);
+    for (const el of [root, zone('top'), zone('left'), zone('right'), zone('console'), zone('dock'), zone('checks')]) if (el) observer.observe(el);
     return () => observer.disconnect();
   }, [rootRef, isPhone]);
   // Leaving the stage: nothing is measured any more.

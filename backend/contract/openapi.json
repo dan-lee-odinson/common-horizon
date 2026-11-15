@@ -2329,6 +2329,18 @@
             ],
             "title": "Slope Deg"
           },
+          "slope_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope Source",
+            "description": "What slope_deg is, whenever it is given (new). Preset sites with the real engine: 'slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek)', a regional slope, wider than a lander."
+          },
           "earth_link": {
             "type": "string",
             "enum": [
@@ -2481,7 +2493,19 @@
               }
             ],
             "title": "Slope Deg",
-            "description": "Local terrain slope, degrees."
+            "description": "Terrain slope at the site, degrees. Null when unknown; slope_source says what it is."
+          },
+          "slope_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope Source",
+            "description": "What slope_deg is, whenever it is given. Real engine: 'slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek)', a regional slope, wider than a lander."
           }
         },
         "type": "object",

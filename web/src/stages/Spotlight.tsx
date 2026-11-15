@@ -35,6 +35,8 @@ export function Spotlight() {
   // until then the row's own figure is shown.
   const q = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck, slopeContext(focus, landerSlopeLimitDeg));
   const words = focusCheck ? balanceWords(levelFromStatus(focusCheck.balance.status), focusCheck.balance.limiting) : null;
+  // The short window's one-line slope keeps its whole label, and the requirement's sentence, in its tooltip.
+  const slopeTitle = [q.slope.label, q.slopeDetail].filter(Boolean).join('. ');
   const isSaved = saved.some((s) => s.id === focus.id);
   const fail = q.result === 'fail';
   const smooth = terrainNotIncluded(focusRow?.evaluation);
@@ -146,17 +148,19 @@ export function Spotlight() {
               {q.sunlightHours.value === null ? null : ' lit'}
             </span>
           </div>
-          <div className="flex flex-col gap-0.5">
-            <Readout q={q.score} size="xl" />
-            {/* The slope, one of the score's terms, when the answer has it, under the backend's name for it. */}
-            <span className="num min-h-[1.125rem] text-[13px] leading-[1.125rem] text-ink-2" data-q="slope" title={q.slopeDetail ?? undefined} data-testid="spotlight-slope">
-              {q.slope.value === null ? null : (
-                <>
-                  <span data-q-label>{q.slope.label}</span> <span data-q-text>{q.slope.text}</span>
-                  <span data-q-unit>{q.slope.unit}</span>
-                </>
-              )}
-            </span>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            {/* A score range ("85–100") is wider than one score: it is set a size smaller, and its "/ 100" may wrap, so it stays inside the panel. */}
+            <Readout q={q.score} size={q.score.value === null ? 'lg' : 'xl'} wrap={q.score.value === null} className="min-w-0" />
+            {/* In a short window the slope takes the score's second line, which costs no height: one line, the whole of it in the tooltip. */}
+            {q.slope.value === null ? null : (
+              <span className="hidden truncate text-[12px] leading-[1.125rem] text-ink-2 short:block" title={slopeTitle} data-testid="spotlight-slope-short">
+                <span className="num text-[13px] text-ink">
+                  {q.slope.text}
+                  {q.slope.unit}
+                </span>{' '}
+                {q.slope.label}
+              </span>
+            )}
           </div>
           <Readout q={q.earthLink} />
           <div className="flex flex-col gap-0.5">
@@ -166,6 +170,19 @@ export function Spotlight() {
               {words}
             </span>
           </div>
+          {/* The slope, one of the score's terms, when the answer has it: the figure, then what it is (the answer's own words), wrapping.
+              A short window has no room for a line of its own, so there it is the score's second line (above). */}
+          {q.slope.value === null ? null : (
+            <p className="col-span-2 m-0 break-words text-[12px] leading-snug text-ink-2 short:hidden" data-q="slope" title={q.slopeDetail ?? undefined} data-testid="spotlight-slope">
+              <span className="num text-[13px] text-ink" data-q-text>
+                {q.slope.text}
+              </span>
+              <span className="num text-[13px] text-ink" data-q-unit>
+                {q.slope.unit}
+              </span>{' '}
+              <span data-q-label>{q.slope.label}</span>
+            </p>
+          )}
         </div>
       </div>
 

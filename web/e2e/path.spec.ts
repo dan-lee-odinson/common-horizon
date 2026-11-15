@@ -71,7 +71,15 @@ test('orbit: the readouts run from real data, the preview pauses, and mission se
   await page.getByTestId('begin').click();
 
   await expect(page.getByTestId('example-badge')).toHaveText('Example data');
-  await expect(page.getByTestId('not-to-scale')).toContainText('Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only.');
+  // The caption says what is drawn: the Sun at its true direction and size, Earth at true size but nearer than it is, and what is not computed.
+  const caption = page.getByTestId('not-to-scale');
+  await expect(caption).toContainText(
+    isPhone(page)
+      ? 'Sun: true direction and true apparent size. Earth: true size, drawn much nearer than it is. Drag to turn the view.'
+      : 'The Sun is at its true direction and true apparent size. Earth is at true size but drawn much nearer than it is. Drag, or use the arrow keys, to turn the view.',
+  );
+  await expect(caption).toContainText('which face points at the Moon is not computed.');
+  await expect(caption).not.toContainText('direction marker');
 
   // The Sun's overhead longitude is a number of degrees east, and it moves as time runs.
   await expect.poll(() => readout(page, 'subsolar_lon'), { timeout: 30_000 }).toMatch(/^\d{1,3}\.\d{2}$/);
@@ -111,7 +119,7 @@ test('orbit: the readouts run from real data, the preview pauses, and mission se
   expect(errors).toEqual([]);
 });
 
-// ---------- The Sun, Earth and their tags stay clear of the glass panels ----------
+// ---------- The Sun's tick, Earth, their tags and the sunlight stay clear of the glass panels ----------
 
 interface Box {
   left: number;
@@ -124,7 +132,27 @@ function overlap(a: Box, b: Box): boolean {
   return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
 
-test('orbit: through a whole lunar day, markers and their tags never touch a glass panel, and the zoom control goes out to the whole Earth and back', async ({ page }) => {
+/** Does the straight line from (x1, y1) to (x2, y2) pass through a box? */
+function crosses(seg: { x1: number; y1: number; x2: number; y2: number }, b: Box): boolean {
+  let lo = 0;
+  let hi = 1;
+  for (const [p, d, min, max] of [
+    [seg.x1, seg.x2 - seg.x1, b.left, b.right],
+    [seg.y1, seg.y2 - seg.y1, b.top, b.bottom],
+  ]) {
+    if (Math.abs(d) < 1e-9) {
+      if (p <= min || p >= max) return false;
+      continue;
+    }
+    const a = (min - p) / d;
+    const c = (max - p) / d;
+    lo = Math.max(lo, Math.min(a, c));
+    hi = Math.min(hi, Math.max(a, c));
+  }
+  return hi > lo;
+}
+
+test('orbit: through a whole lunar day, markers, their tags, the lines of sunlight and the edge glow never touch a glass panel, and the zoom control goes out to the whole Earth and back', async ({ page }) => {
   test.skip(isPhone(page), 'on phones the panels are two short cards above the scene; checked by the phone layout test');
   await page.goto('/');
   await page.getByTestId('begin').click();
@@ -136,6 +164,8 @@ test('orbit: through a whole lunar day, markers and their tags never touch a gla
   expect(max).toBeGreaterThan(700);
   let sunSeen = 0;
   let earthSeen = 0;
+  let linesSeen = 0;
+  let glowSeen = 0;
   for (let i = 0; i <= 12; i++) {
     await scrub.fill(String(Math.round((max * i) / 12)));
     await page.waitForTimeout(450);
@@ -153,9 +183,27 @@ test('orbit: through a whole lunar day, markers and their tags never touch a gla
           const r = Number(m.dataset.ar);
           return { name: m.dataset.marker!, body: { left: x - r, top: y - r, right: x + r, bottom: y + r }, tag: box(m.querySelector('[data-marker-tag]')!) };
         });
-      return { panels, markers };
+      // The lines of sunlight as they are drawn (each "M x y L x y" of the paths), and the glow at the frame's edge.
+      const svg = document.querySelector('[data-testid="sunlight-lines"]')!;
+      const origin = svg.getBoundingClientRect();
+      const lines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+      for (const path of Array.from(svg.querySelectorAll('path'))) {
+        if (Number(getComputedStyle(path).opacity) < 0.02) continue;
+        for (const m of (path.getAttribute('d') ?? '').matchAll(/M(-?[\d.]+) (-?[\d.]+)L(-?[\d.]+) (-?[\d.]+)/g)) lines.push({ x1: Number(m[1]) + origin.left, y1: Number(m[2]) + origin.top, x2: Number(m[3]) + origin.left, y2: Number(m[4]) + origin.top });
+      }
+      const glowNode = document.querySelector<HTMLElement>('[data-testid="sun-edge-glow"]')!;
+      const glow = glowNode.dataset.visible === 'true' ? box(glowNode) : null;
+      return { panels, markers, lines, glow };
     });
     expect(state.panels.length).toBeGreaterThanOrEqual(4);
+    // Sunlight crosses the picture at every step, and none of it touches a panel.
+    expect(state.lines.length, `no lines of sunlight at step ${i}`).toBeGreaterThan(4);
+    linesSeen += state.lines.length;
+    for (const line of state.lines) for (const p of state.panels) expect(crosses(line, p), `a line of sunlight crosses a panel at step ${i}`).toBe(false);
+    if (state.glow) {
+      glowSeen++;
+      for (const p of state.panels) expect(overlap(state.glow, p), `the edge glow overlaps a panel at step ${i}`).toBe(false);
+    }
     for (const m of state.markers) {
       if (m.name === 'sun') sunSeen++;
       if (m.name === 'earthLimb') earthSeen++;
@@ -165,12 +213,16 @@ test('orbit: through a whole lunar day, markers and their tags never touch a gla
       }
     }
   }
-  // Earth's limb is in view the whole time; the Sun is hidden only while it is behind the Moon.
+  // Earth's limb is in view the whole time; the Sun's tick on its ring is hidden only while it is behind the Moon.
   expect(earthSeen).toBe(13);
   expect(sunSeen).toBeGreaterThanOrEqual(6);
+  // In the standard view the Sun itself is never in the frame, so the glow at the frame's edge shows
+  // (except where the panels leave it no room).
+  expect(linesSeen).toBeGreaterThan(13 * 8);
+  expect(glowSeen).toBeGreaterThanOrEqual(8);
 
   // The caption says what is to scale, and the zoom control takes the picture out to the whole Earth and back.
-  await expect(page.getByTestId('not-to-scale')).toContainText('Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only.');
+  await expect(page.getByTestId('not-to-scale')).toContainText('Earth is at true size but drawn much nearer than it is.');
   const zoom = page.getByTestId('orbit-zoom');
   await expect(zoom).toHaveAttribute('aria-pressed', 'false');
   await zoom.click();
@@ -353,14 +405,21 @@ test('mission select: one site in the spotlight, a short strip, and the delay re
   await expect(page.getByTestId('spotlight-name')).toHaveText(before[1]);
   await page.keyboard.press('ArrowUp');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('01');
-  // Further down, the strip moves its window to keep the spotlight in the middle.
+  // Further down, the strip moves its window to keep the spotlight in the middle. How many rows it
+  // shows depends on the room under the spotlight (four or five at 1440 x 900: the spotlight's slope
+  // line takes one when it has a line of its own).
+  const shown = await rows.count();
+  expect(shown).toBeGreaterThanOrEqual(4);
+  expect(shown).toBeLessThanOrEqual(5);
+  const two = (n: number) => String(n).padStart(2, '0');
   for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('04');
-  await expect(page.getByTestId('strip-range')).toHaveText('02 to 06 of 17');
+  const from = 4 - Math.floor(shown / 2);
+  await expect(page.getByTestId('strip-range')).toHaveText(`${two(from)} to ${two(from + shown - 1)} of 17`);
   // End and Home jump to the last and the first site.
   await page.keyboard.press('End');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('17');
-  await expect(page.getByTestId('strip-range')).toHaveText('13 to 17 of 17');
+  await expect(page.getByTestId('strip-range')).toHaveText(`${two(18 - shown)} to 17 of 17`);
   await expect(page.locator('[data-testid="ranked-row"][aria-selected="true"] [data-testid="row-rank"]')).toHaveText('17');
   await page.keyboard.press('Home');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('01');

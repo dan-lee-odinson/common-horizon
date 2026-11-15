@@ -12,6 +12,7 @@ import type {
   HealthResponse,
   HorizonResponse,
   HorizonsCheckFile,
+  MoonTrekCheckFile,
   Site,
   SiteListResponse,
   SiteRef,
@@ -67,6 +68,8 @@ export interface DataValue {
   track: AsyncResult<GeometryTrack>;
   /** The stored check against NASA JPL Horizons (data/horizons-check.json); null when the file is not there. */
   horizonsCheck: AsyncResult<HorizonsCheckFile | null>;
+  /** The stored Sun check against NASA Moon Trek (data/moon-trek-sun-check.json); null when the file is not there. */
+  moonTrekCheck: AsyncResult<MoonTrekCheckFile | null>;
   /** Where the numbers come from (see DataSourceKind). */
   dataSource: DataSourceKind;
   /** Transit from launch to landing, days, as the evaluation answer gives it; null when the answer does not state one. */
@@ -145,6 +148,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const health = useAsync('health', (signal) => api.health(signal));
   const horizonsCheck = useAsync('horizons-check', (signal) => api.horizonsCheck(signal));
+  const moonTrekCheck = useAsync('moon-trek-check', (signal) => api.moonTrekCheck(signal));
   const sites = useAsync('sites', (signal) => api.listSites(signal), isEmpty.sites);
   const catalog = useAsync('catalog', (signal) => api.catalog(signal), isEmpty.catalog);
 
@@ -250,6 +254,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     orbitHorizon,
     track,
     horizonsCheck,
+    moonTrekCheck,
     dataSource,
     transitDays,
     landerSlopeLimitDeg,

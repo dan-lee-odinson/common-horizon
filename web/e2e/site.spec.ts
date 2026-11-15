@@ -943,3 +943,25 @@ test('site on a phone: zoom in, play, the sheet, and back, with nothing scrollin
   expect(await hours(page)).toBe(0);
   expect(errors).toEqual([]);
 });
+
+test('site: with the Data checks band measured after arrival (reduced motion), a low Sun stays in the picture above it', async ({ page }) => {
+  test.skip(isPhone(page), 'the band is a desktop layout');
+  // With reduced motion the camera is placed at once, before the band below it has been measured:
+  // it then settles to the lower pitch the smaller picture needs, so the Sun, four degrees up, stays in view.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await enterMission(page);
+  await spotlight(page, 'Apollo 14');
+  await zoomIn(page);
+  const band = page.getByTestId('site-checks-panel');
+  await expect(band).toBeVisible();
+  const sunTag = page.getByTestId('body-label-sun');
+  await expect(sunTag).toHaveAttribute('data-visible', 'true', { timeout: 30_000 });
+  // The picture is framed above the band: the reticle and both tags are clear of it.
+  const reticle = page.getByTestId('lander-reticle');
+  await expect(reticle).toHaveAttribute('data-visible', 'true');
+  const b = (await band.boundingBox())!;
+  for (const mark of [reticle.locator('svg'), reticle.locator('[data-marker-tag]'), sunTag.locator('[data-marker-tag]')]) {
+    const m = (await mark.boundingBox())!;
+    expect(m.y + m.height).toBeLessThanOrEqual(b.y);
+  }
+});

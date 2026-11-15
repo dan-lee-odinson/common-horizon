@@ -12,7 +12,7 @@ physics carries `provenance` (`is_synthetic`, engine name, notice) and the `X-Da
 
 | Part | Owner | Where |
 |---|---|---|
-| Sun/Earth positions, visibility, darkness, sunlight and Earth percentages, slope, skyline | Physics engine | through the existing `PhysicsEngine` interface and `evaluate_mission` |
+| Sun/Earth positions, visibility, darkness, sunlight and Earth percentages, slope, skyline | Physics engine | through the existing `PhysicsEngine` interface and `evaluate_mission`; the slope of a preset site is a stored value (see "Slope" below) |
 | Fit, power and site-energy arithmetic | Planner module | `planner.fit_check`, `power_check`, `site_energy` (unchanged copy) |
 | Score, requirement order, ranking, launch-delay orchestration | Backend | `app/services/ranking.py`, `app/services/website_evaluation.py` |
 
@@ -49,13 +49,91 @@ Within each group the order is by score, highest first, with ties broken by the 
 
 | Quantity | Today | Effect |
 |---|---|---|
-| `slope_deg` | Null for every site from the real engine adapter (the synthetic engine reports 0) | `score` is null. `score_min` (slope term 0) and `score_max` (slope term 100) bound it, and ranking uses `score_min`. The `landing slope` requirement is unknown, so the verdict is `unknown` unless something else fails. |
-| Lander slope limit | Published only for Griffin (10°, `griffin_slope`) | Every other lander leaves `landing slope` unknown. |
+| `slope_deg` | Known for the 17 preset sites with the real engine (stored, see "Slope" below); null for custom points (the synthetic engine reports 0) | Where it is null: `score` is null. `score_min` (slope term 0) and `score_max` (slope term 100) bound it, and ranking uses `score_min`. The `landing slope` requirement is unknown, so the verdict is `unknown` unless something else fails. |
+| Lander slope limit | Published only for Griffin (10°, `griffin_slope`) | Griffin: `landing slope` passes or fails on the site's slope, labelled as regional terrain screening over a circle 1 km across, not a touchdown safety assessment. Every other lander: the slope is shown in the requirement's `detail` and counts in the score, but `landing slope` has no pass or fail (`passed: null`), so it is listed in `unknown_requirements`. |
 | `clear_sky_percent` | Null without a stored terrain skyline (6 of the 17 presets have one) | Shown as unknown. It is not part of the score. |
 | `geometry` | From the engine's positions at landing | Never invented; null only if an engine returned no positions. |
 | `energy_added_kwh` | Always null | The planner has no net generation-minus-load figure. The planner's `site_energy` (night penalty plus heating penalty) is in `site_energy`. |
 | `fits` / `hardware_fits` | Null when the planner answers "depends on capacity figure" or "mass needed" | `hardware fit` is unknown, not passed. |
 | Mass, power or generation of a catalog item | Null when not published, and for fields that do not apply to the kind | The planner's own figure, with its unit, status and source, is in `figures`. |
+
+## Slope
+
+With the real engine, each of the 17 preset sites has a stored slope, `backend/data/site_slopes.json`, built
+by `backend/scripts/site_slopes_from_moon_trek.py`. It reaches the website through the existing path: the
+engine adapter puts it in the site's `slope_deg`, and `/evaluate` scores and checks it as before (the score
+formula is unchanged).
+
+- **What it is:** the slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek). Every
+  answer that carries the slope says so:
+  - `slope_source` holds that text;
+  - the site's `warnings` add the layer, the number of heights fitted and the fetch date;
+  - the `landing slope` requirement's `detail` repeats it.
+- **It is regional, wider than a lander.** The plane is fitted over a circle 1 km across, so the ground under
+  a lander's feet can be steeper or flatter. Comparing it with Griffin's 10° limit is regional terrain
+  screening over a circle 1 km across, not a touchdown safety assessment.
+- **How it is made:**
+  - Moon Trek's subset service returns a LOLA elevation patch around the site (GeoTIFF, metres above the
+    1737.4 km sphere).
+  - Each pixel centre becomes east/north metres in the site's tangent plane.
+  - The heights within 500 m are fitted with a least-squares plane; the slope is that plane's tilt.
+- **Layers:**
+  - south of 87.5° S, the 5 m south polar model;
+  - from 75° S to 87.5° S, the 30 m south polar model;
+  - elsewhere, the global model at 128 pixels per degree (about 237 m pixels, so only a dozen or so heights
+    fall inside the circle; `heights_fitted` gives the count per site);
+  - a polar patch with no-data inside the circle falls back to the global model (`layers_not_used` says so).
+- **Where it applies:** only at a preset site's own coordinates (within 1 m). A custom point keeps
+  `slope_deg: null` and `slope_source: null`.
+- **Checks** (the requirement keeps the name `landing slope`, which the website matches on):
+  - Griffin (published limit 10°): `landing slope` passes or fails, and the `detail` labels it as
+    screening, for example:
+
+        Regional slope 11.819 deg (slope of the best-fit plane to LOLA heights within 500 m, NASA Moon Trek);
+        Griffin accepts up to 10 deg. Regional terrain screening over a circle 1 km across, not a touchdown
+        safety assessment.
+
+  - every other lander: the slope is shown in `detail` (for example `Regional slope 1.175 deg (...); no
+    published slope limit for Blue Moon Mark 1, so no pass or fail.`) and counts in the score, with no
+    pass or fail.
+- **Without the file:** if `site_slopes.json` is not installed, the real engine still answers: `slope_deg`
+  and `slope_source` are null for every site, every answer carries the warning "Stored site slopes are not
+  installed, so slope_deg is null.", and the server logs it once. A file that exists but is unreadable or
+  invalid is a configuration error (503). Nothing falls back to synthetic data.
+- **Production** still runs the synthetic engine, which reports 0 with
+  `slope_source: "synthetic engine: terrain is not modelled, 0 is a placeholder, not a measured slope"`.
+
+The stored values (all fetched 2026-11-15; pixel size of the global layer along a meridian):
+
+| Site | Position | Slope | Layer | Pixel | Heights fitted |
+|---|---|---|---|---|---|
+| Shackleton Connecting Ridge (`shackleton-ridge`) | 89.684° S, 196.739° E | 6.580° | `LRO_LOLA_DEM_SPole875_5mp_v04` | 5 m | 31423 |
+| Nobile region (`nobile`) | 85.42088° S, 31.6218° E | 7.629° | `LRO_LOLA_DEM_SPole75_30mp_v04` | 30 m | 877 |
+| Apollo 11 (`apollo-11`) | 0.67416° N, 23.47314° E | 1.175° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 15 |
+| Apollo 12 (`apollo-12`) | 3.0128° S, 336.5781° E | 1.126° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 14 |
+| Apollo 14 (`apollo-14`) | 3.64589° S, 342.52806° E | 0.616° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 14 |
+| Apollo 15 (`apollo-15`) | 26.13239° N, 3.6333° E | 1.031° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 16 |
+| Apollo 16 (`apollo-16`) | 8.9734° S, 15.5011° E | 1.968° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 14 |
+| Apollo 17 (`apollo-17`) | 20.1911° N, 30.7723° E | 1.091° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 15 |
+| IM-1 Odysseus (`im-1-odysseus`) | 80.13° S, 1.44° E | 11.819° | `LRO_LOLA_DEM_SPole75_30mp_v04` | 30 m | 889 |
+| IM-2 Athena (`im-2-athena`) | 84.7906° S, 29.1957° E | 2.264° | `LRO_LOLA_DEM_SPole75_30mp_v04` | 30 m | 875 |
+| Blue Ghost Mission 1 (`blue-ghost-m1`) | 18.562° N, 61.81° E | 0.294° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 14 |
+| IM-3 (planned) (`im-3-reiner-gamma`) | 7.585° N, 301.275° E | 0.658° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 14 |
+| Blue Ghost Mission 2 (planned) (`blue-ghost-m2`) | 24.9° S, 177.4° E | 1.782° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 16 |
+| Blue Ghost Mission 3 (planned) (`blue-ghost-m3`) | 36.56° N, 319.28° E | 3.658° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 16 |
+| Draper SERIES-2 (planned) (`draper-cp12`) | 75.0° S, 132.4° E | 0.187° | `LRO_LOLA_DEM_SPole75_30mp_v04` | 30 m | 901 |
+| Chandrayaan-3 (`chandrayaan-3`) | 69.373° S, 32.319° E | 0.435° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 39 |
+| SLIM (`slim`) | 13.316° S, 25.251° E | 7.086° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 15 |
+
+- With Griffin, IM-1 Odysseus (11.819°) now fails the `landing slope` screening; every other preset passes it.
+- No polar patch had no-data inside its circle, so no site fell back to the global layer. Draper SERIES-2
+  lies exactly on 75° S and was covered by the 30 m model.
+- Where the global layer is used, the plane rests on 14 to 39 heights about 237 m apart, so it says
+  little about anything smaller than a few hundred metres.
+
+The patches are kept in `backend/data/site_slopes/` (with each request's address, retrieval time and
+checksum), and `backend/tests/physics/test_site_slopes.py` recomputes every slope from them without the
+network. The Docker image gets `site_slopes.json` only.
 
 ## Contract changes the website needs (smallest set)
 
@@ -69,7 +147,7 @@ These are differences from `web/src/api/types.ts`. All other fields match it by 
    - `score: number | null`;
    - new fields:
      - `rank`, `score_min`, `score_max` and `score_components`;
-     - `slope_deg`, `longest_darkness_hours` and `earth_visible_percent`;
+     - `slope_deg`, `slope_source`, `longest_darkness_hours` and `earth_visible_percent`;
      - `requirements` (one line per requirement), `site_energy`, `elevation_m`, `elevation_source` and `warnings`;
    - `clear_sky_percent`, `hardware_fits` and `energy_added_kwh` are nullable.
 
@@ -97,7 +175,12 @@ These are differences from `web/src/api/types.ts`. All other fields match it by 
    - `earth_box` covers the Earth's sampled directions with elevation above 0°.
    - **HorizonRequest:** `step_hours` is rounded to whole minutes and may be coarsened (see `time_step_s`).
 
-`contract_version` stays at `0.1.0`: the existing `/api/v1` shapes did not change.
+10. **Slope** (see "Slope" below): new `slope_source` beside `slope_deg` in each `SiteEvaluation`, and in
+    `site` of `/api/v1/missions/evaluate`. The `landing slope` requirement's `detail` names the slope and
+    what it is.
+
+`contract_version` stays at `0.1.0`: the only change to the `/api/v1` shapes is one added output field,
+`site.slope_source`.
 
 ## Inputs and validation
 
@@ -187,7 +270,10 @@ sky the Earth moves through. One physics run through the same `PhysicsEngine` in
    The website mock used ≤ 2 % and ≥ 98 %. Confirm which.
 3. **Unknown verdicts.** A site with an unchecked requirement and no failure ranks between passing and failing sites, by its worst-case score. Confirm the grouping, and that ranking by `score_min` is right.
 4. **Slope.**
-   - The real engine has no slope yet: is a slope from the LOLA DEM planned (Isabella)?
+   - The preset sites now have a stored regional slope (see "Slope"). Custom points still have none: is a
+     run-time slope from the LOLA DEM planned (Isabella)?
+   - A lander without a published slope limit leaves `landing slope` without pass or fail, so its verdict
+     is still `unknown` at best, even where the slope is known. Confirm that this is wanted.
    - Should Starship HLS use the crew-lander *tilt* threshold (HLS-R-0071, 0–8°) as its slope limit? Tilt is not ground slope, so it is not mapped.
 5. **No lander chosen** fails `hardware fit`. **A lander with no payload** passes it ("nothing to fit"), because `fit_check` needs at least one payload.
 6. **Observer height** for website requests is 2 m, the height the stored horizon profiles were computed for.

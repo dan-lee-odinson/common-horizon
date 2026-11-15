@@ -378,7 +378,11 @@ export interface SiteQuantities {
   answerResult: 'pass' | 'fail' | 'unknown' | null;
   /** "Slope not checked: ..." when the pass above stands without a slope check; otherwise null. */
   slopeNote: string | null;
-  /** The site's slope (`slope_deg`), labelled with the backend's name for its requirement; a dash when the answer has none. */
+  /**
+   * The site's slope (`slope_deg`); a dash when the answer has none. Its label is the answer's
+   * `slope_source` when it gives one (what the slope is: "slope of the best-fit plane to LOLA
+   * heights within 500 m (NASA Moon Trek)"), else the backend's name for its requirement.
+   */
   slope: Quantity;
   /** The backend's own sentence for the slope requirement ("Slope 4 deg; Griffin accepts up to 10 deg."), or null. */
   slopeDetail: string | null;
@@ -421,11 +425,12 @@ function slopeRequirement(e: SiteEvaluation) {
   return Array.isArray(e.requirements) ? (e.requirements.find((r) => r.requirement === 'landing slope') ?? null) : null;
 }
 
-/** `slope_deg` when the answer has it, labelled with the backend's name for the slope requirement. */
+/** `slope_deg` when the answer has it, labelled with its `slope_source`, else the backend's name for the slope requirement. */
 function slopeQuantity(e: SiteEvaluation): Quantity {
+  const source = typeof e.slope_source === 'string' ? e.slope_source.trim() : '';
   const req = slopeRequirement(e);
   const name = req ? req.requirement : 'slope';
-  const label = name.charAt(0).toUpperCase() + name.slice(1);
+  const label = source !== '' ? source : name.charAt(0).toUpperCase() + name.slice(1);
   const v = e.slope_deg;
   return typeof v === 'number' && Number.isFinite(v) ? quantity('slope', label, v, v.toFixed(1), '°') : missing('slope', label);
 }

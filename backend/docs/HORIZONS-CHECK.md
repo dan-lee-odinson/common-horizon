@@ -159,7 +159,78 @@ The tests in `backend/tests/horizon/test_horizons_check.py` (stored result, webs
 and `backend/tests/test_horizons_compare.py` (the route, with stand-ins for Horizons and the
 engine) need neither the network nor the kernels.
 
+## Sun check against NASA Moon Trek
+
+NASA Moon Trek (<https://trek.nasa.gov/moon/>) has its own service for the Sun's azimuth and
+elevation seen from a point on the Moon. It answers for the Sun only (it refuses the Earth). This
+check does with it what the Horizons check does: all 17 preset sites, every hour from 1 January
+2027 00:00 to 1 January 2028 00:00 UTC (8761 samples per site), the engine against Moon Trek, and
+the angle on the sky between the two directions. The engine side and the heights are the same as
+in the Horizons check (`app.api.horizons.engine_az_el`, heights from `load_sites`).
+
+| Site | Position | Sun, largest | Sun, 95th pct | Sun, mean | Elevation, largest | Horizons Sun, largest |
+|---|---|---|---|---|---|---|
+| Shackleton Connecting Ridge (`shackleton-ridge`) | 89.684° S, 196.739° E | 0.006048° | 0.005991° | 0.005727° | 0.000874° | 0.005991° |
+| Nobile region (`nobile`) | 85.42088° S, 31.6218° E | 0.006025° | 0.005966° | 0.005727° | 0.001272° | 0.005991° |
+| Apollo 11 (`apollo-11`) | 0.67416° N, 23.47314° E | 0.006400° | 0.006325° | 0.005689° | 0.006396° | 0.005990° |
+| Apollo 12 (`apollo-12`) | 3.0128° S, 336.5781° E | 0.006555° | 0.006466° | 0.005677° | 0.006553° | 0.005990° |
+| Apollo 14 (`apollo-14`) | 3.64589° S, 342.52806° E | 0.006536° | 0.006450° | 0.005679° | 0.006532° | 0.005990° |
+| Apollo 15 (`apollo-15`) | 26.13239° N, 3.6333° E | 0.006400° | 0.006328° | 0.005691° | 0.005819° | 0.005990° |
+| Apollo 16 (`apollo-16`) | 8.9734° S, 15.5011° E | 0.006421° | 0.006345° | 0.005688° | 0.006372° | 0.005990° |
+| Apollo 17 (`apollo-17`) | 20.1911° N, 30.7723° E | 0.006338° | 0.006267° | 0.005695° | 0.005985° | 0.005990° |
+| IM-1 Odysseus (`im-1-odysseus`) | 80.13° S, 1.44° E | 0.006070° | 0.006006° | 0.005725° | 0.001812° | 0.005991° |
+| IM-2 Athena (`im-2-athena`) | 84.7906° S, 29.1957° E | 0.006025° | 0.005967° | 0.005727° | 0.001335° | 0.005991° |
+| Blue Ghost Mission 1 (`blue-ghost-m1`) | 18.562° N, 61.81° E | 0.006276° | 0.006208° | 0.005702° | 0.005974° | 0.005990° |
+| IM-3 (planned) (`im-3-reiner-gamma`) | 7.585° N, 301.275° E | 0.006633° | 0.006532° | 0.005673° | 0.006563° | 0.005990° |
+| Blue Ghost Mission 2 (planned) (`blue-ghost-m2`) | 24.9° S, 177.4° E | 0.006426° | 0.006349° | 0.005700° | 0.005973° | 0.005991° |
+| Blue Ghost Mission 3 (planned) (`blue-ghost-m3`) | 36.56° N, 319.28° E | 0.006477° | 0.006392° | 0.005690° | 0.005384° | 0.005990° |
+| Draper SERIES-2 (planned) (`draper-cp12`) | 75.0° S, 132.4° E | 0.005971° | 0.005930° | 0.005728° | 0.002271° | 0.005991° |
+| Chandrayaan-3 (`chandrayaan-3`) | 69.373° S, 32.319° E | 0.006035° | 0.005989° | 0.005724° | 0.002801° | 0.005990° |
+| SLIM (`slim`) | 13.316° S, 25.251° E | 0.006382° | 0.006308° | 0.005692° | 0.006264° | 0.005990° |
+
+"Elevation, largest" is the largest difference in elevation alone. The last column repeats the
+Horizons check's largest Sun angle for the same site, for comparison.
+
+Across all 17 sites the largest angle is 0.006633° (IM-3) and the largest difference in
+elevation 0.006563°, against a stop line of 0.05°. The mean is nearly the same at every site
+(0.005673° to 0.005728°) and close to the Horizons check's (0.005688°). Moon Trek's answer does not
+say whether its directions are apparent or geometric, so this check does not say where the
+difference comes from. The known answer for Apollo 11 at 2027-02-17 12:00 UTC (azimuth 91.141082°,
+elevation 68.258447°) is what the kept answer for that hour says.
+
+How it was asked:
+
+    GET https://trek.nasa.gov/getAzElfromT1/LTD002=Moon,<lat>,<lon>,<altKm>,<lat>,<lon>,1,1/Sun/<start>/<end>/3600
+
+* one month per request (12 per site, 204 in all), one request at a time, with a one second pause;
+  retrieved 2026-11-15, 16:33 to 16:41 UTC;
+* `altKm` is the same height as in the Horizons check (site height plus observer height above the
+  1737.4 km sphere). For the Sun a few kilometres move the direction by less than 1e-6°;
+* times as `2027-01-01T00:00:00`; the answers give them as day of year (`2027-001T00:00:00.000000`),
+  and the script checks that every month has exactly the hours asked for.
+
+Moon Trek's answers (204 XML files, 20.3 MB) are kept unchanged outside the repository.
+`backend/data/horizon_validation/moon_trek_sun_check_2027.json` records
+for each site the statistics, one sample per week with both answers side by side, and for each
+request its address, retrieval time, size and SHA-256. The website gets a small copy,
+`web/public/data/moon-trek-sun-check.json`: per site the largest Sun angle, the sample count, the
+period, the retrieval time and the Moon Trek address.
+
+To run it again (the kernels as for the Horizons check; answers already kept are read instead of
+being asked again; exit status 1 if any angle is above 0.05°):
+
+    python backend/scripts/validate_against_moon_trek.py --kernel-dir /path/to/naif --year 2027 \
+        --answers-dir /path/outside/the/repo/moon-trek-sun-2027 \
+        --out backend/data/horizon_validation/moon_trek_sun_check_2027.json \
+        --web-out web/public/data/moon-trek-sun-check.json
+
+`backend/tests/horizon/test_moon_trek_check.py` checks the helpers, the stored result and the
+website copy without the network or the kernels.
+
 ## Source
 
 Jet Propulsion Laboratory, Solar System Dynamics Group, Horizons System and its API:
 <https://ssd.jpl.nasa.gov/horizons/>, <https://ssd-api.jpl.nasa.gov/doc/horizons.html>.
+
+NASA Moon Trek (NASA Solar System Treks), Sun azimuth and elevation service:
+<https://trek.nasa.gov/moon/>.

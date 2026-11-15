@@ -39,6 +39,7 @@
       "earth_visible_percent": 100,
       "clear_sky_percent": 97.7,
       "slope_deg": 2,
+      "slope_source": "example model: an invented slope, not a measured one",
       "earth_link": "clear",
       "hardware_fits": true,
       "energy_added_kwh": null,
@@ -77,7 +78,7 @@
         {
           "requirement": "landing slope",
           "passed": null,
-          "detail": "No published slope limit for Starship HLS."
+          "detail": "Slope 2 deg (example model: an invented slope, not a measured one); no published slope limit for Starship HLS, so no pass or fail."
         },
         {
           "requirement": "Earth contact",
@@ -107,6 +108,7 @@
       "earth_visible_percent": 22.3,
       "clear_sky_percent": 98.5,
       "slope_deg": 6.5,
+      "slope_source": "example model: an invented slope, not a measured one",
       "earth_link": "intermittent",
       "hardware_fits": true,
       "energy_added_kwh": null,
@@ -145,7 +147,7 @@
         {
           "requirement": "landing slope",
           "passed": null,
-          "detail": "No published slope limit for Starship HLS."
+          "detail": "Slope 6.5 deg (example model: an invented slope, not a measured one); no published slope limit for Starship HLS, so no pass or fail."
         },
         {
           "requirement": "Earth contact",
@@ -175,6 +177,7 @@
       "earth_visible_percent": 27.6,
       "clear_sky_percent": 90.9,
       "slope_deg": 9.5,
+      "slope_source": "example model: an invented slope, not a measured one",
       "earth_link": "intermittent",
       "hardware_fits": true,
       "energy_added_kwh": null,
@@ -213,7 +216,7 @@
         {
           "requirement": "landing slope",
           "passed": null,
-          "detail": "No published slope limit for Starship HLS."
+          "detail": "Slope 9.5 deg (example model: an invented slope, not a measured one); no published slope limit for Starship HLS, so no pass or fail."
         },
         {
           "requirement": "Earth contact",

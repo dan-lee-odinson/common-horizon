@@ -35,7 +35,8 @@
     "longitude_deg": -45.0,
     "elevation_m": 0.0,
     "elevation_source": "synthetic_default",
-    "slope_deg": 0.0
+    "slope_deg": 0.0,
+    "slope_source": "synthetic engine: terrain is not modelled, 0 is a placeholder, not a measured slope"
   },
   "timeseries": {
     "frame": "MOON_ME",

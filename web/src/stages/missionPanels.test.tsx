@@ -83,6 +83,7 @@ function scene(slipDays: number, pick: string | null = null, updating = false): 
     orbitHorizon: idle(),
     track: idle(),
     horizonsCheck: idle(),
+    moonTrekCheck: idle(),
     dataSource: 'example',
     transitDays: TRANSIT_DAYS,
     landerSlopeLimitDeg: null,
