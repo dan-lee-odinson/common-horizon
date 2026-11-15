@@ -127,7 +127,9 @@ kernels or stored profiles are missing and never falls back to synthetic data. P
 `slope_deg` is the stored slope of a preset site when the request is at that site's own coordinates
 (within 1 m; `backend/data/site_slopes.json`), with `slope_source` = "slope of the best-fit plane to LOLA
 heights within 500 m (NASA Moon Trek)": a regional slope, wider than a lander. Anywhere else `slope_deg` and
-`slope_source` are null. Without a usable stored skyline, `terrain_skyline` and
+`slope_source` are null. If the slope file is not installed, they are null everywhere, every answer carries
+the warning "Stored site slopes are not installed, so slope_deg is null." and the server logs it once; a slope
+file that exists but is unreadable or invalid answers 503. Without a usable stored skyline, `terrain_skyline` and
 `sky_visibility_fraction` are null. Site elevation, in order: a supplied `altitude_m` (`input`); else the
 elevation of a stored site within 50 m, even when its skyline does not fit the observer height
 (`terrain_model`, with a warning); else a 0 m placeholder labelled `elevation_source = "synthetic_default"`

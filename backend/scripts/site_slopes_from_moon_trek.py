@@ -56,8 +56,8 @@ from app.physics.site_slopes import (  # noqa: E402
     FIT_RADIUS_M,
     FORMAT,
     FORMAT_VERSION,
+    SCREENING_NOTE,
     SLOPE_DESCRIPTION,
-    SLOPE_SCALE_NOTE,
 )
 
 SERVICE = "https://trek.nasa.gov/moon/TrekWS/rest/transform/latlon/subset/stream/tiff"
@@ -327,7 +327,7 @@ def main() -> None:
     out = {
         "format": FORMAT,
         "format_version": FORMAT_VERSION,
-        "what": f"For each preset site, the {SLOPE_DESCRIPTION}. {SLOPE_SCALE_NOTE}",
+        "what": f"For each preset site, the {SLOPE_DESCRIPTION}. {SCREENING_NOTE}",
         "method": ("Pixel centres turned into east/north metres in the tangent plane at the site; every height whose "
                    "centre lies within fit_radius_m of the site is fitted with a least-squares plane "
                    "h = a*east + b*north + c; slope_deg = atan(hypot(a, b)). A polar layer is used where the site "

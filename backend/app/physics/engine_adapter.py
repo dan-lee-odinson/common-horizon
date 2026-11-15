@@ -23,7 +23,8 @@ What is computed, and from what:
 * Slope: at a preset site's own coordinates, the stored slope from
   ``backend/data/site_slopes.json`` (``app.physics.site_slopes``): the slope of the best-fit
   plane to LOLA heights within 500 m (NASA Moon Trek), with ``slope_source`` saying so. It is
-  regional, wider than a lander.
+  regional, wider than a lander. Without the file (not installed) every slope is null, every
+  answer says so in a warning, and the log says so once.
 
 Not available at run time and therefore reported as unknown: the slope anywhere else
 (``slope_deg = null``) and, without a stored profile, the sky visibility fraction
@@ -32,7 +33,8 @@ altitude has no known elevation. The contract requires a number, so it is report
 as a 0 m placeholder labelled ``elevation_source = "synthetic_default"``, with a warning.
 
 Missing kernels, a missing or empty profile directory, an unreadable profile and a
-missing or invalid slope file raise ``PhysicsEngineUnavailable`` (HTTP 503). Nothing falls back to synthetic data.
+slope file that exists but is unreadable or invalid raise ``PhysicsEngineUnavailable``
+(HTTP 503). Nothing falls back to synthetic data.
 Error messages name files, never absolute server paths; the paths go to the log.
 
 SPICE keeps global state and is not thread-safe, so every SPICE call in this
@@ -64,6 +66,7 @@ from app.physics.interface import (
 from app.physics.metrics import summarise
 from app.physics.site_slopes import (
     DEFAULT_SITE_SLOPES_FILE,
+    SLOPES_NOT_INSTALLED_WARNING,
     SLOPE_DESCRIPTION,
     SLOPE_SCALE_NOTE,
     SiteSlopes,
@@ -335,8 +338,10 @@ def select_terrain(index: ProfileIndex, request: SimulationRequest) -> Terrain:
     )
 
 
-def slope_notes(slope: StoredSlope | None) -> tuple[list[str], list[str]]:
+def slope_notes(slope: StoredSlope | None, *, installed: bool = True) -> tuple[list[str], list[str]]:
     """``(warnings, sources)`` for the site slope: what the stored value is, or why there is none."""
+    if not installed:
+        return [SLOPES_NOT_INSTALLED_WARNING], []
     if slope is None:
         return (
             [
@@ -468,6 +473,8 @@ class PhysicsEngineAdapter:
         self._kernels_loaded = False
         self._profiles: ProfileIndex | None = None
         self._slopes: SiteSlopes | None = None
+        self._slopes_installed = True  # False once the slope file was found missing (logged once)
+        self._slopes_lock = threading.Lock()
 
     # ----------------------------------------------------------------------------------- status
 
@@ -476,8 +483,8 @@ class PhysicsEngineAdapter:
         return EngineInfo(name=ENGINE_NAME, version=ENGINE_VERSION, is_synthetic=False, available=self._data_present())
 
     def _data_present(self) -> bool:
-        """Cheap file check for /health: never loads kernels, profiles or slopes."""
-        if not self._profile_dir.is_dir() or not self._slopes_file.is_file():
+        """Cheap file check for /health: never loads kernels or profiles. (Slopes are optional.)"""
+        if not self._profile_dir.is_dir():
             return False
         if self._injected_positions is not None or self._kernels_loaded:
             return True
@@ -523,17 +530,28 @@ class PhysicsEngineAdapter:
             self._profiles = ProfileIndex.load(self._profile_dir)
         return self._profiles
 
-    def _site_slopes(self) -> SiteSlopes:
-        if self._slopes is None:
-            try:
-                self._slopes = SiteSlopes.load(self._slopes_file)
-            except (OSError, ValueError):  # SiteSlopesError and JSON errors are ValueErrors
-                logger.exception("Unreadable site slope file %s", self._slopes_file)
-                raise PhysicsEngineUnavailable(
-                    f"The stored site slope file {self._slopes_file.name} is missing, unreadable or invalid "
-                    "(details in the server log)."
-                ) from None
-        return self._slopes
+    def _site_slopes(self) -> SiteSlopes | None:
+        """The stored slopes, or None when the file is not installed (logged once per adapter).
+
+        A file that exists but cannot be read or is invalid is a configuration error (HTTP 503).
+        """
+        with self._slopes_lock:
+            if self._slopes is None and self._slopes_installed:
+                try:
+                    self._slopes = SiteSlopes.load(self._slopes_file)
+                except FileNotFoundError:
+                    self._slopes_installed = False
+                    logger.warning(
+                        "Stored site slopes are not installed (%s not found): slope_deg is null for every site.",
+                        self._slopes_file,
+                    )
+                except (OSError, ValueError):  # SiteSlopesError and JSON errors are ValueErrors
+                    logger.exception("Unreadable site slope file %s", self._slopes_file)
+                    raise PhysicsEngineUnavailable(
+                        f"The stored site slope file {self._slopes_file.name} is unreadable or invalid "
+                        "(details in the server log)."
+                    ) from None
+            return self._slopes
 
     def _positions_function(self) -> BodyPositions:
         if self._injected_positions is not None:
@@ -630,8 +648,8 @@ class PhysicsEngineAdapter:
                 earth=_body_timeseries([earth for _, earth in pairs]),
             )
 
-        slope = slopes.at(request.latitude_deg, request.longitude_deg)
-        slope_warnings, slope_sources = slope_notes(slope)
+        slope = None if slopes is None else slopes.at(request.latitude_deg, request.longitude_deg)
+        slope_warnings, slope_sources = slope_notes(slope, installed=slopes is not None)
         warnings = [*terrain.warnings, *slope_warnings]
         if any(moment.microsecond for moment in times):
             warnings.append(

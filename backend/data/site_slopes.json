@@ -1,7 +1,7 @@
 {
  "format": "common-horizon/site-slopes",
  "format_version": 1,
- "what": "For each preset site, the slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek). It is a regional slope over a circle 1 km across, wider than a lander: the ground under a lander's feet can be steeper or flatter.",
+ "what": "For each preset site, the slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek). Regional terrain screening over a circle 1 km across, not a touchdown safety assessment.",
  "method": "Pixel centres turned into east/north metres in the tangent plane at the site; every height whose centre lies within fit_radius_m of the site is fitted with a least-squares plane h = a*east + b*north + c; slope_deg = atan(hypot(a, b)). A polar layer is used where the site lies in it, unless its patch has no-data inside the circle; then the global layer.",
  "pixel_size_m": "Pixel size of the layer used; for the global layer (1/128 degree), along a meridian.",
  "source": "NASA Moon Trek (https://trek.nasa.gov/moon/), LOLA DEM layers, subset service https://trek.nasa.gov/moon/TrekWS/rest/transform/latlon/subset/stream/tiff",

@@ -50,7 +50,7 @@ Within each group the order is by score, highest first, with ties broken by the 
 | Quantity | Today | Effect |
 |---|---|---|
 | `slope_deg` | Known for the 17 preset sites with the real engine (stored, see "Slope" below); null for custom points (the synthetic engine reports 0) | Where it is null: `score` is null. `score_min` (slope term 0) and `score_max` (slope term 100) bound it, and ranking uses `score_min`. The `landing slope` requirement is unknown, so the verdict is `unknown` unless something else fails. |
-| Lander slope limit | Published only for Griffin (10°, `griffin_slope`) | Griffin: `landing slope` passes or fails on the site's slope. Every other lander: the slope is shown in the requirement's `detail` and counts in the score, but `landing slope` has no pass or fail (`passed: null`), so it is listed in `unknown_requirements`. |
+| Lander slope limit | Published only for Griffin (10°, `griffin_slope`) | Griffin: `landing slope` passes or fails on the site's slope, labelled as regional terrain screening over a circle 1 km across, not a touchdown safety assessment. Every other lander: the slope is shown in the requirement's `detail` and counts in the score, but `landing slope` has no pass or fail (`passed: null`), so it is listed in `unknown_requirements`. |
 | `clear_sky_percent` | Null without a stored terrain skyline (6 of the 17 presets have one) | Shown as unknown. It is not part of the score. |
 | `geometry` | From the engine's positions at landing | Never invented; null only if an engine returned no positions. |
 | `energy_added_kwh` | Always null | The planner has no net generation-minus-load figure. The planner's `site_energy` (night penalty plus heating penalty) is in `site_energy`. |
@@ -70,7 +70,8 @@ formula is unchanged).
   - the site's `warnings` add the layer, the number of heights fitted and the fetch date;
   - the `landing slope` requirement's `detail` repeats it.
 - **It is regional, wider than a lander.** The plane is fitted over a circle 1 km across, so the ground under
-  a lander's feet can be steeper or flatter. Griffin's 10° limit is checked against this regional figure.
+  a lander's feet can be steeper or flatter. Comparing it with Griffin's 10° limit is regional terrain
+  screening over a circle 1 km across, not a touchdown safety assessment.
 - **How it is made:**
   - Moon Trek's subset service returns a LOLA elevation patch around the site (GeoTIFF, metres above the
     1737.4 km sphere).
@@ -84,9 +85,21 @@ formula is unchanged).
   - a polar patch with no-data inside the circle falls back to the global model (`layers_not_used` says so).
 - **Where it applies:** only at a preset site's own coordinates (within 1 m). A custom point keeps
   `slope_deg: null` and `slope_source: null`.
-- **Checks:**
-  - Griffin (published limit 10°): `landing slope` passes or fails;
-  - every other lander: the slope is shown in `detail` and counts in the score, with no pass or fail.
+- **Checks** (the requirement keeps the name `landing slope`, which the website matches on):
+  - Griffin (published limit 10°): `landing slope` passes or fails, and the `detail` labels it as
+    screening, for example:
+
+        Regional slope 11.819 deg (slope of the best-fit plane to LOLA heights within 500 m, NASA Moon Trek);
+        Griffin accepts up to 10 deg. Regional terrain screening over a circle 1 km across, not a touchdown
+        safety assessment.
+
+  - every other lander: the slope is shown in `detail` (for example `Regional slope 1.175 deg (...); no
+    published slope limit for Blue Moon Mark 1, so no pass or fail.`) and counts in the score, with no
+    pass or fail.
+- **Without the file:** if `site_slopes.json` is not installed, the real engine still answers: `slope_deg`
+  and `slope_source` are null for every site, every answer carries the warning "Stored site slopes are not
+  installed, so slope_deg is null.", and the server logs it once. A file that exists but is unreadable or
+  invalid is a configuration error (503). Nothing falls back to synthetic data.
 - **Production** still runs the synthetic engine, which reports 0 with
   `slope_source: "synthetic engine: terrain is not modelled, 0 is a placeholder, not a measured slope"`.
 
@@ -112,7 +125,7 @@ The stored values (all fetched 2026-11-15; pixel size of the global layer along 
 | Chandrayaan-3 (`chandrayaan-3`) | 69.373° S, 32.319° E | 0.435° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 39 |
 | SLIM (`slim`) | 13.316° S, 25.251° E | 7.086° | `LRO_LOLA_DEM_Global_128ppd_v04` | 236.9 m | 15 |
 
-- With Griffin, IM-1 Odysseus (11.819°) now fails `landing slope`; every other preset passes it.
+- With Griffin, IM-1 Odysseus (11.819°) now fails the `landing slope` screening; every other preset passes it.
 - No polar patch had no-data inside its circle, so no site fell back to the global layer. Draper SERIES-2
   lies exactly on 75° S and was covered by the 30 m model.
 - Where the global layer is used, the plane rests on 14 to 39 heights about 237 m apart, so it says

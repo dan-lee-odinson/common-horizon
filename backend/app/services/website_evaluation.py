@@ -29,6 +29,7 @@ from app.models.website import (
     normalize_lon_east,
 )
 from app.physics.interface import PhysicsEngine
+from app.physics.site_slopes import SCREENING_NOTE, SLOPE_DESCRIPTION, SLOPE_DESCRIPTION_INLINE
 from app.planner_bridge import planner
 from app.services import planner_checks, ranking
 from app.services.catalog import PlannerSelection, lander_item, to_planner_selection
@@ -121,9 +122,16 @@ def _site_stay(engine: PhysicsEngine, site: SiteRef, start: datetime, stay_days:
 
 
 def _slope_check(slope_deg: float | None, slope_source: str | None, selection: PlannerSelection) -> RequirementCheck:
-    """Pass or fail only for a lander with a published slope limit; otherwise the slope is shown, unchecked."""
+    """Pass or fail only for a lander with a published slope limit; otherwise the slope is shown, unchecked.
+
+    The stored Moon Trek slope is regional, so a pass or fail on it is labelled as terrain screening.
+    The requirement keeps the name "landing slope": the website matches on it.
+    """
+    regional = slope_deg is not None and slope_source == SLOPE_DESCRIPTION
     if slope_deg is None:
         slope = "Site slope is unknown"
+    elif regional:
+        slope = f"Regional slope {slope_deg:g} deg ({SLOPE_DESCRIPTION_INLINE})"
     else:
         slope = f"Slope {slope_deg:g} deg" + (f" ({slope_source})" if slope_source else "")
     lander = lander_item(selection)
@@ -141,7 +149,8 @@ def _slope_check(slope_deg: float | None, slope_source: str | None, selection: P
     if slope_deg is None:
         return RequirementCheck(requirement="landing slope", passed=None, detail=f"{slope}; {limit}")
     passed = slope_deg <= lander.max_slope_deg
-    return RequirementCheck(requirement="landing slope", passed=passed, detail=f"{slope}; {limit}")
+    detail = f"{slope}; {limit}" + (f" {SCREENING_NOTE}" if regional else "")
+    return RequirementCheck(requirement="landing slope", passed=passed, detail=detail)
 
 
 def _evaluate_site(

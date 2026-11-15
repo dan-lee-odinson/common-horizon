@@ -13,6 +13,7 @@ import pytest
 from app.physics.site_slopes import (
     DEFAULT_SITE_SLOPES_FILE,
     FIT_RADIUS_M,
+    SCREENING_NOTE,
     SLOPE_DESCRIPTION,
     SiteSlopes,
     SiteSlopesError,
@@ -150,7 +151,11 @@ def test_no_data_inside_the_circle_makes_the_patch_unusable():
 
 def test_every_preset_site_has_a_stored_slope_at_its_own_point():
     assert STORED["format"] == "common-horizon/site-slopes"
-    assert SLOPE_DESCRIPTION in STORED["what"]
+    assert STORED["what"] == (
+        "For each preset site, the slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek). "
+        "Regional terrain screening over a circle 1 km across, not a touchdown safety assessment."
+    )
+    assert SLOPE_DESCRIPTION in STORED["what"] and SCREENING_NOTE in STORED["what"]
     assert set(STORED["sites"]) == {site["id"] for site in PRESETS}
     for site in PRESETS:
         entry = STORED["sites"][site["id"]]

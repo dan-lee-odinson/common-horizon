@@ -101,6 +101,8 @@ repository or in `.env` files committed to git.
   sample-and-hold (`app/physics/metrics.py`). Each response lists its data in `provenance.sources`.
 - Slope: at a preset site's own coordinates, the stored slope from `data/site_slopes.json` (the slope of
   the best-fit plane to LOLA heights within 500 m, from NASA Moon Trek; `site.slope_source` says so).
+  Without that file every slope is null, with a warning in every answer; an unreadable or invalid file
+  answers 503.
 - Unknown values stay unknown: `slope_deg` is null away from the preset sites; without a stored profile there is no
   `terrain_skyline` or `sky_visibility_fraction`; without a profile or `altitude_m`, `elevation_m`
   is a 0 m placeholder labelled `elevation_source = "synthetic_default"`, with a warning.

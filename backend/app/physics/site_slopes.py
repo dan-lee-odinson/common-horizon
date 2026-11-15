@@ -6,7 +6,8 @@ The slope is that plane's tilt. It is a regional slope over a circle 1 km across
 lander: the ground under a lander's feet can be steeper or flatter.
 
 The engine adapter reports a stored slope only for a request at a preset site's own coordinates
-(within ``SLOPE_MATCH_DISTANCE_M``). Every other point keeps ``slope_deg = null``.
+(within ``SLOPE_MATCH_DISTANCE_M``). Every other point keeps ``slope_deg = null``. Checking it
+against a lander's published limit is regional terrain screening, not a touchdown safety assessment.
 """
 
 from __future__ import annotations
@@ -22,10 +23,15 @@ DEFAULT_SITE_SLOPES_FILE = Path(__file__).resolve().parents[2] / "data" / "site_
 
 FIT_RADIUS_M = 500.0
 SLOPE_DESCRIPTION = "slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek)"
+# The same description, written to sit inside parentheses (the landing-slope requirement's detail).
+SLOPE_DESCRIPTION_INLINE = "slope of the best-fit plane to LOLA heights within 500 m, NASA Moon Trek"
 SLOPE_SCALE_NOTE = (
     "It is a regional slope over a circle 1 km across, wider than a lander: the ground under a "
     "lander's feet can be steeper or flatter."
 )
+# What comparing this slope with a lander's limit is, and is not.
+SCREENING_NOTE = "Regional terrain screening over a circle 1 km across, not a touchdown safety assessment."
+SLOPES_NOT_INSTALLED_WARNING = "Stored site slopes are not installed, so slope_deg is null."
 # A request gets a stored slope only at the preset site's own point; 1 m absorbs the rounding of
 # the longitude conversions between the website (0..360) and the physics request (-180..180).
 SLOPE_MATCH_DISTANCE_M = 1.0
