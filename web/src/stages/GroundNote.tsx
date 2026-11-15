@@ -25,7 +25,12 @@ export function GroundNote({ siteId, custom, pointer = false }: { siteId: string
   return pointer ? <span data-testid="site-ground-pointer">Ground: LOLA heights, true scale.</span> : null;
 }
 
-/** The Ground panel: where the drawn ground comes from. Nothing while the ground is level. */
+/**
+ * The Ground panel: where the drawn ground comes from, then (where it applies) that the sunlight
+ * numbers use a smooth horizon, then that the near ground is smooth. In a crowded wing it keeps
+ * most of its height and scrolls the rest; the Hardware panel below keeps room for a row.
+ * Nothing while the ground is level.
+ */
 export function GroundPanel({ siteId, custom, bare = false, className = '' }: { siteId: string | null; custom: boolean; bare?: boolean; className?: string }) {
   const terrain = useGround(siteId, custom);
   if (!terrain || !terrain.entry) return null;
@@ -33,14 +38,8 @@ export function GroundPanel({ siteId, custom, bare = false, className = '' }: { 
   const body = (
     <>
       <h3 className="panel-title m-0">Ground</h3>
-      <p className={`m-0 text-[13px] leading-snug text-ink-2 ${bare ? '' : 'min-h-0 overflow-y-auto overscroll-contain'}`} data-testid="site-ground" tabIndex={bare ? undefined : 0}>
+      <p className={`m-0 text-[12px] leading-snug text-ink-2 ${bare ? '' : 'min-h-0 overflow-y-auto overscroll-contain'}`} data-testid="site-ground" tabIndex={bare ? undefined : 0}>
         <span data-testid="site-ground-source">{words.source}</span>
-        {words.nearSmooth ? (
-          <>
-            {' '}
-            <span data-testid="site-ground-near-smooth">{words.nearSmooth}</span>
-          </>
-        ) : null}
         {words.smoothHorizon ? (
           <>
             {' '}
@@ -49,6 +48,12 @@ export function GroundPanel({ siteId, custom, bare = false, className = '' }: { 
               <span data-q="terrain_rise_deg">{words.smoothHorizon.deg}</span>
               {words.smoothHorizon.after}
             </span>
+          </>
+        ) : null}
+        {words.nearSmooth ? (
+          <>
+            {' '}
+            <span data-testid="site-ground-near-smooth">{words.nearSmooth}</span>
           </>
         ) : null}
       </p>
@@ -62,7 +67,7 @@ export function GroundPanel({ siteId, custom, bare = false, className = '' }: { 
     );
   }
   return (
-    <Glass as="section" className={`flex min-h-0 flex-col gap-2.5 p-4 short:p-3.5 ${className}`} aria-label="Ground" data-panel data-testid="ground-panel">
+    <Glass as="section" className={`flex min-h-0 flex-col gap-2 p-3.5 ${className}`} aria-label="Ground" data-panel data-testid="ground-panel">
       {body}
     </Glass>
   );

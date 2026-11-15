@@ -20,6 +20,8 @@ export const NEAR_BLEND_M = 1500;
 export const JOIN_M = 160;
 /** The far ground is drawn out to this distance from the site, metres. */
 export const FAR_RADIUS_M = 32_000;
+/** Over its last this-many metres the far ground fades into the skyline band's colour. */
+export const FAR_FADE_M = 4_000;
 /** Spacing of the lines of the eased ring round the near grid (near only), metres. */
 const RING_STEP_M = 50;
 

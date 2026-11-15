@@ -516,8 +516,8 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       <div className="hud-layer">
         <div className="site-wing site-wing-r wing-r absolute right-5 top-[4.75rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="right" data-site-zone="right">
           {earthPanel()}
-          {webgl ? <GroundPanel siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} className="shrink" /> : null}
-          {hardwarePanel({ className: 'max-lg:hidden [@media(max-height:759px)]:hidden' })}
+          {webgl ? <GroundPanel siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} className="shrink-[0.02]" /> : null}
+          {hardwarePanel({ className: 'min-h-[10rem] max-lg:hidden [@media(max-height:759px)]:hidden' })}
         </div>
       </div>
 

@@ -18,11 +18,18 @@ export const SITE_VIEW = {
   /** Vertical field of view, degrees: wide enough for a 52 m lander and the horizon behind it. */
   fov: 42,
   fovPhone: 58,
-  /** Nearest and farthest things drawn, metres. */
+  /**
+   * Nearest and farthest things drawn, metres. The far ground reaches 32 km; the depth buffer still
+   * parts the ground from the hardware to a fraction of a millimetre near the lander and to about
+   * a metre at 3 km (near / far stays at 1 : 100,000).
+   */
   near: 0.5,
-  far: 12_000,
-  /** Radius of the sky dome around the camera, metres. A drawing distance only: the sky has none. */
-  dome: 9_000,
+  far: 50_000,
+  /**
+   * Radius of the sky dome around the camera, metres. A drawing distance only: the sky has none. It
+   * lies beyond the farthest ground (32 km), so the ground stands in front of the sky.
+   */
+  dome: 40_000,
   /** The skyline band reaches this far below level, so the ground's far edge is always in front of it. */
   bandFloorDeg: -12,
   /** Width of the bright line along the skyline, degrees. */

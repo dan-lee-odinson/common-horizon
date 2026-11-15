@@ -98,7 +98,10 @@ export function requestSiteTerrain(siteId: string | null | undefined): void {
     put(siteId, { entry });
     // The near ground first: it is what the hardware stands on.
     void loadGrid(entry.near).then((near) => {
-      put(siteId, near ? { status: 'ready', near, farStatus: 'none' } : { status: 'failed', farStatus: 'none' });
+      put(siteId, near ? { status: 'ready', near } : { status: 'failed', farStatus: 'none' });
+      if (!near) return;
+      // Then the far ground. If it cannot be read, the near ground stays, eased back to level past its edge.
+      void loadGrid(entry.far).then((far) => put(siteId, far ? { farStatus: 'ready', far } : { farStatus: 'failed' }));
     });
   });
 }

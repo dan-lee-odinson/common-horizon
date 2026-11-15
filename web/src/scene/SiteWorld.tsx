@@ -3,9 +3,9 @@
 // A world in metres. The landing point is the origin; x points east, y up, z south. What is drawn:
 //   the sky      stars, Earth, the Sun, its path over the stay and the terrain skyline, on a dome
 //                round the camera (SiteSky)
-//   the ground   at a preset site, the real ground from the LOLA height files at true scale, with
-//                range rings painted on it; elsewhere a level disc with range rings, an illustration
-//                (SiteGround, siteTerrain.ts)
+//   the ground   at a preset site, the real ground from the LOLA height files at true scale out
+//                to 32 km, with range rings painted on it; elsewhere a level disc with range rings,
+//                an illustration (SiteGround, siteTerrain.ts)
 //   the hardware the mission's models at true scale, and their shadows (SiteHardware)
 // The Sun's and Earth's directions and the lit / dark word come from `skyAt`, the same function the
 // readouts use, at the instant the site clock shows. The light follows the word: with the terrain
@@ -32,7 +32,7 @@ import { hiddenByHardware, siteLayout, standOnGround, type PlacedItem, type Site
 import { createGroundUniforms, createSiteClock, createSiteNow, type GroundUniforms, type SiteNow } from './siteNow';
 import { SiteRig } from './SiteRig';
 import { SiteSky } from './SiteSky';
-import { groundHeight, type SiteGroundShape } from './siteTerrain';
+import { everyOtherPost, groundHeight, type SiteGroundShape } from './siteTerrain';
 import { useSiteTerrain } from './siteTerrainLoad';
 import { bandProfile, bandTopAt, domePoint, earthDiscRadius, insideFrame, siteArrival, siteFrame, SITE_VIEW, sunDiscRadius, sunPathOnDome } from './siteView';
 
@@ -53,7 +53,12 @@ export function SiteWorld({ data, active }: { data: SceneData; active: boolean }
   const metas = useModelMetas(ids);
   // The real ground, at a preset site whose near file has loaded (custom points keep the level ground).
   const terrain = useSiteTerrain(data.focus?.custom ? null : (data.focus?.id ?? null));
-  const shape = useMemo<SiteGroundShape | null>(() => (terrain.near ? { near: terrain.near, far: null } : null), [terrain.near]);
+  // On phones the far ground keeps every other post.
+  const isPhone = data.isPhone;
+  const shape = useMemo<SiteGroundShape | null>(
+    () => (terrain.near ? { near: terrain.near, far: terrain.far ? (isPhone ? everyOtherPost(terrain.far) : terrain.far) : null } : null),
+    [terrain.near, terrain.far, isPhone],
+  );
   const groundAt = useMemo(() => (shape ? (x: number, z: number) => groundHeight(shape, x, z) : null), [shape]);
   const layout = useMemo(() => standOnGround(siteLayout(choices, metas), groundAt), [choices, metas, groundAt]);
 
@@ -73,7 +78,7 @@ export function SiteWorld({ data, active }: { data: SceneData; active: boolean }
       <SiteHardware layout={layout} now={now} uniforms={uniforms} />
       <SiteMarkers layout={layout} names={data.hardwareNames ?? {}} now={now} active={active} />
       <SiteSky now={now} profile={profile} sunPath={sunPath} />
-      <SiteAnchors active={active} now={now} profile={profile} landerMid={landerMid} layout={layout} ground={shape ? 'terrain' : 'level'} />
+      <SiteAnchors active={active} now={now} profile={profile} landerMid={landerMid} layout={layout} ground={shape ? (shape.far ? 'terrain' : 'terrain-near') : 'level'} />
       <SiteRig active={active} data={data} heightM={layout.heightM} layoutRadius={layout.radius} groundAt={groundAt} />
     </group>
   );

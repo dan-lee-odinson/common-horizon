@@ -1022,3 +1022,38 @@ test('site ground: a custom point keeps the level ground and its caption', async
   await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'level');
 });
 
+
+test('site ground: at Apollo 17 the far terrain is drawn, and the screen says the sunlight numbers use a smooth horizon, with 14.0 degrees', async ({ page }) => {
+  await enterMission(page);
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  await spotlight(page, 'Apollo 17');
+  await zoomIn(page);
+  await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain');
+  await expect(page.getByTestId('site-ground-source')).toHaveText(
+    'Ground: LOLA elevation from NASA Moon Trek (237 m model near, 237 m model far), drawn at true scale. Shading only: shadows cast by terrain are not drawn.',
+  );
+  const line = page.getByTestId('site-ground-smooth-horizon');
+  await expect(line).toHaveText('Sunlight numbers at this site use a smooth horizon. The distant terrain is drawn for scale and is not in those numbers. It rises up to 14.0 degrees above the horizon here.');
+  await expect(line.locator('[data-q="terrain_rise_deg"]')).toHaveText('14.0');
+});
+
+test('site ground: at Shackleton ridge the sunlight numbers use the terrain skyline, so there is no smooth-horizon line', async ({ page }) => {
+  await enterMission(page);
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  await spotlight(page, 'Shackleton Connecting Ridge');
+  await zoomIn(page);
+  await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain');
+  await expect(page.getByTestId('site-ground-source')).toContainText('(5 m model near, 100 m model far)');
+  await expect(page.getByTestId('site-ground-smooth-horizon')).toHaveCount(0);
+});
+
+test('site ground: when only the far file cannot be loaded, the near ground stays, eased back to level ground', async ({ page }) => {
+  await page.route('**/site-terrain/*.far.f32', (route) => route.abort());
+  await enterMission(page);
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  await spotlight(page, 'Apollo 17');
+  await zoomIn(page);
+  await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain-near');
+  await expect(page.getByTestId('site-ground-source')).toContainText('then eased back to level ground, which is an illustration');
+  await expect(page.getByTestId('site-ground-smooth-horizon')).toHaveCount(0);
+});
