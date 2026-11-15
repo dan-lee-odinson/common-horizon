@@ -1,7 +1,6 @@
 // Everything the visitor has chosen lives here: the stage, the dates, the hardware, the sites.
 
 import type { CatalogItem, HardwareChoice, Site, SiteRef } from '../api/types';
-import type { TimeScale } from '../util/time';
 import { formatLatLon, normalizeLon360 } from '../util/geo';
 import { MAX_STORAGE_KWH } from '../util/storage';
 import { createStore } from './store';
@@ -37,7 +36,6 @@ export interface AppState {
   cardOpen: boolean;
   launchUtcMs: number;
   slipDays: number;
-  timeScale: TimeScale;
   stayDays: number;
   hardware: Record<string, HardwarePick>;
   /** Battery storage typed in the planner, kWh. 0 = none. */
@@ -133,7 +131,6 @@ export const appStore = createStore<AppState>({
   cardOpen: !cardSeen(),
   launchUtcMs: DEFAULT_LAUNCH_UTC_MS,
   slipDays: 0,
-  timeScale: 'UTC',
   stayDays: DEFAULT_STAY_DAYS,
   hardware: {},
   storageKwh: 0,
@@ -246,9 +243,6 @@ export const actions = {
     appStore.set({ slipDays: clamp(Math.round(days), 0, MAX_SLIP_DAYS) });
     simClock.set({ nowMs: null });
     orbitClock.set({ nowMs: null });
-  },
-  setTimeScale(timeScale: TimeScale) {
-    appStore.set({ timeScale });
   },
   setStay(days: number) {
     appStore.set({ stayDays: clamp(Math.round(days * 4) / 4, MIN_STAY_DAYS, MAX_STAY_DAYS) });

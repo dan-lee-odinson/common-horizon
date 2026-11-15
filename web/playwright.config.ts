@@ -9,6 +9,9 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
+  // One test at a time. The 3D pages render in software in the test browser, and two of them side
+  // by side slow each other enough to run into the time limits.
+  workers: 1,
   retries: 0,
   reporter: [['list']],
   use: {

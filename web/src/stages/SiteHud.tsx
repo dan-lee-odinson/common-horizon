@@ -61,7 +61,7 @@ const LEADERS: LeaderSpec[] = [
   { anchor: 'earth', to: '[data-leader-target="earth"]', color: 'var(--ch-earth)' },
 ];
 
-/** What in the picture is drawn from the data and what is an illustration, in one sentence. */
+/** What the heights in the hardware list are, and that the list stands in for a drawing of the hardware. */
 const HARDWARE_NOTE = 'Heights are those of the hardware models, in their descriptions’ own words. The hardware is listed here, not drawn in the view.';
 const HARDWARE_NOTE_FLAT = 'Heights are those of the hardware models, in their descriptions’ own words.';
 
@@ -128,8 +128,6 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
     hideAnchors();
     return () => hideAnchors('sun', 'earth', 'lander');
   }, []);
-  // Time stops when the stage is left by any way out.
-  useEffect(() => () => actions.setPlaying(false), []);
 
   const q = live();
   const fixed = siteStageQuantities({ site, landingMs, plannedLandingMs, stayEndMs: windowEndMs, stayDays, evaluation: focusRow?.evaluation ?? null, check: focusCheck });
@@ -176,7 +174,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       valueText: () => {
         const l = live();
         const state = l.sunState.text === DASH ? 'lit or dark not known' : l.sunState.text;
-        return `${l.sinceLanding.text} from the landing, ${l.utcClock.text} ${l.utcClock.unit}, ${state}`;
+        return `${l.sinceLanding.text} from the landing, ${l.utcClock.text} ${l.utcClock.unit}, ${state}${l.beforeLanding ? ', before the landing' : ''}`;
       },
     };
     // `live` reads through `readLive`, which is made again whenever the data changes.
@@ -242,7 +240,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   const transport = <Transport playing={playing} speed={speed} speeds={speeds} onTogglePlay={togglePlay} onRestart={restart} onSpeed={actions.setSpeed} disabled={!ranged} />;
 
   const beforeLanding = (
-    <p className="tag tag-warn site-before m-0 min-h-9 shrink-0 px-3 normal-case tracking-[0.04em]" role="status" data-testid="before-landing">
+    <p className="tag tag-warn m-0 min-h-9 w-fit shrink-0 px-3 normal-case tracking-[0.04em]" data-testid="before-landing">
       <span className="uppercase tracking-[0.1em]" data-q={q.phase.key}>
         <span data-q-text>{q.phase.text}</span>
       </span>
@@ -325,7 +323,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
               <Readout q={q.nextChange} size="sm" />
               <Readout q={q.sunAz} size="sm" />
               <Readout q={q.sunEl} size="sm" />
-              <div className="col-span-2 flex">{beforeLanding}</div>
+              <div className="site-before col-span-2">{beforeLanding}</div>
             </Glass>
           </div>
         </div>
@@ -333,7 +331,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
         <Drawer open={sheetOpen} onClose={() => actions.setHorizonOpen(false)} title="Horizon and readouts" side="bottom" testId="site-sheet" className="site-sheet">
           <div className="flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 py-3">
             {plot(180, 'console', 90)}
-            <SkyLegend scaleBreak={scaleBreak} />
+            <SkyLegend scaleBreak={scaleBreak} delayed={slipDays > 0} />
             {clockPanel({ bare: true })}
             {sunPanel({ bare: true })}
             {earthPanel({ bare: true })}
@@ -407,19 +405,24 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             </span>
           )}
           {result.verdict.text === DASH ? null : (
-            <span className={`${passTag} min-h-9 min-w-0 shrink px-2.5`} data-q={result.verdict.key} data-testid="site-verdict">
-              <span className="truncate" data-q-text>
-                {result.verdict.text}
-              </span>
+            <span className={`${passTag} min-h-9 shrink-0 px-2.5`} data-q={result.verdict.key} data-testid="site-verdict">
+              <span data-q-text>{result.verdict.text}</span>
             </span>
           )}
           <span className="num flex shrink-0 items-center gap-3 rounded-[3px] bg-glass-strong px-2.5 py-2 text-[13px] leading-none text-ink-2 max-xl:hidden" data-testid="site-coordinates">
             <Inline q={fixed.siteLat} />
             <Inline q={fixed.siteLon} />
           </span>
-          {beforeLanding}
         </div>
       </div>
+
+      {/* Inside the launch delay, the stage says so where the scene begins: no hardware stands there yet. */}
+      {webgl ? (
+        <div className="hud-layer" data-depth="0.6">
+          {/* On its own over the scene, so it carries its own dark backing. */}
+          <div className="site-before absolute left-[22.5rem] top-[8rem] rounded-[3px] bg-glass-strong max-lg:left-[18.5rem]">{beforeLanding}</div>
+        </div>
+      ) : null}
 
       {/* Left wing: the Sun now, the shadows it casts and its light over the stay. */}
       <div className="hud-layer" data-depth="0.9">
@@ -440,9 +443,12 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       {webgl ? null : (
         <div className="hud-layer" data-depth="0.5">
           <Glass as="section" className="absolute left-[22.5rem] right-[22.5rem] top-[11.5rem] flex flex-col gap-3 p-4 max-lg:left-[18.5rem] max-lg:right-[18.5rem]" aria-label="Horizon" data-enter="fade" data-panel data-testid="site-flat">
-            <h3 className="panel-title m-0">Horizon</h3>
+            <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
+              <h3 className="panel-title m-0">Horizon</h3>
+              <div className="site-before">{beforeLanding}</div>
+            </div>
             {plot(short ? 180 : 260, 'hero', 45)}
-            <SkyLegend scaleBreak={scaleBreak} />
+            <SkyLegend scaleBreak={scaleBreak} delayed={slipDays > 0} />
           </Glass>
         </div>
       )}
@@ -460,7 +466,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
           <div className="flex min-w-0 flex-col gap-1.5">
             {webgl ? (
               <>
-                <SkyLegend scaleBreak={scaleBreak} />
+                <SkyLegend scaleBreak={scaleBreak} delayed={slipDays > 0} />
                 {plot(plotHeight, 'console', 45)}
               </>
             ) : null}

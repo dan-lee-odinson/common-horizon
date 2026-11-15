@@ -643,7 +643,7 @@
     border-top: 1px solid var(--ch-line);
     padding-top: 0.75rem;
   }
-  /* "Before landing" shows only while the clock is inside the launch delay. */
+  /* "Before landing" (and the place kept for it) shows only while the clock is inside the launch delay. */
   .site-hud[data-phase='stay'] .site-before {
     display: none;
   }

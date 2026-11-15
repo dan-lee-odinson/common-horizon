@@ -113,12 +113,13 @@ export function StayTimeline({
     let lastLabelPx = -Infinity;
     return ticks
       .filter((q) => q.value !== null)
-      .map((q) => {
+      .map((q, i) => {
         const f = rangeFraction(landingMs + q.value! * DAY_MS, startMs, endMs);
         const px = f * laneWidth;
         // A label is shown when it is clear of the last one shown and of the lane's right end.
         const show = px - lastLabelPx >= 48 && laneWidth - px >= 20;
-        if (show) lastLabelPx = px;
+        // The first label starts at its mark instead of being centred on it, so it reaches further right.
+        if (show) lastLabelPx = i === 0 ? px + 22 : px;
         return { q, f, show };
       });
   }, [ticks, landingMs, startMs, endMs, laneWidth]);
@@ -270,8 +271,8 @@ export function StayTimeline({
       <div
         ref={laneRef}
         className="stay-lane"
-        role={interactive ? undefined : 'img'}
-        aria-label={interactive ? undefined : label}
+        role={compact ? 'img' : undefined}
+        aria-label={compact ? label : undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerEnd}

@@ -264,7 +264,16 @@ export function HorizonPanel({ data, fromMs, toMs, elRange = null, label, getSun
  * What the lines and marks of the horizon plot and of the stay timeline mean. `scaleBreak` is the
  * axis label of the height where the plot's scale changes, when it has two bands.
  */
-export function SkyLegend({ scaleBreak = null, className = '' }: { scaleBreak?: { key: string; text: string; unit: string } | null; className?: string }) {
+export function SkyLegend({
+  scaleBreak = null,
+  delayed = false,
+  className = '',
+}: {
+  scaleBreak?: { key: string; text: string; unit: string } | null;
+  /** True with a launch delay: the plot then covers the delay as well as the stay. */
+  delayed?: boolean;
+  className?: string;
+}) {
   return (
     <ul className={`m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 p-0 text-[12px] leading-tight text-ink-2 ${className}`} data-testid="sky-legend">
       <li className="flex items-center gap-1.5">
@@ -281,7 +290,7 @@ export function SkyLegend({ scaleBreak = null, className = '' }: { scaleBreak?: 
       </li>
       <li className="flex items-center gap-1.5">
         <span className="inline-block h-2.5 w-4 rounded-[2px] border border-earth bg-earth-soft" aria-hidden />
-        Earth’s range over the stay
+        {delayed ? 'Earth’s range over the delay and the stay' : 'Earth’s range over the stay'}
       </li>
       <li className="flex items-center gap-1.5">
         <span className="inline-block h-2.5 w-4 bg-sun" aria-hidden />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DAY_MS, LTC_MICROSECONDS_PER_DAY, formatHours, formatLtc, formatTimeShort, formatUtc, ltcOffsetMicros, parseDatetimeLocalUtc, toDatetimeLocalUtc, utcToLtcMicros } from './time';
+import { DAY_MS, LTC_MICROSECONDS_PER_DAY, formatHours, formatSinceLanding, formatUtcMinute, ltcClock, ltcOffsetMicros, parseDatetimeLocalUtc, toDatetimeLocalUtc, utcClock, utcToLtcMicros } from './time';
 
 const LANDING = Date.UTC(2027, 1, 15, 15, 0, 0);
 
@@ -32,19 +32,25 @@ describe('LTC (model value) = UTC + 56.02 µs per day since landing', () => {
     expect(utcToLtcMicros(LANDING + 10 * DAY_MS, LANDING)).toBe((LANDING + 10 * DAY_MS) * 1000 + 560);
   });
 
-  it('formats LTC with microseconds so the small offset is visible', () => {
-    expect(formatLtc(LANDING, LANDING)).toBe('2027-02-15 15:00:00.000000 LTC');
-    expect(formatLtc(LANDING + DAY_MS, LANDING)).toBe('2027-02-16 15:00:00.000056 LTC');
-    expect(formatLtc(LANDING + 100 * DAY_MS, LANDING)).toBe('2027-05-26 15:00:00.005602 LTC');
+  it('reads the LTC clock with microseconds so the small offset is visible', () => {
+    expect(ltcClock(LANDING, LANDING)).toEqual({ date: '2027-02-15', time: '15:00:00', fraction: '000000' });
+    expect(ltcClock(LANDING + DAY_MS, LANDING)).toEqual({ date: '2027-02-16', time: '15:00:00', fraction: '000056' });
+    expect(ltcClock(LANDING + 100 * DAY_MS, LANDING)).toEqual({ date: '2027-05-26', time: '15:00:00', fraction: '005602' });
+    // Before the landing the LTC reading is a little behind UTC.
+    expect(ltcClock(LANDING - 2 * DAY_MS, LANDING)).toEqual({ date: '2027-02-13', time: '14:59:59', fraction: '999888' });
   });
 
-  it('rounds short labels to the minute instead of cutting them', () => {
-    expect(formatTimeShort(LANDING - 4 * DAY_MS, 'LTC', LANDING)).toBe('2027-02-11 15:00 LTC');
-    expect(formatTimeShort(LANDING, 'UTC', LANDING)).toBe('2027-02-15 15:00 UTC');
+  it('reads the UTC clock plainly, and rounds dates beside a control to the minute instead of cutting them', () => {
+    expect(utcClock(LANDING)).toEqual({ date: '2027-02-15', time: '15:00:00', fraction: '' });
+    expect(formatUtcMinute(LANDING)).toBe('2027-02-15 15:00');
+    expect(formatUtcMinute(LANDING - 4 * DAY_MS + 59_700)).toBe('2027-02-11 15:01');
   });
 
-  it('formats UTC plainly', () => {
-    expect(formatUtc(LANDING)).toBe('2027-02-15 15:00:00 UTC');
+  it('counts time from the landing with a sign, in days and hours', () => {
+    expect(formatSinceLanding(LANDING, LANDING)).toBe('+0 d 00 h');
+    expect(formatSinceLanding(LANDING + 78 * 3_600_000, LANDING)).toBe('+3 d 06 h');
+    expect(formatSinceLanding(LANDING - 12 * 3_600_000, LANDING)).toBe('−0 d 12 h');
+    expect(formatSinceLanding(LANDING - 14 * DAY_MS, LANDING)).toBe('−14 d 00 h');
   });
 });
 

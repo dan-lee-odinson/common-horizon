@@ -80,6 +80,55 @@ describe('text contrast on glass', () => {
   });
 });
 
+describe('graphs and the stay timeline', () => {
+  /** The well a graph is drawn in, over a glass panel at its lightest. */
+  const well = (tint: string): Rgba => over(parseColor(token('--ch-well')), worstGlass(tint));
+
+  for (const tint of ['--ch-glass', '--ch-glass-strong']) {
+    it(`lines on the plot's well over ${tint} are at least 3 to 1`, () => {
+      // The skyline, the Sun's path and dot, Earth's box and ring, the level line and the grid's strong lines.
+      for (const name of ['--ch-cyan', '--ch-sun', '--ch-earth']) {
+        expect(contrast(parseColor(token(name)), well(tint)), name).toBeGreaterThanOrEqual(3);
+      }
+      const strongLine = over(parseColor(token('--ch-line-strong')), well(tint));
+      expect(contrast(strongLine, well(tint)), '--ch-line-strong').toBeGreaterThanOrEqual(3);
+    });
+
+    it(`words on the plot's well over ${tint} are at least 4.5 to 1`, () => {
+      // "Earth" beside its box; the axis labels sit on the glass itself and are covered above.
+      expect(contrast(parseColor(token('--ch-earth-text')), well(tint))).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+
+  it('the timeline reads by shape and by colour: lit, dark and the needle are each at least 3 to 1', () => {
+    const backing = parseColor(token('--ch-space'));
+    const lit = parseColor(token('--ch-sun'));
+    // A lit period against the bar's backing, and against a dark period beside it.
+    expect(contrast(lit, backing)).toBeGreaterThanOrEqual(3);
+    expect(contrast(lit, parseColor(token('--ch-dark-period')))).toBeGreaterThanOrEqual(3);
+    // A dark period's outline against its own fill and against the backing.
+    const outlineOnDark = over(parseColor(token('--ch-line-strong')), parseColor(token('--ch-dark-period')));
+    expect(contrast(outlineOnDark, parseColor(token('--ch-dark-period')))).toBeGreaterThanOrEqual(3);
+    expect(contrast(over(parseColor(token('--ch-line-strong')), backing), backing)).toBeGreaterThanOrEqual(3);
+    // The needle: light over the dark bar, and dark-edged where it crosses a lit period.
+    expect(contrast(parseColor(token('--ch-ink')), backing)).toBeGreaterThanOrEqual(3);
+    expect(contrast(parseColor(token('--ch-accent-ink')), lit)).toBeGreaterThanOrEqual(3);
+    // The stay bracket and the needle's cap, on glass.
+    expect(contrast(parseColor(token('--ch-accent')), worstGlass('--ch-glass-strong'))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('the stretch before the landing is told from the stay by its hatching: the hatch lines differ by at least 3 to 1 over a lit period', () => {
+    const lit = parseColor(token('--ch-sun'));
+    const css = readFileSync(fileURLToPath(new URL('./index.css', import.meta.url)), 'utf8');
+    const rule = /\.stay-lead\s*\{[^}]*repeating-linear-gradient\(135deg,\s*(rgb\([^)]+\))[^,]*,\s*(rgb\([^)]+\))/.exec(css);
+    expect(rule).not.toBeNull();
+    const [dark, light] = [over(parseColor(rule![1]), lit), over(parseColor(rule![2]), lit)];
+    expect(contrast(light, dark)).toBeGreaterThanOrEqual(3);
+    // And the hatched stretch stays plainly dimmer than the stay beside it.
+    expect(contrast(lit, light)).toBeGreaterThanOrEqual(1.5);
+  });
+});
+
 describe('contrast arithmetic', () => {
   it('matches the known black on white and grey values', () => {
     expect(contrast(parseColor('#000'), parseColor('#fff'))).toBeCloseTo(21, 5);

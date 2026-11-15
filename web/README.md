@@ -223,7 +223,33 @@ Presets, coordinates and saved sites are in a glass **drawer** at the right, so 
 buries the one site that matters; the **Mission Assistant** runs along the bottom. The picture
 shifts to keep the site's marker and tag clear of the open panels (`src/scene/missionView.ts`).
 
-**Stage 3, Site** follows in the next commits of this branch.
+**Stage 3, Site.** **Zoom in to this site** goes down to the site, and time runs through the stay.
+A strip across the top names the site (rank, pass or fail, coordinates) and holds **Back to mission
+select**. Two wings read the sky at the instant shown: the **Sun** (lit or dark, the time to the
+next sunrise or sunset, azimuth and elevation, the shadow of a metre of height and of the lander on
+level ground, and its light over the stay) and **Earth** (azimuth, elevation, apparent width and the
+Earth link over the stay), with the mission's **hardware** and the height of each model. A console
+along the bottom holds the **mission clock** (UTC and the LTC model value), **Play**, **Back to the
+landing** and three **speeds**, and the **horizon plot** directly above the **stay timeline**:
+
+* the horizon plot is the sky unrolled (compass direction across, height above level upward) with
+  the terrain skyline, the Sun's path (solid above the skyline, dashed where the terrain hides it),
+  the part of the sky Earth moves through, and a Sun dot and an Earth ring that follow the clock;
+* the stay timeline shows lit periods as solid blocks and dark periods as low outlines, and it is
+  the scrubber: drag anywhere on it, or use the keyboard (arrows step an hour, six with Shift; Page
+  Up and Page Down a day; Home and End the ends; Space plays and pauses). With a launch delay it
+  starts at the planned landing: the stretch before the landing is hatched and labelled with the
+  delay, a dashed marker stands at the planned landing and a bracket spans the stay. Scrubbed into
+  that stretch, the stage says "before landing" and how long until it. Play always runs the stay
+  itself, from the landing to its end, and stops there.
+
+The Sun's disc and Earth's disc are drawn at their true apparent size from the site, at mean
+distances (about 0.53° and 1.90° to 1.91°; `src/util/bodies.ts`, sources in `SOURCES-web.md`), and
+a line on screen says so; the skyline is the horizon answer's own; the ground is an illustration,
+and the screen says that too. One function gives the sky at the instant shown (`skyAt` in
+`src/util/quantities.ts`) to the readouts, the plot, the timeline and the scene, so they cannot
+disagree. On a phone the same parts are a status card, a dock along the bottom and a sheet that
+rises above it; without WebGL the horizon plot takes the scene's place.
 
 **Where the numbers come from.** Every readout shows a quantity from the API layer (in mock mode,
 the mock model): nothing on screen is random or made up, and a readout shows a dash until its data
@@ -233,6 +259,15 @@ day of the window (one probe point, no hardware, launch moved a day at a time), 
 `src/util/track.ts`). Answers are cached, so changing the delay by a day asks for one new day. A
 real backend is asked six questions at a time. Earth's direction at a site is worked out from
 Earth's overhead point, which ignores parallax and is good to about 1 degree.
+
+**Lit and dark.** Whether a site is lit, and when the Sun next rises or sets behind the terrain,
+come from the site's horizon answer (`POST /horizon`): the terrain skyline around the site and the
+Sun's path through the window, each sample marked above or hidden. The website asks for samples
+never more than one hour apart, however long the stay: a window longer than 150 days is asked for
+in several requests that meet end to end and are joined into one answer (`src/state/horizonLoad.ts`).
+A change is placed where the Sun, followed along a straight line between two samples, crosses the
+skyline as the answer gives it (`src/util/horizon.ts`); against the mock model that is within a
+tenth of an hour or so, which is how finely the time to the next change is shown.
 
 **Time.** LTC (model value) = UTC + 56.02 microseconds for every day counted from the landing time.
 The rate is a published estimate (Ashby and Patla, 2024; see `SOURCES-web.md`). Counting from the
@@ -261,7 +296,9 @@ web/
   src/App.tsx              the 3D space, the HUD over it and the landing card
   src/api/                 client.ts (network), types.ts (provisional), mock/, examples/
   src/state/               app state, data loading, the geometry track loader, the four-state hook,
-                           assistant.ts (the assistant's conversation)
+                           assistant.ts (the assistant's conversation), horizonLoad.ts (a site's
+                           horizon answer for a window of any length), models.ts (the hardware
+                           models' sizes)
   src/stages/              the HUD of each stage, the top bar, the landing card, the clocks
     MissionHud.tsx         mission select: where its panels sit, and what they leave of the window
     Spotlight.tsx          the spotlight site: rank, name, readouts, pass or fail, zoom in
@@ -271,18 +308,26 @@ web/
     SiteDrawer.tsx         the drawer: presets, coordinates, saved sites
     MissionSheet.tsx       the mission planner sheet
     Assistant.tsx          the Mission Assistant (along the bottom, or as a sheet)
-    SiteHud.tsx            the site stage's HUD (provisional)
+    SiteHud.tsx            the site stage: where its panels sit, and what they leave of the window
+    SitePanels.tsx         its reading panels: Sun, mission clock, Earth, hardware
+    Playback.tsx           the clocks: the Orbit preview, and Play through the stay
   src/hud/                 reusable HUD pieces: glass panel, readout, ring dial, reticle, line graph,
-                           drawer, sheet, leader lines, parallax
+                           drawer, sheet, leader lines, parallax; HorizonPanel.tsx (the horizon plot),
+                           StayTimeline.tsx (lit and dark periods, and the scrubber), Transport.tsx
+                           (play, pause, speed)
   src/scene/               the 3D space: Moon world, ring system, camera director, 2D fallback;
                            orbitView.ts and missionView.ts (where things sit on screen, as arithmetic)
   src/components/          icons, ComparePanel.tsx (saved sites side by side) and shared parts
   src/util/                time (LTC), geometry, the Sun and Earth track, horizon reading, readout
                            quantities, season, power colours, ranking, mission.ts (the one-line
-                           mission summary), storage.ts (battery entry)
+                           mission summary), storage.ts (battery entry), bodies.ts (sizes and
+                           distances of the Sun, Earth and the Moon), shadow.ts (shadows on level
+                           ground), stay.ts (play and scrub through the stay), horizonPlot.ts (the
+                           horizon plot's scales and shapes)
   src/styles/              theme.css (every colour), fonts.css, index.css
   src/assets/fonts/        the three font families and their licences
-  e2e/path.spec.ts         the browser tests
+  e2e/path.spec.ts         the browser tests: landing card, Orbit, mission select
+  e2e/site.spec.ts         the browser tests: the site stage
   e2e/screens.capture.ts   takes the pictures in docs/screens/
   docs/screens/            pictures of the app
   public/textures/         slot for the Moon colour map (see its README)

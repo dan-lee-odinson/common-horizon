@@ -9,8 +9,6 @@ export const DAY_MS = 86_400_000;
 export const HOUR_MS = 3_600_000;
 export const LTC_MICROSECONDS_PER_DAY = 56.02;
 
-export type TimeScale = 'UTC' | 'LTC';
-
 /** Offset of LTC from UTC, in microseconds, at a UTC instant. */
 export function ltcOffsetMicros(utcMs: number, landingUtcMs: number): number {
   const daysSinceLanding = (utcMs - landingUtcMs) / DAY_MS;
@@ -33,40 +31,6 @@ function ymdhms(d: Date): string {
   );
 }
 
-/** "2027-02-15 15:00:00 UTC" */
-export function formatUtc(utcMs: number): string {
-  return `${ymdhms(new Date(utcMs))} UTC`;
-}
-
-/** "2027-02-15 15:00:00.000056 LTC" — microseconds shown because the offset is that small. */
-export function formatLtc(utcMs: number, landingUtcMs: number): string {
-  const micros = utcToLtcMicros(utcMs, landingUtcMs);
-  const wholeMs = Math.floor(micros / 1000);
-  const subMs = micros - wholeMs * 1000; // 0..999 microseconds
-  const d = new Date(wholeMs);
-  const fraction = pad(d.getUTCMilliseconds(), 3) + pad(subMs, 3);
-  return `${ymdhms(d)}.${fraction} LTC`;
-}
-
-export function formatTime(utcMs: number, scale: TimeScale, landingUtcMs: number): string {
-  return scale === 'UTC' ? formatUtc(utcMs) : formatLtc(utcMs, landingUtcMs);
-}
-
-/** Short label rounded to the minute: "2027-02-15 15:00 UTC" or "2027-02-15 15:00 LTC". */
-export function formatTimeShort(utcMs: number, scale: TimeScale, landingUtcMs: number): string {
-  const ms = scale === 'UTC' ? utcMs : utcToLtcMicros(utcMs, landingUtcMs) / 1000;
-  const d = new Date(Math.round(ms / 60_000) * 60_000);
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} ${scale}`;
-}
-
-/** "+1.234 ms" style offset text for the LTC note. */
-export function formatLtcOffset(utcMs: number, landingUtcMs: number): string {
-  const us = ltcOffsetMicros(utcMs, landingUtcMs);
-  const sign = us < 0 ? '−' : '+';
-  const abs = Math.abs(us);
-  return abs >= 1000 ? `${sign}${(abs / 1000).toFixed(3)} ms` : `${sign}${abs.toFixed(2)} µs`;
-}
-
 /** Value for <input type="datetime-local">, read as UTC: "2027-02-10T15:00". */
 export function toDatetimeLocalUtc(utcMs: number): string {
   const d = new Date(utcMs);
@@ -86,10 +50,6 @@ export function parseDatetimeLocalUtc(value: string): number {
 
 export function toIsoUtc(utcMs: number): string {
   return new Date(utcMs).toISOString().replace('.000Z', 'Z');
-}
-
-export function addDays(utcMs: number, days: number): number {
-  return utcMs + days * DAY_MS;
 }
 
 /** "3 d 4 h" for durations, "45 h" for short ones. */
