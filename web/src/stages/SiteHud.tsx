@@ -54,6 +54,7 @@ import { AnchorTag } from './AnchorTag';
 import { ClockPanel, EarthPanel, HardwarePanel, Inline, SunPanel } from './SitePanels';
 import { useEntrance } from './useEntrance';
 import { SiteChecks } from './SiteChecks';
+import { GroundNote } from './GroundNote';
 import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
 const LEADERS: LeaderSpec[] = [
@@ -343,7 +344,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
   const trueSize = (
     <p className="m-0 text-[13px] leading-snug text-ink-2" data-testid="true-size">
-      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. Lit means some part of the Sun's disc is above the skyline, so the disc can sit mostly behind a ridge while the site is lit. <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
+      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. Lit means some part of the Sun's disc is above the skyline, so the disc can sit mostly behind a ridge while the site is lit. <GroundNote siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} />{' '}
       <span data-testid="site-rings">
         Range rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
       </span>
@@ -416,7 +417,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             )}
             {webgl ? (
               <p className="m-0 text-[12px] leading-snug text-ink-2" data-testid="true-size">
-                Sun <Inline q={fixed.sunWidth} />, Earth <Inline q={q.earthWidth} />: true apparent size (mean distances). <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
+                Sun <Inline q={fixed.sunWidth} />, Earth <Inline q={q.earthWidth} />: true apparent size (mean distances). <GroundNote siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} />{' '}
                 <span data-testid="site-rings">
                   Rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
                 </span>

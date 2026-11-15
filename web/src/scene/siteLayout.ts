@@ -34,6 +34,8 @@ export interface PlacedItem {
   halfX: number;
   halfZ: number;
   height: number;
+  /** Height of the ground under the middle of its footprint, metres (see `standOnGround`); 0 on level ground. */
+  y?: number;
 }
 
 /** A plain labelled marker for an item with no model: a thin post at a place that is an illustration. */
@@ -44,6 +46,8 @@ export interface PlacedMarker {
   x: number;
   z: number;
   count: number;
+  /** Height of the ground at its foot, metres; 0 on level ground. */
+  y?: number;
 }
 
 /** Height of a marker's post, metres: a sign, not a size. */
@@ -202,6 +206,20 @@ export function siteLayout(choices: readonly HardwareChoice[], models: Readonly<
   };
 }
 
+/**
+ * The layout with every item and marker standing on the ground: each takes the ground's height at
+ * the middle of its footprint (`groundAt(x, z)`, metres). The places themselves do not change. With
+ * no ground function (level ground) the layout is returned as it is.
+ */
+export function standOnGround(layout: SiteLayout, groundAt: ((x: number, z: number) => number) | null): SiteLayout {
+  if (!groundAt) return layout;
+  return {
+    ...layout,
+    items: layout.items.map((i) => ({ ...i, y: groundAt(i.x, i.z) })),
+    markers: layout.markers.map((m) => ({ ...m, y: groundAt(m.x, m.z) })),
+  };
+}
+
 /** The clear ground between two footprints, metres (negative when they overlap). */
 export function footprintGap(a: PlacedItem, b: PlacedItem): number {
   const dx = Math.abs(a.x - b.x) - (a.halfX + b.halfX);
@@ -232,7 +250,7 @@ export function hiddenByHardware(from: { x: number; y: number; z: number }, dir:
     let far = Infinity;
     const slabs: [number, number, number, number][] = [
       [from.x, dir.x, item.x - item.halfX, item.x + item.halfX],
-      [from.y, dir.y, 0, item.height],
+      [from.y, dir.y, item.y ?? 0, (item.y ?? 0) + item.height],
       [from.z, dir.z, item.z - item.halfZ, item.z + item.halfZ],
     ];
     let hit = true;

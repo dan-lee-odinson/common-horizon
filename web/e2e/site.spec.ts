@@ -196,8 +196,13 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
   expect(await readout(page, 'earth_width')).toMatch(/^1\.9[01]$/);
   await expect(trueSize.locator('[data-q="sun_width"]')).toHaveText('0.53°');
   await expect(trueSize.locator('[data-q="earth_width"]')).toHaveText(/^1\.9[01]°$/);
-  // What is an illustration is said to be one, and the rings on the ground say what they measure.
-  await expect(page.getByTestId('site-illustration-ground')).toHaveText('The ground is an illustration.');
+  // The ground is the real ground from the height files, and the words say where it comes from;
+  // the rings on the ground say what they measure.
+  await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain');
+  await expect(page.getByTestId('site-ground-source')).toContainText('Ground: LOLA elevation from NASA Moon Trek (');
+  await expect(page.getByTestId('site-ground-source')).toContainText('drawn at true scale');
+  await expect(page.getByTestId('site-ground-source')).toContainText('Shading only: shadows cast by terrain are not drawn.');
+  await expect(page.getByTestId('site-illustration-ground')).toHaveCount(0);
   const rings = page.getByTestId('site-rings');
   await expect(rings.locator('[data-q="ground_ring_minor"]')).toHaveText(/^10\s?m$/);
   await expect(rings.locator('[data-q="ground_ring_major"]')).toHaveText(/^100\s?m$/);
@@ -898,10 +903,11 @@ test('site on a phone: zoom in, play, the sheet, and back, with nothing scrollin
     expect(c.right, c.id).toBeLessThanOrEqual(390);
   }
 
-  // Both discs are stated to be at true apparent size, and the ground to be an illustration.
+  // Both discs are stated to be at true apparent size, and the ground's source is given.
   await expect(page.getByTestId('true-size')).toContainText('true apparent size');
   await expect(page.getByTestId('true-size').locator('[data-q="sun_width"]')).toHaveText('0.53°');
-  await expect(page.getByTestId('site-illustration-ground')).toBeVisible();
+  await expect(page.getByTestId('site-ground-source')).toBeVisible();
+  await expect(page.getByTestId('site-ground-source')).toContainText('LOLA elevation from NASA Moon Trek');
 
   // Play runs the clock; Pause holds it.
   const play = page.getByTestId('site-play');
@@ -965,3 +971,58 @@ test('site: with the Data checks band measured after arrival (reduced motion), a
     expect(m.y + m.height).toBeLessThanOrEqual(b.y);
   }
 });
+
+// ---------- the ground ----------
+
+/** The words under the picture about the ground (the wide layout's or the phone dock's). */
+function groundNote(page: Page) {
+  return page.getByTestId('true-size').first();
+}
+
+test('site ground: the real ground at Shackleton ridge, from the 5 m model, with no smoothness note', async ({ page }) => {
+  await enterMission(page);
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  await spotlight(page, 'Shackleton Connecting Ridge');
+  await zoomIn(page);
+  await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain');
+  await expect(page.getByTestId('site-ground-source')).toContainText('(5 m model');
+  await expect(groundNote(page).getByTestId('site-ground-near-smooth')).toHaveCount(0);
+  await expect(groundNote(page).getByTestId('site-illustration-ground')).toHaveCount(0);
+});
+
+test('site ground: at Apollo 17 the near ground comes from the global model, and the note says it is smooth', async ({ page }) => {
+  await enterMission(page);
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  await spotlight(page, 'Apollo 17');
+  await zoomIn(page);
+  await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'terrain');
+  await expect(page.getByTestId('site-ground-source')).toContainText('(237 m model');
+  await expect(page.getByTestId('site-ground-near-smooth')).toHaveText('The near ground here comes from a 237 m model, so it is smooth with no small detail.');
+});
+
+test('site ground: when the near file cannot be loaded, the level ground and its caption stay', async ({ page }) => {
+  await page.route('**/site-terrain/*.near.f32', (route) => route.abort());
+  await enterMission(page);
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  await zoomIn(page);
+  await expect(page.getByTestId('site-illustration-ground')).toHaveText('The ground is an illustration.');
+  await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'level');
+  await expect(page.getByTestId('site-ground')).toHaveCount(0);
+});
+
+test('site ground: a custom point keeps the level ground and its caption', async ({ page }) => {
+  await enterMission(page);
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  await page.getByTestId('drawer-toggle').click();
+  await page.getByTestId('mode-custom').click();
+  await page.getByTestId('lat-input').fill('-88.5');
+  await page.getByTestId('lon-input').fill('45');
+  await page.getByTestId('go-coordinate').click();
+  await expect(page.getByTestId('spotlight-name')).toContainText('Custom point');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('spotlight-rank')).toHaveText(/^\d\d$/, { timeout: 20_000 });
+  await zoomIn(page);
+  await expect(page.getByTestId('site-illustration-ground')).toHaveText('The ground is an illustration.');
+  await expect(page.getByTestId('world')).toHaveAttribute('data-site-ground', 'level');
+});
+

@@ -9,7 +9,7 @@ import { skyAt, type SkyNow } from '../util/quantities';
 import { shadowOffsetPerMetre } from '../util/shadow';
 import type { GeometryTrack } from '../util/track';
 import { cssColor } from './colors';
-import { GROUND_FRAGMENT, GROUND_VERTEX } from './siteShaders';
+import { GROUND_FRAGMENT, GROUND_VERTEX, TERRAIN_FRAGMENT, TERRAIN_VERTEX } from './siteShaders';
 import { groundCutDeg, groundSunTerm, SITE_VIEW, skylineMinDeg } from './siteView';
 
 export interface SiteNow {
@@ -43,6 +43,8 @@ export function createGroundUniforms() {
     uRadius: { value: SITE_VIEW.groundRadius },
     uRings: { value: new THREE.Vector3(SITE_VIEW.ringMinor, SITE_VIEW.ringMinorTo, SITE_VIEW.ringMajor) },
     uShadow: { value: new THREE.Vector2(0, 0) },
+    /** Toward the Sun, for the real ground's slopes; straight down while there is no Sun. */
+    uSunDir: { value: new THREE.Vector3(0, -1, 0) },
   };
 }
 
@@ -57,11 +59,23 @@ export function createGroundMaterial(uniforms: GroundUniforms, shadow: boolean):
   return new THREE.ShaderMaterial({
     vertexShader: GROUND_VERTEX,
     fragmentShader: GROUND_FRAGMENT,
-    uniforms: { ...uniforms, uProject: { value: shadow ? 1 : 0 }, uDirect: { value: shadow ? 0 : 1 } },
+    uniforms: { ...uniforms, uProject: { value: shadow ? 1 : 0 }, uDirect: { value: shadow ? 0 : 1 }, uHole: { value: 0 } },
     // A shadow lies in the ground's own plane: it is drawn straight after the ground, over it, and
     // leaves the depth alone, so the hardware drawn next stands in front of it.
     depthTest: !shadow,
     depthWrite: !shadow,
+  });
+}
+
+/**
+ * The real ground's material (siteTerrain.ts). It holds the very same uniform objects as the level
+ * ground, so the light, the lit word and the rings are the same on both.
+ */
+export function createTerrainMaterial(uniforms: GroundUniforms): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    vertexShader: TERRAIN_VERTEX,
+    fragmentShader: TERRAIN_FRAGMENT,
+    uniforms: { ...uniforms, uFarFade: { value: new THREE.Vector2(1e9, 2e9) } },
   });
 }
 
@@ -97,7 +111,11 @@ export function createSiteClock(now: SiteNow, uniforms: GroundUniforms) {
         const d = azElToLocal(sky.sun.az, sky.sun.el, 1);
         now.sunDir.set(d.x, d.y, d.z);
         uniforms.uSunTerm.value = groundSunTerm(sky.sun.el);
-      } else uniforms.uSunTerm.value = 0;
+        uniforms.uSunDir.value.copy(now.sunDir);
+      } else {
+        uniforms.uSunTerm.value = 0;
+        uniforms.uSunDir.value.set(0, -1, 0);
+      }
       // Shadows can be drawn only while the Sun's whole disc is above the level plane (and are
       // shown only while the answer says lit: see SiteHardware).
       const offset = sky?.sun ? shadowOffsetPerMetre(sky.sun.az, sky.sun.el) : null;

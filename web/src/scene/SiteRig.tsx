@@ -35,7 +35,20 @@ const LOOK_S = 0.3;
 
 type Controls = ControlsLike & { enableDamping: boolean };
 
-export function SiteRig({ active, data, heightM, layoutRadius }: { active: boolean; data: SceneData; heightM: number | null; layoutRadius: number }) {
+export function SiteRig({
+  active,
+  data,
+  heightM,
+  layoutRadius,
+  groundAt = null,
+}: {
+  active: boolean;
+  data: SceneData;
+  heightM: number | null;
+  layoutRadius: number;
+  /** The ground's height at a point (x east, z south), metres, where the real ground is drawn; null on level ground. */
+  groundAt?: ((x: number, z: number) => number) | null;
+}) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const gl = useThree((s) => s.gl);
   const size = useThree((s) => s.size);
@@ -48,6 +61,8 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
 
   const dataRef = useRef(data);
   dataRef.current = data;
+  const groundRef = useRef(groundAt);
+  groundRef.current = groundAt;
   /** The compass direction the camera faces at rest, and the Sun it was chosen by: fixed once, on arrival. */
   const viewAz = useRef(0);
   const arrivalSun = useRef<{ az: number; el: number } | null>(null);
@@ -288,6 +303,15 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
     if (!active) return;
     // At rest: how far down the camera may swing depends on how close it is (see `lookUpLimit`).
     if (mode.current === 'rest' && controls) controls.maxPolarAngle = lookUpLimit(controls.target.y, camera.position.distanceTo(controls.target));
+    // Over real ground the camera never goes into it: it keeps `minCameraHeight` above the ground under it.
+    const ground = groundRef.current;
+    if (ground) {
+      const floor = ground(camera.position.x, camera.position.z) + SITE_VIEW.minCameraHeight;
+      if (camera.position.y < floor) {
+        camera.position.y = floor;
+        if (controls) camera.lookAt(controls.target);
+      }
+    }
     const x = Math.round(view.current.x);
     const y = Math.round(view.current.y);
     const key = `${size.width}x${size.height}:${x},${y}`;
