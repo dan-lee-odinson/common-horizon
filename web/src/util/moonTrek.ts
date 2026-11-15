@@ -42,7 +42,7 @@ export type LayerKind = 'photo' | 'terrain' | 'slope' | 'slope10';
 
 /** The layer buttons, in the order they are shown. */
 export const LAYER_KINDS: readonly LayerKind[] = ['photo', 'terrain', 'slope', 'slope10'];
-export const LAYER_NAMES: Record<LayerKind, string> = { photo: 'Photo', terrain: 'Terrain', slope: 'Slope', slope10: 'Slope under 10°' };
+export const LAYER_NAMES: Record<LayerKind, string> = { photo: 'Photo', terrain: 'Terrain', slope: 'Slope', slope10: 'Under 10°' };
 
 export interface TrekLayer {
   kind: LayerKind;
@@ -53,30 +53,27 @@ export interface TrekLayer {
   maxZoom: number;
   /** South polar layers: the data reaches this far from the pole in x and in y, metres. */
   cover?: number;
-  /** The caption's title for the layer. */
+  /** Moon Trek's own title for the layer, as its catalog gives it: the caption's title. */
   title: string;
-  /**
-   * 'moon-trek' when the title is Moon Trek's own (read from the service when the stored pictures
-   * were made: public/site-context/manifest.json); 'ours' when it is written here from the label.
-   */
-  titleFrom: 'moon-trek' | 'ours';
   /** Said in the caption in place of the ground scale. */
   scaleNote?: string;
+  /** Slope layers: the size of Moon Trek's own legend picture, pixels (as the service sent it on 15 November 2026). */
+  legend?: { w: number; h: number };
 }
 
 /** Every layer the map can show. In each grid and kind the finest comes first. */
 export const LAYERS: readonly TrekLayer[] = [
-  { kind: 'photo', grid: 'SP', label: 'LRO_WAC_Mosaic_SPole60_100m_v02', ext: 'png', maxZoom: 5, cover: 1_095_600, title: 'LRO WAC Mosaic, S Pole v2', titleFrom: 'moon-trek' },
-  { kind: 'terrain', grid: 'SP', label: 'LRO_LOLA_ClrShade_SPole875_5mp_v04', ext: 'png', maxZoom: 9, cover: 75_840, title: 'LRO LOLA DEM, S Pole, 87.5 deg, ColorHillshade', titleFrom: 'moon-trek' },
-  { kind: 'terrain', grid: 'SP', label: 'LRO_LOLA_ClrShade_SPole75_30mp_v04', ext: 'png', maxZoom: 6, cover: 457_440, title: 'LRO LOLA DEM, S Pole, 75 deg, ColorHillshade', titleFrom: 'ours' },
-  { kind: 'terrain', grid: 'SP', label: 'LRO_LOLA_ClrShade_SPole45_100mp_v04', ext: 'png', maxZoom: 4, cover: 1_095_600, title: 'LRO LOLA DEM, S Pole, 45 deg, ColorHillshade', titleFrom: 'ours' },
-  { kind: 'slope', grid: 'SP', label: 'ColorSlope_LRO_LOLA_DEM_SPole875_5mp_v04', ext: 'png', maxZoom: 10, cover: 75_840, title: 'LRO LOLA DEM, S Pole, 87.5 deg, Color Slope', titleFrom: 'ours' },
-  { kind: 'slope', grid: 'SP', label: 'LRO_LOLA_ClrSlope_SPole75S_120m', ext: 'png', maxZoom: 4, cover: 457_440, title: 'LRO LOLA Color Slope, S Pole, 75 deg, 120 m', titleFrom: 'ours' },
-  { kind: 'slope10', grid: 'SP', label: 'ColorSlope_10below_LRO_LOLA_DEM_SPole875_5m', ext: 'png', maxZoom: 10, cover: 75_840, title: 'LRO LOLA DEM, S Pole, 87.5 deg, Slope under 10 deg', titleFrom: 'ours' },
-  { kind: 'slope10', grid: 'SP', label: 'LOLA_RGB_Slope_below_10deg_SPole45', ext: 'png', maxZoom: 5, cover: 1_095_600, title: 'LOLA Slope under 10 deg, S Pole, 45 deg', titleFrom: 'ours' },
-  { kind: 'photo', grid: 'EQ', label: 'LRO_WAC_Mosaic_Global_303ppd_v02', ext: 'jpg', maxZoom: 8, title: 'LRO WAC Mosaic v2', titleFrom: 'moon-trek' },
-  { kind: 'terrain', grid: 'EQ', label: 'LRO_LOLA_ClrShade_Global_128ppd_v04', ext: 'png', maxZoom: 5, title: 'LRO LOLA DEM, Global, 128 ppd, ColorHillshade', titleFrom: 'ours' },
-  { kind: 'slope', grid: 'EQ', label: 'LRO_LOLA_ClrSlope_Global_16ppd', ext: 'png', maxZoom: 2, title: 'LRO LOLA Color Slope, Global, 16 ppd', titleFrom: 'ours', scaleNote: 'regional, about 5 km per pixel' },
+  { kind: 'photo', grid: 'SP', label: 'LRO_WAC_Mosaic_SPole60_100m_v02', ext: 'png', maxZoom: 5, cover: 1_095_600, title: 'LRO WAC Mosaic, S Pole v2' },
+  { kind: 'terrain', grid: 'SP', label: 'LRO_LOLA_ClrShade_SPole875_5mp_v04', ext: 'png', maxZoom: 9, cover: 75_840, title: 'LRO LOLA DEM, S Pole, 87.5 deg, ColorHillshade' },
+  { kind: 'terrain', grid: 'SP', label: 'LRO_LOLA_ClrShade_SPole75_30mp_v04', ext: 'png', maxZoom: 6, cover: 457_440, title: 'LRO LOLA DEM, S Pole, 75 deg, ColorHillshade' },
+  { kind: 'terrain', grid: 'SP', label: 'LRO_LOLA_ClrShade_SPole45_100mp_v04', ext: 'png', maxZoom: 4, cover: 1_095_600, title: 'LRO LOLA DEM, S Pole, 45 deg, ColorHillshade' },
+  { kind: 'slope', grid: 'SP', label: 'ColorSlope_LRO_LOLA_DEM_SPole875_5mp_v04', ext: 'png', maxZoom: 10, cover: 75_840, title: 'LRO LOLA Color Slope, S Pole, 87.5 deg', legend: { w: 615, h: 145 } },
+  { kind: 'slope', grid: 'SP', label: 'LRO_LOLA_ClrSlope_SPole75S_120m', ext: 'png', maxZoom: 4, cover: 457_440, title: 'LOLA Slope Southpole 120m, Colorized', legend: { w: 50, h: 150 } },
+  { kind: 'slope10', grid: 'SP', label: 'ColorSlope_10below_LRO_LOLA_DEM_SPole875_5m', ext: 'png', maxZoom: 10, cover: 75_840, title: 'LRO LOLA Color Slope < 10 deg, S Pole, 87.5 deg', legend: { w: 1440, h: 340 } },
+  { kind: 'slope10', grid: 'SP', label: 'LOLA_RGB_Slope_below_10deg_SPole45', ext: 'png', maxZoom: 5, cover: 1_095_600, title: 'LRO LOLA Color Slope < 10 deg, S Pole', legend: { w: 615, h: 145 } },
+  { kind: 'photo', grid: 'EQ', label: 'LRO_WAC_Mosaic_Global_303ppd_v02', ext: 'jpg', maxZoom: 8, title: 'LRO WAC Mosaic v2' },
+  { kind: 'terrain', grid: 'EQ', label: 'LRO_LOLA_ClrShade_Global_128ppd_v04', ext: 'png', maxZoom: 5, title: 'LRO LOLA DEM, ColorHillshade' },
+  { kind: 'slope', grid: 'EQ', label: 'LRO_LOLA_ClrSlope_Global_16ppd', ext: 'png', maxZoom: 2, title: 'LOLA Slope 16ppd, Colorized', scaleNote: 'regional, about 5 km per pixel', legend: { w: 50, h: 150 } },
 ];
 
 export function layerByLabel(label: string): TrekLayer | undefined {

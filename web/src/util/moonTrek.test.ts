@@ -9,6 +9,9 @@ import {
   chooseLayer,
   gridFor,
   homeView,
+  isSlope,
+  LAYER_KINDS,
+  LAYER_NAMES,
   LAYERS,
   layerByLabel,
   legendUrl,
@@ -229,6 +232,35 @@ describe('scale and captions', () => {
     expect(perPixelText(166.57)).toBe('167 m per pixel');
     expect(perPixelText(5.3)).toBe('5.3 m per pixel');
     expect(perPixelText(5331)).toBe('5.3 km per pixel');
+  });
+});
+
+describe('Moon Trek’s own names', () => {
+  it('captions each layer with Moon Trek’s own title', () => {
+    const titles = Object.fromEntries(LAYERS.map((l) => [l.label, l.title]));
+    expect(titles).toEqual({
+      LRO_WAC_Mosaic_Global_303ppd_v02: 'LRO WAC Mosaic v2',
+      LRO_LOLA_ClrShade_Global_128ppd_v04: 'LRO LOLA DEM, ColorHillshade',
+      LRO_LOLA_ClrSlope_Global_16ppd: 'LOLA Slope 16ppd, Colorized',
+      LRO_WAC_Mosaic_SPole60_100m_v02: 'LRO WAC Mosaic, S Pole v2',
+      LRO_LOLA_ClrShade_SPole875_5mp_v04: 'LRO LOLA DEM, S Pole, 87.5 deg, ColorHillshade',
+      LRO_LOLA_ClrShade_SPole75_30mp_v04: 'LRO LOLA DEM, S Pole, 75 deg, ColorHillshade',
+      LRO_LOLA_ClrShade_SPole45_100mp_v04: 'LRO LOLA DEM, S Pole, 45 deg, ColorHillshade',
+      ColorSlope_LRO_LOLA_DEM_SPole875_5mp_v04: 'LRO LOLA Color Slope, S Pole, 87.5 deg',
+      LRO_LOLA_ClrSlope_SPole75S_120m: 'LOLA Slope Southpole 120m, Colorized',
+      ColorSlope_10below_LRO_LOLA_DEM_SPole875_5m: 'LRO LOLA Color Slope < 10 deg, S Pole, 87.5 deg',
+      LOLA_RGB_Slope_below_10deg_SPole45: 'LRO LOLA Color Slope < 10 deg, S Pole',
+    });
+  });
+
+  it('names the fourth button short enough for one line', () => {
+    expect(LAYER_KINDS.map((k) => LAYER_NAMES[k])).toEqual(['Photo', 'Terrain', 'Slope', 'Under 10°']);
+  });
+
+  it('knows the size of every slope layer’s legend, and only theirs', () => {
+    for (const l of LAYERS) expect(Boolean(l.legend), l.label).toBe(isSlope(l.kind));
+    expect(layerByLabel('LRO_LOLA_ClrSlope_Global_16ppd')!.legend).toEqual({ w: 50, h: 150 });
+    expect(layerByLabel('ColorSlope_LRO_LOLA_DEM_SPole875_5mp_v04')!.legend).toEqual({ w: 615, h: 145 });
   });
 });
 

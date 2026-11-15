@@ -26,6 +26,7 @@ describe('the Site map panel', () => {
 
   it('is a button until it is opened, and nothing before the stage is measured', () => {
     expect(draw(APOLLO_15)).toContain('data-testid="site-map-toggle"');
+    expect(draw(APOLLO_15)).toContain('Site map · NASA Moon Trek</button>');
     expect(draw(APOLLO_15)).not.toContain('data-testid="site-map"');
     siteFrame.set({ measured: false });
     expect(draw(APOLLO_15)).toBe('');
@@ -67,9 +68,12 @@ describe('the Site map panel', () => {
   it('stays inside the free part of the window', () => {
     siteMapUi.set({ open: true });
     const html = draw(APOLLO_15);
-    const width = Number(/width:(\d+)px/.exec(html)?.[1]);
-    expect(width).toBeGreaterThanOrEqual(272);
-    expect(width).toBeLessThanOrEqual(1100 - 340 - 24);
+    // The map's column, within the free width less the panel's padding and border.
+    const width = Number(/style="width:([\d.]+)px" data-testid="site-map-body"/.exec(html)?.[1]);
+    expect(width).toBeGreaterThanOrEqual(248);
+    expect(width).toBeLessThanOrEqual(1100 - 340 - 24 - 26);
+    // The room less the glass border, on the box that scrolls (never the glass: its brackets stand outside it).
+    expect(html).toContain(`max-height:${900 - 112 - 6 - (900 - 600 + 6) - 2}px" data-testid="site-map-scroll"`);
   });
 });
 

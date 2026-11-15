@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
 // The Site map on the Site stage, on example data (mock mode). NASA Moon Trek is never reached from
@@ -7,6 +9,24 @@ import { expect, test, type Page } from '@playwright/test';
 // Planning checked on the live service).
 
 const TILE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGNMyChgYGBgYmBgYGBgAAAOugE8ZYmolgAAAABJRU5ErkJggg==', 'base64');
+/**
+ * Moon Trek's own legend pictures, as the service sent them on 15 November 2026 (NASA imagery):
+ * the small tall one the global and 75° slope layers use, and the two wide ones of the ridge.
+ * The 45° "under 10°" legend is the same size as the ridge's slope legend.
+ */
+const LEGENDS = (() => {
+  const file = (name: string) => readFileSync(fileURLToPath(new URL(`./fixtures/moon-trek-legends/${name}`, import.meta.url)));
+  const tall = { body: file('LRO_LOLA_ClrSlope_Global_16ppd.png'), contentType: 'image/png' };
+  const wide = { body: file('ColorSlope_LRO_LOLA_DEM_SPole875_5mp_v04.jpg'), contentType: 'image/jpeg' };
+  const wider = { body: file('ColorSlope_10below_LRO_LOLA_DEM_SPole875_5m.jpg'), contentType: 'image/jpeg' };
+  return new Map([
+    ['LRO_LOLA_ClrSlope_Global_16ppd', tall],
+    ['LRO_LOLA_ClrSlope_SPole75S_120m', tall],
+    ['ColorSlope_LRO_LOLA_DEM_SPole875_5mp_v04', wide],
+    ['LOLA_RGB_Slope_below_10deg_SPole45', wide],
+    ['ColorSlope_10below_LRO_LOLA_DEM_SPole875_5m', wider],
+  ]);
+})();
 const STORED_NOTE = 'Stored picture. NASA Moon Trek could not be reached.';
 const NO_PICTURE_NOTE = 'NASA Moon Trek could not be reached, and there is no stored picture for this point.';
 
@@ -27,6 +47,11 @@ async function interceptTrek(page: Page, mode: Trek['mode']): Promise<Trek> {
     if (trek.mode === 'refuse') return route.abort('failed');
     // Left without an answer: the map's own six seconds run out.
     if (trek.mode === 'hang') return;
+    const legend = /\/TrekWS\/rest\/cat\/legend\/stream\?label=(\w+)/.exec(route.request().url());
+    if (legend) {
+      const picture = LEGENDS.get(legend[1]);
+      return picture ? route.fulfill({ status: 200, ...picture }) : route.fulfill({ status: 404, body: 'no legend' });
+    }
     return route.fulfill({ status: 200, contentType: 'image/png', body: TILE_PNG });
   });
   return trek;
@@ -85,6 +110,25 @@ function tagsOverPanel(page: Page): Promise<string[]> {
   });
 }
 
+/** Where the legend picture is drawn, and whether all of it shows inside the panel without scrolling. */
+function legendInPanel(page: Page) {
+  return page.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>('[data-testid="site-map"]')!;
+    const scroller = document.querySelector<HTMLElement>('[data-testid="site-map-scroll"]')!;
+    const img = document.querySelector<HTMLImageElement>('[data-testid="site-map-legend"] img')!;
+    const p = panel.getBoundingClientRect();
+    const r = img.getBoundingClientRect();
+    return {
+      loaded: img.complete && img.naturalWidth > 0,
+      natural: [img.naturalWidth, img.naturalHeight],
+      drawn: [Math.round(r.width), Math.round(r.height)],
+      rendering: getComputedStyle(img).imageRendering,
+      inside: r.left >= p.left - 0.5 && r.right <= p.right + 0.5 && r.top >= p.top - 0.5 && r.bottom <= p.bottom + 0.5,
+      scrolls: scroller.scrollHeight > scroller.clientHeight + 1,
+    };
+  });
+}
+
 /** Every combination of the rows and columns given, as "zoom/row/col.ext". */
 function grid(zoom: number, rows: number[], cols: number[], ext: string): string[] {
   return rows.flatMap((r) => cols.map((c) => `${zoom}/${r}/${c}.${ext}`));
@@ -98,6 +142,7 @@ test('site map: the stored picture at once, the live tiles over it, the layers, 
   await zoomIn(page);
   // Closed until asked for: the stage looks as it did.
   await expect(page.getByTestId('site-map')).toHaveCount(0);
+  await expect(page.getByTestId('site-map-toggle')).toHaveText('Site map · NASA Moon Trek');
   await openMap(page);
   await expect(page.getByTestId('site-map-close')).toBeFocused();
 
@@ -147,8 +192,11 @@ test('site map: the stored picture at once, the live tiles over it, the layers, 
   await expect(frame).toHaveAttribute('data-state', 'live');
   expect(tilesAsked(trek, from).length).toBeGreaterThan(0);
   expect(tilesAsked(trek, from).every((t) => t.startsWith('2/') && t.endsWith('.png'))).toBe(true);
-  await expect(page.getByTestId('site-map-caption')).toHaveText('LRO LOLA Color Slope, Global, 16 ppd · NASA Moon Trek · regional, about 5 km per pixel');
+  await expect(page.getByTestId('site-map-caption')).toHaveText('LOLA Slope 16ppd, Colorized · NASA Moon Trek · regional, about 5 km per pixel');
   await expect(page.getByTestId('site-map-legend').getByRole('img')).toHaveAttribute('src', 'https://trek.nasa.gov/moon/TrekWS/rest/cat/legend/stream?label=LRO_LOLA_ClrSlope_Global_16ppd');
+  // Moon Trek's small legend (50 x 150) at 3x with square pixels, beside the map, all of it inside the panel.
+  await expect(page.getByTestId('site-map-legend')).toHaveAttribute('data-placement', 'side');
+  await expect.poll(() => legendInPanel(page)).toEqual({ loaded: true, natural: [50, 150], drawn: [150, 450], rendering: 'pixelated', inside: true, scrolls: false });
   await layers.nth(1).click();
   await expect(page.getByTestId('site-map-legend')).toHaveCount(0);
 
@@ -184,7 +232,7 @@ test('site map: keeps the stored picture when Moon Trek is refused, and when six
   expect(tilesAsked(trek)).toContain('7/64/63.png');
   expect(trek.asked.every((u) => u.includes('/SP/LRO_LOLA_ClrShade_SPole875_5mp_v04/'))).toBe(true);
   await expect(page.getByTestId('site-map-caption')).toHaveText('LRO LOLA DEM, S Pole, 87.5 deg, ColorHillshade · NASA Moon Trek · 67 m per pixel · 0° longitude is up');
-  await expect(page.getByTestId('site-map-layers').getByRole('button')).toHaveText(['Photo', 'Terrain', 'Slope', 'Slope under 10°']);
+  await expect(page.getByTestId('site-map-layers').getByRole('button')).toHaveText(['Photo', 'Terrain', 'Slope', 'Under 10°']);
 
   // Another layer that cannot be reached: the caption names the stored picture's layer, which is what is shown.
   await page.getByTestId('site-map-layers').getByRole('button', { name: 'Photo' }).click();
@@ -201,6 +249,46 @@ test('site map: keeps the stored picture when Moon Trek is refused, and when six
   await expect(frame).toHaveAttribute('data-state', 'stored', { timeout: 10_000 });
   await expect(page.getByTestId('site-map-status')).toHaveText(STORED_NOTE);
   expect(await page.getByTestId('site-map-stored').evaluate((el) => (el as HTMLElement).style.transform)).toBe('scale(2)');
+});
+
+test('site map: the ridge’s wide legends show whole inside the panel at 1440 x 900, and the layer buttons keep to one line', async ({ page }) => {
+  test.skip(isPhone(page), 'the phone layout is checked in its own test');
+  await interceptTrek(page, 'answer');
+  await enterMission(page);
+  await spotlight(page, 'Shackleton Connecting Ridge');
+  await zoomIn(page);
+  await openMap(page);
+  const frame = page.getByTestId('site-map-frame');
+  await expect(frame).toHaveAttribute('data-state', 'live');
+
+  // The four buttons on one line, whichever layer is shown.
+  const oneLine = async () => {
+    const tops = await page
+      .getByTestId('site-map-layers')
+      .getByRole('button')
+      .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+    expect(tops).toHaveLength(4);
+    expect(new Set(tops).size).toBe(1);
+  };
+  await oneLine();
+
+  const layers = page.getByTestId('site-map-layers');
+  for (const [name, label, natural] of [
+    ['Slope', 'ColorSlope_LRO_LOLA_DEM_SPole875_5mp_v04', [615, 145]],
+    ['Under 10°', 'ColorSlope_10below_LRO_LOLA_DEM_SPole875_5m', [1440, 340]],
+  ] as const) {
+    await layers.getByRole('button', { name, exact: true }).click();
+    await expect(frame).toHaveAttribute('data-layer', label);
+    await expect(frame).toHaveAttribute('data-state', 'live');
+    await expect(page.getByTestId('site-map-legend')).toHaveAttribute('data-placement', 'below');
+    await expect.poll(() => legendInPanel(page)).toMatchObject({ loaded: true, natural, inside: true, scrolls: false });
+    await oneLine();
+    // The legend as wide as the map; the map gives up the height the legend takes, and stays a usable size.
+    const [legendBox, mapBox] = [await page.getByTestId('site-map-legend').getByRole('img').boundingBox(), await frame.boundingBox()];
+    expect(Math.abs(legendBox!.width - mapBox!.width)).toBeLessThanOrEqual(1);
+    expect(mapBox!.width).toBeGreaterThanOrEqual(280);
+  }
+  await expect(page.getByTestId('site-map-caption')).toHaveText('LRO LOLA Color Slope < 10 deg, S Pole, 87.5 deg · NASA Moon Trek · 67 m per pixel · 0° longitude is up');
 });
 
 test('site map: a view across 180° asks for the wrapped columns', async ({ page }) => {
