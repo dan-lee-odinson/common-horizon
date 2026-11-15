@@ -320,10 +320,176 @@
           }
         }
       }
+    },
+    "/assistant": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Mission Assistant (text only)",
+        "description": "Answers one question about the visitor's mission, from the same evaluation ``POST /evaluate`` runs over\nthe 17 preset sites (and the selected custom point). A language model on Amazon Bedrock words the answer;\nit is told to use only the numbers in those results. Text only, at most about 120 words.\n\n503 when the assistant is switched off (``CH_ASSISTANT_ENABLED``), today's cap is reached, or Bedrock\nrefuses or times out. The cap is counted in memory per running copy and resets each UTC day.",
+        "operationId": "assistant_assistant_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request (for example a question over 500 characters) or hardware the planner cannot use"
+          },
+          "502": {
+            "description": "Engine output violated the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Assistant unavailable: switched off, today's cap reached, Bedrock refused or timed out, or the physics engine is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AskContext": {
+        "properties": {
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id",
+            "description": "The site the visitor has selected: a preset id, a custom point (custom:<lat>:<lon_east>) or null."
+          },
+          "launch_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Launch Utc"
+          },
+          "slip_days": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Slip Days"
+          },
+          "stay_days": {
+            "type": "number",
+            "maximum": 365.25,
+            "minimum": 1.0,
+            "title": "Stay Days"
+          },
+          "hardware": {
+            "items": {
+              "$ref": "#/components/schemas/HardwareChoice"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "title": "Hardware"
+          },
+          "storage_kwh": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Storage Kwh",
+            "description": "Battery storage typed by the visitor, kWh. 0 = none."
+          },
+          "transit_days": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 30.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transit Days",
+            "description": "Launch-to-landing time, days (optional; the website does not send it yet). Left out or null: the website's own value, 5 days, as on every POST /evaluate it sends."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "site_id",
+          "launch_utc",
+          "slip_days",
+          "stay_days",
+          "hardware",
+          "storage_kwh"
+        ],
+        "title": "AskContext",
+        "description": "The visitor's current mission, as the website holds it. The same bounds as ``POST /evaluate``."
+      },
+      "AskRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question",
+            "description": "The visitor's question, 1..500 characters. Longer: 422."
+          },
+          "context": {
+            "$ref": "#/components/schemas/AskContext"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question",
+          "context"
+        ],
+        "title": "AskRequest"
+      },
+      "AskResponse": {
+        "properties": {
+          "answer": {
+            "type": "string",
+            "title": "Answer",
+            "description": "Plain text from the language model, at most about 120 words."
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer"
+        ],
+        "title": "AskResponse",
+        "description": "The website's optional ``example`` flag marks its own mock answers; the backend never sends it."
+      },
       "BodyTimeseries": {
         "properties": {
           "position_km": {
@@ -1354,7 +1520,7 @@
           "assistant_available": {
             "type": "boolean",
             "title": "Assistant Available",
-            "description": "False: the assistant (language model) is not part of this backend yet."
+            "description": "CH_ASSISTANT_ENABLED as configured (default false). Read from the settings: no network call."
           }
         },
         "type": "object",

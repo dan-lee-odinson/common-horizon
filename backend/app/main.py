@@ -4,10 +4,11 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, horizons, missions, website, website_horizon
+from app.api import assistant, health, horizons, missions, website, website_horizon
 from app.api.errors import request_validation_error_handler
 from app.config import SERVICE_VERSION, Settings, get_settings
 from app.physics.factory import build_engine
+from app.services.assistant import DailyCap, configure_logging
 
 DESCRIPTION = """
 Backend bridge between the Common Horizon website and the lunar physics engine.
@@ -35,6 +36,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     # get_physics_engine reads this, so an app serves the engine its own settings chose, not the environment's.
     app.state.physics_engine = engine
+    # /health and POST /assistant read the assistant switches from here, so tests can build apps with their own.
+    app.state.settings = settings
+    app.state.assistant_cap = DailyCap(settings.assistant_daily_cap)
+    if settings.assistant_enabled:
+        configure_logging()
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     # Exact, normalised origins only (see app.config); no wildcard, no credentials.
     app.add_middleware(
@@ -50,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(website.router)
     app.include_router(website_horizon.router)
     app.include_router(horizons.router)
+    app.include_router(assistant.router)
     return app
 
 

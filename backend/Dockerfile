@@ -32,10 +32,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     AWS_LWA_READINESS_CHECK_PATH=/health \
     CH_PHYSICS_ENGINE=synthetic \
     CH_SPICE_KERNEL_DIR=/opt/common-horizon/spice \
-    CH_HORIZON_PROFILE_DIR=/var/task/data/horizon
+    CH_HORIZON_PROFILE_DIR=/var/task/data/horizon \
+    CH_ASSISTANT_ENABLED=false
 
 # The real engine's data. CH_PHYSICS_ENGINE stays "synthetic" above: switching production to
 # "physics" is a separate, explicitly authorised configuration change (a Lambda environment variable).
+# The same goes for the Mission Assistant: CH_ASSISTANT_ENABLED stays false until the Lambda's role may
+# call Bedrock (README.md, "Mission Assistant"). Its code is in app/ (copied below); it needs no data files.
 #
 # NASA/JPL NAIF SPICE kernels, downloaded from the official NAIF server at build time and verified
 # against pinned SHA-256 checksums (the build fails on any mismatch). They are never committed.
@@ -68,7 +71,7 @@ RUN apt-get update \
     && python -m pip install "pip==${PIP_VERSION}" \
     && python -m pip install --no-deps -r requirements.txt \
     && python -m pip check \
-    && python -c "import numpy, spiceypy, rasterio, rasterio.warp" \
+    && python -c "import numpy, spiceypy, rasterio, rasterio.warp, boto3, botocore.config" \
     && useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 
 COPY app ./app

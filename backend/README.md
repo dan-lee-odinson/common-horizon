@@ -33,6 +33,7 @@ uvicorn app.main:app --reload --port 8000
 | GET | `/catalog` | The planner's hardware catalog in the website's shape. |
 | POST | `/check` | The planner's fit, power and site-energy checks for one site. |
 | POST | `/evaluate` | Evaluate several sites and rank them by Dan's rules. |
+| POST | `/assistant` | Mission Assistant: a plain-text answer about the visitor's mission (off by default; see below). |
 
 See [docs/API_CONTRACT.md](docs/API_CONTRACT.md) for every field, its unit, its validation
 bounds and how it maps to the physics engine integration document. The website endpoints,
@@ -74,6 +75,10 @@ python -m scripts.export_contract
 | `CH_MAX_TOTAL_SAMPLES` | `20000` | Work budget of one evaluation: distinct sample timestamps over the baseline and all launch-delay cases. Larger requests get 422. |
 | `CH_CORS_ORIGINS` | `https://commonhorizon.study,https://www.commonhorizon.study,http://localhost:5173` | Comma-separated browser origins allowed to call the API. Setting it **replaces** the defaults. |
 | `CH_CORS_EXTRA_ORIGINS` | *(empty)* | Comma-separated origins **added** to the list above, e.g. the Amplify branch URL `https://main.<app-id>.amplifyapp.com`. |
+| `CH_ASSISTANT_ENABLED` | `false` | `true` switches `POST /assistant` on. `/health` sends `assistant_available` equal to it. Off: every `/assistant` call answers 503. |
+| `CH_ASSISTANT_MODEL_ID` | `openai.gpt-oss-120b-1:0` | Bedrock model the assistant calls. |
+| `CH_ASSISTANT_REGION` | `us-east-1` | AWS region of that Bedrock endpoint. |
+| `CH_ASSISTANT_DAILY_CAP` | `300` | Model calls per UTC day, counted in memory per running copy (see "Mission Assistant"). |
 | `AWS_LWA_PORT` | `8080` (Docker) | Port uvicorn listens on and the Lambda Web Adapter forwards to. |
 
 CORS origins are normalised to the exact form browsers send (`scheme://host[:port]`, lowercase,
@@ -82,9 +87,64 @@ no trailing slash, no default port), so `https://commonhorizon.study/` and
 anything other than `localhost` / `127.0.0.1` / `[::1]` are refused: the app fails at startup
 rather than run with a broken or open CORS policy. Credentials are not allowed cross-origin.
 
-No secrets are needed or stored. Later AWS access (Bedrock) must use the standard AWS
-credential chain (an IAM role on Lambda, a local profile in development), never values in this
-repository or in `.env` files committed to git.
+No secrets are needed or stored. Bedrock access uses the standard AWS credential chain (the
+Lambda's IAM role, a local profile in development), never values in this repository or in `.env`
+files committed to git.
+
+## Mission Assistant (`POST /assistant`)
+
+It answers a visitor's question about the current mission in plain text, from the same evaluation
+`POST /evaluate` runs over the 17 preset sites (plus a selected custom point), with the website's 5-day
+transit unless the request gives its own, so its landing date is the page's. A language model on
+Amazon Bedrock (`openai.gpt-oss-120b-1:0`, `us-east-1`, Converse API through boto3, `maxTokens` 1500,
+one attempt with a 30 s read timeout) words the answer; it is told to use only the numbers in those results. The request, the JSON the model is
+sent, the instructions and the errors are in [docs/WEBSITE_API.md](docs/WEBSITE_API.md), "POST /assistant".
+
+**Switched off by default.** With `CH_ASSISTANT_ENABLED=false` (the default and the Dockerfile's
+value) every call answers 503, boto3 is never imported, and `/health` says `assistant_available: false`.
+
+**The daily cap is counted in memory per running copy and resets each UTC day.** Each Lambda
+execution environment (and each local process) keeps its own count, starting at 0 when it starts
+and again at 00:00 UTC, so several warm copies together can make more calls than
+`CH_ASSISTANT_DAILY_CAP`. The AWS budget is the real spending limit.
+
+**What the Lambda's role needs** before the switch is turned on (Converse is authorised by
+`bedrock:InvokeModel`; nothing else is called):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "MissionAssistantConverse",
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": "arn:aws:bedrock:us-east-1::foundation-model/openai.gpt-oss-120b-1:0"
+    }
+  ]
+}
+```
+
+If the account has not used this model before, an administrator may first have to enable access to
+it in the Bedrock console; that is an account setting, not a permission the Lambda role needs.
+
+**Logs:** the question's length, the model's token counts and stop reason, and on failure the Bedrock
+error code. Never the question's text.
+
+## Dependencies
+
+Runtime packages added for the Mission Assistant (pinned in `requirements.txt`; the physics engine's
+packages are listed in [docs/SOURCES-horizon.md](docs/SOURCES-horizon.md)).
+
+| Name | Version | Used for | License | Maintained by | Origin check |
+|---|---|---|---|---|---|
+| boto3 | 1.44.3 | Bedrock Runtime client (Converse API) for `POST /assistant` | Apache-2.0 | Amazon Web Services | US company; not of Chinese origin |
+| botocore | 1.44.3 | boto3's core: request signing, retries, timeouts (transitive) | Apache-2.0 | Amazon Web Services | US company; not of Chinese origin |
+| s3transfer | 0.19.3 | Required by boto3; not used by the assistant (transitive) | Apache-2.0 | Amazon Web Services | US company; not of Chinese origin |
+| jmespath | 1.1.0 | Required by boto3 and botocore (transitive) | MIT | James Saryerwinnie and the JMESPath contributors | Open-source project led from the US; not of Chinese origin |
+| python-dateutil | 2.9.0.post0 | Required by botocore (transitive) | Apache-2.0 and BSD-3-Clause (dual) | Paul Ganssle and the dateutil contributors | Open-source project led from the US; not of Chinese origin |
+| six | 1.17.0 | Required by python-dateutil (transitive) | MIT | Benjamin Peterson | Open-source project led from the US; not of Chinese origin |
+| urllib3 | 2.8.0 | HTTP connections for botocore (transitive) | MIT | Seth Michael Larson, Quentin Pradet, Illia Volochii and the urllib3 contributors | Open-source project with maintainers in the US and Europe; not of Chinese origin |
 
 ## Real physics engine (`CH_PHYSICS_ENGINE=physics`)
 
@@ -221,7 +281,7 @@ backend/
     main.py               FastAPI app factory, CORS, routers
     config.py             environment settings, service and contract versions
     timegrid.py           shared sample-count / time-grid rules
-    api/                  /health and /api/v1/missions/evaluate
+    api/                  /health, /api/v1/missions/evaluate, the website routes and /assistant
     models/               Pydantic contract: mission inputs, physics outputs, limits
     physics/
       interface.py        PhysicsEngine protocol + SimulationRequest/SimulationResult

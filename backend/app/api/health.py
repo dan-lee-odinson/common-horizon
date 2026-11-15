@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from app.config import CONTRACT_VERSION, SERVICE_NAME, SERVICE_VERSION
@@ -24,12 +24,12 @@ class HealthResponse(BaseModel):
     contract_version: str
     physics_engine: EngineStatus
     assistant_available: bool = Field(
-        description="False: the assistant (language model) is not part of this backend yet."
+        description="CH_ASSISTANT_ENABLED as configured (default false). Read from the settings: no network call."
     )
 
 
 @router.get("/health", response_model=HealthResponse, summary="Liveness and configuration check")
-def health(engine: Annotated[PhysicsEngine, Depends(get_physics_engine)]) -> HealthResponse:
+def health(request: Request, engine: Annotated[PhysicsEngine, Depends(get_physics_engine)]) -> HealthResponse:
     """Always cheap: used as the AWS Lambda Web Adapter readiness check. Never runs the engine."""
     info = engine.info
     return HealthResponse(
@@ -40,5 +40,5 @@ def health(engine: Annotated[PhysicsEngine, Depends(get_physics_engine)]) -> Hea
         physics_engine=EngineStatus(
             name=info.name, version=info.version, is_synthetic=info.is_synthetic, available=info.available
         ),
-        assistant_available=False,
+        assistant_available=request.app.state.settings.assistant_enabled,
     )

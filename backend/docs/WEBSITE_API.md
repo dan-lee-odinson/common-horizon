@@ -167,7 +167,7 @@ These are differences from `web/src/api/types.ts`. All other fields match it by 
    - `fits` is nullable;
    - new fields: `fit_verdict`, `site_energy`, `provenance` and `warnings`;
    - `energy_added_kwh` is null.
-8. **HealthResponse:** `assistant_available` is now sent (always `false`). The backend's `status` is always `"ok"`, and the extra fields (`service`, `contract_version`, `physics_engine`) are additive.
+8. **HealthResponse:** `assistant_available` is sent and equals the `CH_ASSISTANT_ENABLED` switch (default `false`; read from the settings, no network call). The backend's `status` is always `"ok"`, and the extra fields (`service`, `contract_version`, `physics_engine`) are additive.
 9. **HorizonResponse** (`POST /horizon`, see below):
    - `sun_path[].state` is `"above"` when **any part of the Sun's disc** is visible above the terrain, the rule `/evaluate` uses for sunlight. The comment in `types.ts` says "the Sun's centre". The difference is deliberate: there is one definition of "lit" across the product.
    - new fields: `provenance`, `warnings`, `time_step_s` and `skyline_source` (`stored_profile` or `smooth_sphere`).
@@ -254,6 +254,64 @@ sky the Earth moves through. One physics run through the same `PhysicsEngine` in
 - 502: engine output that breaks the contract.
 
 
+## POST /assistant
+
+The Mission Assistant. It answers one question about the visitor's current mission in plain text and never
+changes the interface. The shapes are the website's `AskRequest` and `AskResponse` (`web/src/api/types.ts`),
+field for field; `tests/test_assistant.py` checks them against that file.
+
+**Request** (`AskRequest`): `question` (1 to 500 characters) and `context` with `site_id` (a preset id, a
+custom point `custom:<lat>:<lon_east>` as the website names it, or null), `launch_utc`, `slip_days`,
+`stay_days`, `hardware` and `storage_kwh`, with the same bounds as `POST /evaluate`. The backend also accepts an
+optional `context.transit_days` (0 to 30 days), which the website does not send yet.
+
+**Response** (`AskResponse`): `{"answer": "..."}`. The backend never sends the website's `example` flag.
+
+**How it answers:**
+1. It runs the same evaluation as `POST /evaluate` (the same service, `evaluate_sites`) over the 17 preset
+   sites, plus the selected custom point when there is one. Its `transit_days` is the request's, or, when the
+   request leaves it out, the website's own value: `WEBSITE_TRANSIT_DAYS` (5 days) in
+   `backend/app/models/assistant.py`, the same figure as `TRANSIT_DAYS` in `web/src/util/transit.ts`, which
+   the website sends with every `/evaluate`. So the assistant evaluates the landing date the page shows. A test
+   reads `transit.ts` and fails when the two differ.
+2. It sends the language model the question and a compact JSON of those results: per site the rank, score
+   (or its range when the slope is unknown), sunlight percent, longest darkness, Earth contact, slope and its
+   source, each requirement with `pass`, `fail` or `unknown` and its detail text, and the power status and
+   margin, numbers rounded to two decimals. The selected site is marked `"selected": true`. The data source
+   (`is_synthetic`) and the evaluation's warnings go with it.
+3. Model: `openai.gpt-oss-120b-1:0` on Amazon Bedrock, `us-east-1`, Converse API through boto3, `maxTokens`
+   1500 (gpt-oss's reasoning counts against it, so this leaves room for the answer; the instructions still ask
+   for about 120 words), temperature 0.2, one attempt with a 5 s connect and 30 s read timeout (35 s at most,
+   inside the Lambda's 60 s). Credentials come from the standard AWS chain (the Lambda's role).
+4. The instructions: answer only from the supplied results; never state a number that is not in them; say so
+   when the results do not cover the question; plain text, at most about 120 words; decline anything that is
+   not about this mission and these sites. The question is sent as a JSON string after the results and the
+   instructions say it is data, not instructions.
+5. Only the model's text blocks are returned. Reasoning blocks (`reasoningContent`, and any
+   `<reasoning>...</reasoning>` inside the text) are dropped.
+
+**Errors:**
+- 422: invalid input, with the same error shape as `/evaluate` (a question over 500 characters, an empty
+  question, a stay that ends after 2100, hardware the planner cannot use).
+- 503, `{"detail": "<one plain sentence>"}`: the assistant is switched off, today's cap is reached, Bedrock
+  refused the call or timed out, or the physics engine is unavailable. The website's client turns every 503
+  from `/assistant` into "The assistant is unavailable right now".
+- 502: engine output that breaks the contract.
+
+**The daily cap** (`CH_ASSISTANT_DAILY_CAP`, default 300) is counted in memory per running copy and resets
+each UTC day. Each Lambda execution environment keeps its own count, which also starts again at 0 when that
+copy starts, so the total across copies can be higher. The AWS budget is the real spending limit.
+
+**Logs:** the question's length and the model's token counts (input, output, total) and stop reason; on a
+Bedrock error, its error code. Never the question's text.
+
+**Open points:**
+- If the team changes the transit time, `WEBSITE_TRANSIT_DAYS` changes with `TRANSIT_DAYS` (the test above
+  fails until it does), or the website sends `context.transit_days` with each question.
+- A selected site that is neither a preset nor a `custom:<lat>:<lon_east>` id is not evaluated; the JSON
+  says so and the model is told it is not in the results.
+
+
 ## Decisions for Dan and Isabella
 
 1. **Transit time.** The website computes `landing = launch + 5 days (mock TRANSIT_DAYS) + slip`. The 5 days are a mock-model input, not a team decision. The backend therefore:
@@ -309,4 +367,6 @@ The Docker image is built from `backend/` only, so it cannot read `planner/` or 
 3. Use the response's `landing_utc` everywhere. Do not add a local transit time. Send `transit_days` once the team fixes one.
 4. ~~`POST /horizon` is not implemented yet: the horizon plot and stage-3 scene still need it.~~ Done: see
    "POST /horizon" above. The website still has to read its added fields and the "any part of the disc" rule.
-5. `POST /assistant` is not implemented (out of scope; `assistant_available` is `false`).
+5. ~~`POST /assistant` is not implemented (out of scope; `assistant_available` is `false`).~~ Done: see
+   "POST /assistant" above. It is switched off (`CH_ASSISTANT_ENABLED=false`) until the Lambda's role may call
+   Bedrock; the website then shows its "not available in this version" line, as it does today.
