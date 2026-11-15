@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lunar Hardware Models</title>
-<meta name="description" content="Review page for the code-built lunar hardware models: sizes, sources and a turning view of each model.">
+<meta name="description" content="Review page for the lunar hardware models: how each was made, its sizes and sources, and a turning view of each model.">
 <style>
   :root {
     --bg: #f5f5f3;
@@ -114,6 +114,18 @@
   li { margin-bottom: 4px; }
   .muted { color: var(--muted); }
   .note { font-style: italic; }
+  .kind {
+    display: inline-block;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 0 9px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .kind-imported { background: var(--warn-bg); color: var(--warn-fg); }
+  .kind-generated { background: var(--warn-bg); color: var(--warn-fg); font-weight: 600; }
+  .kind-note { margin: 2px 0 10px; }
+  a { color: inherit; }
   footer { margin-top: 36px; color: var(--muted); font-size: 0.85rem; }
   code { font-size: 0.9em; }
 </style>
@@ -140,12 +152,16 @@
 <main>
   <h1>Lunar hardware models</h1>
   <p class="lede">
-    Simple shapes of lunar hardware, built with code for the Common Horizon site (NASA Space
-    Apps 2026, Lunar Landing Site Navigator) and drawn at true scale from the sizes listed
-    below: published figures where we have them, our own estimates where marked. Units are
-    meters, Y is up, and each model's origin is the centre of its footprint on the ground.
-    Every model is an illustrative shape, built with SI/AI-written code. The facts on this page
-    are read from the JSON file next to each model.
+    Simple shapes of lunar hardware for the Common Horizon site (NASA Space Apps 2026, Lunar
+    Landing Site Navigator), at true scale from the sizes listed below: published figures where
+    we have them, our own estimates where marked. Units are meters, Y is up, and each model's
+    origin is the centre of its footprint on the ground. There are three kinds of model, and
+    each says which it is: <strong>code-built</strong> (an illustrative shape, built with
+    SI/AI-written code), <strong>imported</strong> (an illustrative shape from a community CAD
+    model; not the manufacturer's data) and <strong>generated</strong> (an illustrative shape,
+    SI/AI-generated from a photo; not the manufacturer's data). Imported and generated shapes are
+    plain grey: their colours and textures were removed. The facts on this page are read from the
+    JSON file next to each model.
   </p>
   <div id="notice" class="notice" role="status"></div>
 
@@ -154,6 +170,7 @@
       <thead>
         <tr>
           <th scope="col">Model</th>
+          <th scope="col">Kind</th>
           <th scope="col">Width x height x depth (m)</th>
           <th scope="col">Triangles</th>
           <th scope="col">Status</th>
@@ -178,7 +195,9 @@
 
   <footer>
     <p>
-      Built by the scripts in <code>tools/models/</code>; sources are listed in
+      Code-built models are drawn by the scripts in <code>tools/models/</code>; imported and
+      generated models are finished (made plain, turned Y up, scaled to the published height and
+      stood on the origin) by <code>tools/models/finish-model.mjs</code>. Sources are listed in
       <code>tools/models/SOURCES-models.md</code>. 3D views use three.js. Sizes are checked by
       <code>npm run check</code> in <code>tools/models/</code>.
     </p>
@@ -187,8 +206,9 @@
 
 <script type="module">
   // Models in the order of the brief. Each has <id>.glb (shape) and <id>.json (facts) here.
-  const MODEL_IDS = ['starship-lander', 'habitat-unit', 'fission-power-unit', 'solar-array-mast', 'griffin-lander'];
+  const MODEL_IDS = ['starship-lander', 'habitat-unit', 'fission-power-unit', 'solar-array-mast', 'griffin-lander', 'blue-moon-mk1', 'viper-rover'];
   const DIM_LABEL = { width_x: 'Width (x)', height_y: 'Height (y)', depth_z: 'Depth (z)' };
+  const KIND_LABEL = { 'code-built': 'Code-built', imported: 'Imported CAD', generated: 'SI/AI-generated from a photo' };
   const BACKGROUND = 0x15171a;
 
   const notice = document.getElementById('notice');
@@ -207,6 +227,9 @@
   }
 
   const fmt = (value) => Number(value.toFixed(3)).toString();
+  const kindBadge = (f) => el('span', { class: `kind kind-${f.kind ?? 'unknown'}`, text: KIND_LABEL[f.kind] ?? 'kind not stated' });
+  // A link only for https addresses from the JSON; anything else is shown as plain text.
+  const link = (url, text = url) => (/^https:\/\/\S+$/.test(url ?? '') ? el('a', { href: url, rel: 'noopener noreferrer', text }) : (text ?? ''));
   const sizeText = (d) => `${fmt(d.width_x)} x ${fmt(d.height_y)} x ${fmt(d.depth_z)}`;
 
   // Read every model's JSON. A file that cannot be read is reported, and the others still show.
@@ -239,6 +262,7 @@
     for (const f of facts) {
       body.append(el('tr', {},
         el('td', {}, el('a', { href: `#${f.id}`, text: f.name })),
+        el('td', {}, kindBadge(f)),
         el('td', { class: 'num' }, sizeText(f.dimensions_m), sizeQualifier(f)),
         el('td', { class: 'num', text: `${f.triangles.toLocaleString('en-US')}` }),
         el('td', {}, el('span', { class: 'badge', text: f.status })),
@@ -261,15 +285,47 @@
 
     const sources = el('ul');
     for (const s of f.dimension_sources) {
-      sources.append(el('li', {},
+      const item = el('li', {},
         el('strong', { text: `${DIM_LABEL[s.dimension] ?? s.dimension}: ${fmt(s.value_m)} m. ` }),
-        `${s.meaning}. Source: ${s.source}. Status: ${s.status}.`));
+        `${s.meaning}. Source: ${s.source}`);
+      if (s.link) item.append(' (', link(s.link), ')');
+      item.append(`. Status: ${s.status}.`);
+      if (s.published) {
+        item.append(` Published figure for comparison: ${fmt(s.published.value_m)} m (${s.published.source}`);
+        if (s.published.link) item.append(', ', link(s.published.link));
+        item.append(`; ${s.published.status}); ours is ${s.difference_percent > 0 ? '+' : ''}${s.difference_percent}% from it.`);
+      }
+      sources.append(item);
     }
 
     const right = el('div', {},
       el('h2', { text: f.name }),
+      el('p', { class: 'kind-note' }, kindBadge(f), ' ', el('span', { class: 'note', text: f.note })),
       facts,
       el('h3', { text: 'Where each size comes from' }), sources);
+
+    if (f.kind === 'imported' && f.source) {
+      const s = f.source;
+      const list = el('ul',
+        {},
+        el('li', {}, `CAD model: ${s.title ?? ''}, by ${s.author}.`),
+        el('li', {}, 'Source address: ', link(s.url)),
+        el('li', {}, `Terms: ${s.terms}`, s.terms_url ? ' (' : '', s.terms_url ? link(s.terms_url) : '', s.terms_url ? ')' : ''),
+      );
+      for (const c of s.changes ?? []) list.append(el('li', { text: `Change for this site: ${c}` }));
+      right.append(el('h3', { text: 'Where the shape comes from' }), list);
+    }
+    if (f.kind === 'generated' && f.generation) {
+      const g = f.generation;
+      const list = el('ul', {},
+        el('li', {}, `Picture: ${g.picture?.description ? `${g.picture.description}. ` : ''}Credit: ${g.picture?.credit}.`,
+          g.picture?.source_url ? ' ' : '', g.picture?.source_url ? link(g.picture.source_url) : ''),
+        el('li', { text: `Made by: ${g.model}${g.model_maker ? ` (${g.model_maker}${g.model_license ? `, ${g.model_license} licence` : ''})` : ''}, run on ${g.service}${g.endpoint ? ` (${g.endpoint})` : ''}.` }),
+        el('li', { text: `Request id: ${g.request_id}. Date: ${g.date}.` }),
+      );
+      if (g.cleanup) list.append(el('li', { text: `Picture cleanup before that: ${g.cleanup.model}, request id ${g.cleanup.request_id}.` }));
+      right.append(el('h3', { text: 'How the shape was made' }), list);
+    }
 
     if (f.parts?.length) {
       const parts = el('ul');
@@ -290,7 +346,8 @@
     }
     const simplifications = el('ul');
     for (const s of f.simplifications) simplifications.append(el('li', { text: s }));
-    right.append(el('h3', { text: 'Simplifications' }), simplifications, el('p', { class: 'note', text: f.note }));
+    right.append(el('h3', { text: f.kind === 'code-built' ? 'Simplifications' : 'Simplifications and known differences' }),
+      simplifications, el('p', { class: 'note', text: f.note }));
 
     const card = el('article', { class: 'card', id: f.id }, viewer, right);
     document.getElementById('cards').append(card);

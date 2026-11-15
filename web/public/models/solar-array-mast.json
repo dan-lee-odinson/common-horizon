@@ -2,6 +2,7 @@
   "id": "solar-array-mast",
   "name": "Solar array mast (sizes are parameters)",
   "file": "solar-array-mast.glb",
+  "kind": "code-built",
   "status": "our estimate, to be replaced by a published figure",
   "note": "illustrative shape, built with SI/AI-written code",
   "units": "meters",

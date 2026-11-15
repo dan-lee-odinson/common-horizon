@@ -32,6 +32,7 @@ function sampleJson(overrides = {}) {
     id: 'sample',
     name: 'Sample',
     file: 'sample.glb',
+    kind: 'code-built',
     status: 'test',
     note: 'illustrative shape, built with SI/AI-written code',
     units: 'meters',
@@ -133,7 +134,7 @@ test('check: textures and vertex colours fail (plain colours only)', async () =>
 });
 
 test('check: missing note, missing source and wrong file name fail', () => {
-  assert.match(checkDescription(sampleJson({ note: 'built with code' })).join('\n'), /"note" must read exactly/);
+  assert.match(checkDescription(sampleJson({ note: 'built with code' })).join('\n'), /"note" for a code-built model must read exactly/);
   const noSource = sampleJson();
   noSource.dimension_sources = noSource.dimension_sources.slice(0, 2);
   assert.match(checkDescription(noSource).join('\n'), /no source given for depth_z/);
@@ -187,7 +188,7 @@ test('check: the committed models pass', async () => {
   const { failed, results, folderProblems } = await checkFolder(DEFAULT_DIR);
   const problems = [...folderProblems, ...results.flatMap((r) => r.problems.map((p) => `${r.id}: ${p}`))];
   assert.equal(failed, false, problems.join('\n'));
-  assert.equal(results.length, 5);
+  assert.equal(results.length, Object.keys(BRIEF).length);
 });
 
 test('check: solar array mast built with non-default sizes fails the brief check', () => {
@@ -200,4 +201,82 @@ test('check: solar array mast built with non-default sizes fails the brief check
   const { problems } = checkAgainstBrief(json, BRIEF['solar-array-mast']);
   assert.match(problems.join('\n'), /built with height_m = 12, not the default 10/);
   assert.match(problems.join('\n'), /built with panel_width_m = 5, not the default 4/);
+});
+
+// ---- Kinds of model: code-built, imported, generated (each with its own exact note) ----
+
+const NOTES = {
+  'code-built': 'illustrative shape, built with SI/AI-written code',
+  imported: "illustrative shape from a community CAD model; not the manufacturer's data",
+  generated: "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data",
+};
+
+function importedJson(overrides = {}) {
+  return sampleJson({
+    kind: 'imported',
+    note: NOTES.imported,
+    source: { author: 'A. Author', url: 'https://example.org/model', terms: 'public-document terms' },
+    ...overrides,
+  });
+}
+
+function generatedJson(generationOverrides = {}, overrides = {}) {
+  return sampleJson({
+    kind: 'generated',
+    note: NOTES.generated,
+    generation: {
+      picture: { credit: 'A. Photographer' },
+      model: 'TRELLIS.2',
+      service: 'fal.ai',
+      request_id: '00000000-0000-0000-0000-000000000000',
+      date: '2026-11-15',
+      ...generationOverrides,
+    },
+    ...overrides,
+  });
+}
+
+test("check: each kind passes with its own note and fails with another kind's note", () => {
+  assert.deepEqual(checkDescription(sampleJson()), []);
+  assert.deepEqual(checkDescription(importedJson()), []);
+  assert.deepEqual(checkDescription(generatedJson()), []);
+  assert.match(checkDescription(importedJson({ note: NOTES['code-built'] })).join('\n'), /"note" for an imported model must read exactly/);
+  assert.match(checkDescription(generatedJson({}, { note: NOTES.imported })).join('\n'), /"note" for a generated model must read exactly/);
+  assert.match(checkDescription(sampleJson({ note: NOTES.generated })).join('\n'), /"note" for a code-built model/);
+});
+
+test('check: a missing or unknown kind fails', () => {
+  assert.match(checkDescription(sampleJson({ kind: undefined })).join('\n'), /"kind" must be one of code-built, imported, generated/);
+  assert.match(checkDescription(sampleJson({ kind: 'scanned' })).join('\n'), /"kind" must be one of/);
+});
+
+test('check: an imported model must name the author, the source address and the terms', () => {
+  assert.match(checkDescription(importedJson({ source: undefined })).join('\n'), /needs a "source"/);
+  const noAuthor = importedJson();
+  delete noAuthor.source.author;
+  assert.match(checkDescription(noAuthor).join('\n'), /source\.author/);
+  assert.match(checkDescription(importedJson({ source: { author: 'A', url: 'example.org', terms: 't' } })).join('\n'), /source\.url/);
+  assert.match(checkDescription(importedJson({ source: { author: 'A', url: 'https://x.org', terms: ' ' } })).join('\n'), /source\.terms/);
+});
+
+test('check: a generated model must name the picture credit, TRELLIS.2, the service, the request id and the date', () => {
+  assert.match(checkDescription(generatedJson({ picture: {} })).join('\n'), /picture\.credit/);
+  assert.match(checkDescription(generatedJson({ model: 'Other3D' })).join('\n'), /"generation\.model" must be "TRELLIS\.2"/);
+  assert.match(checkDescription(generatedJson({ service: '' })).join('\n'), /generation\.service/);
+  assert.match(checkDescription(generatedJson({ request_id: undefined })).join('\n'), /generation\.request_id/);
+  assert.match(checkDescription(generatedJson({ date: '15 Nov 2026' })).join('\n'), /generation\.date/);
+  assert.match(checkDescription(generatedJson({}, { generation: undefined })).join('\n'), /needs a "generation" record/);
+  assert.deepEqual(checkDescription(generatedJson({ cleanup: { model: 'Nano Banana 2', request_id: 'abc' } })), []);
+  assert.match(checkDescription(generatedJson({ cleanup: { model: 'Other image model', request_id: 'abc' } })).join('\n'), /must name "Nano Banana 2"/);
+});
+
+test('check: the brief fixes the kind, the author, the picture credit and a fixed triangle count', () => {
+  const brief = { kind: 'imported', status: 'test', author: 'A. Author', triangles: 12 };
+  assert.deepEqual(checkAgainstBrief(importedJson(), brief).problems, []);
+  assert.match(checkAgainstBrief(importedJson({ triangles: 13 }), brief).problems.join('\n'), /should have 12 triangles/);
+  assert.match(checkAgainstBrief(importedJson({ source: { author: 'B', url: 'https://x', terms: 't' } }), brief).problems.join('\n'), /author should be A\. Author/);
+  assert.match(checkAgainstBrief(generatedJson(), brief).problems.join('\n'), /kind should be "imported"/);
+  const genBrief = { kind: 'generated', status: 'test', picture_credit: 'A. Photographer' };
+  assert.deepEqual(checkAgainstBrief(generatedJson(), genBrief).problems, []);
+  assert.match(checkAgainstBrief(generatedJson({ picture: { credit: 'Someone else' } }), genBrief).problems.join('\n'), /picture credit should name A\. Photographer/);
 });
