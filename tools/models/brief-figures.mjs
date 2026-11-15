@@ -86,4 +86,10 @@ export const BRIEF = Object.freeze({
     dimensions_m: { height_y: 2.6 }, // "about 2.6 meters to the top of its antenna" (maker's news page, 26 May 2026)
     picture_credit: 'Dan Lee-Odinson', // team member's own photo
   },
+  'pressurized-rover': {
+    kind: 'generated',
+    status: STATUS_LABELS.jaxaFigure,
+    dimensions_m: { height_y: 4.85 }, // L x W x H = 6.44 x 4.84 x 4.85 m (JAXA, 29 Sep 2025)
+    picture_credit: 'Dan Lee-Odinson', // team member's own photo of a scale model
+  },
 });
