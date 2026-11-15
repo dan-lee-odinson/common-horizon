@@ -29,6 +29,7 @@ from app.models.website import (
     normalize_lon_east,
 )
 from app.physics.interface import PhysicsEngine
+from app.physics.site_slopes import SCREENING_NOTE, SLOPE_DESCRIPTION, SLOPE_DESCRIPTION_INLINE
 from app.planner_bridge import planner
 from app.services import planner_checks, ranking
 from app.services.catalog import PlannerSelection, lander_item, to_planner_selection
@@ -120,26 +121,36 @@ def _site_stay(engine: PhysicsEngine, site: SiteRef, start: datetime, stay_days:
     return _SiteStay(evaluation=evaluation, dark_hours=dark_hours, nights=dark_periods(evaluation))
 
 
-def _slope_check(slope_deg: float | None, selection: PlannerSelection) -> RequirementCheck:
+def _slope_check(slope_deg: float | None, slope_source: str | None, selection: PlannerSelection) -> RequirementCheck:
+    """Pass or fail only for a lander with a published slope limit; otherwise the slope is shown, unchecked.
+
+    The stored Moon Trek slope is regional, so a pass or fail on it is labelled as terrain screening.
+    The requirement keeps the name "landing slope": the website matches on it.
+    """
+    regional = slope_deg is not None and slope_source == SLOPE_DESCRIPTION
+    if slope_deg is None:
+        slope = "Site slope is unknown"
+    elif regional:
+        slope = f"Regional slope {slope_deg:g} deg ({SLOPE_DESCRIPTION_INLINE})"
+    else:
+        slope = f"Slope {slope_deg:g} deg" + (f" ({slope_source})" if slope_source else "")
     lander = lander_item(selection)
     if lander is None:
-        return RequirementCheck(requirement="landing slope", passed=None, detail="No lander chosen: no slope limit.")
-    if lander.max_slope_deg is None:
         return RequirementCheck(
-            requirement="landing slope", passed=None, detail=f"No published slope limit for {lander.name}."
+            requirement="landing slope", passed=None, detail=f"{slope}; no lander chosen, so no slope limit."
         )
-    if slope_deg is None:
+    if lander.max_slope_deg is None:
         return RequirementCheck(
             requirement="landing slope",
             passed=None,
-            detail=f"Site slope is unknown; {lander.name} accepts up to {lander.max_slope_deg:g} deg.",
+            detail=f"{slope}; no published slope limit for {lander.name}, so no pass or fail.",
         )
+    limit = f"{lander.name} accepts up to {lander.max_slope_deg:g} deg."
+    if slope_deg is None:
+        return RequirementCheck(requirement="landing slope", passed=None, detail=f"{slope}; {limit}")
     passed = slope_deg <= lander.max_slope_deg
-    return RequirementCheck(
-        requirement="landing slope",
-        passed=passed,
-        detail=f"Slope {slope_deg:g} deg; {lander.name} accepts up to {lander.max_slope_deg:g} deg.",
-    )
+    detail = f"{slope}; {limit}" + (f" {SCREENING_NOTE}" if regional else "")
+    return RequirementCheck(requirement="landing slope", passed=passed, detail=detail)
 
 
 def _evaluate_site(
@@ -173,7 +184,7 @@ def _evaluate_site(
             passed=None if power is None else power.day.passes,
             detail="power check unavailable" if power is None else f"day status {power.day.status}",
         ),
-        _slope_check(info.slope_deg, selection),
+        _slope_check(info.slope_deg, info.slope_source, selection),
         RequirementCheck(requirement="Earth contact", passed=link != "none", detail=f"Earth link {link}"),
     ]
     decided = ranking.verdict({check.requirement: check.passed for check in checks})
@@ -198,6 +209,7 @@ def _evaluate_site(
         earth_visible_percent=metrics.earth_visibility_percentage,
         clear_sky_percent=None if metrics.sky_visibility_fraction is None else 100.0 * metrics.sky_visibility_fraction,
         slope_deg=info.slope_deg,
+        slope_source=info.slope_source,
         earth_link=link,
         hardware_fits=fit.fits,
         energy_added_kwh=None,

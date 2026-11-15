@@ -311,6 +311,13 @@ class SiteEvaluation(_OutputModel):
     earth_visible_percent: float
     clear_sky_percent: float | None = Field(description="Null when no terrain skyline is available for the site.")
     slope_deg: float | None
+    slope_source: str | None = Field(
+        default=None,
+        description=(
+            "What slope_deg is, whenever it is given (new). Preset sites with the real engine: 'slope of the "
+            "best-fit plane to LOLA heights within 500 m (NASA Moon Trek)', a regional slope, wider than a lander."
+        ),
+    )
     earth_link: EarthLink
     hardware_fits: bool | None
     energy_added_kwh: float | None

@@ -2,8 +2,8 @@
 //
 // Four glass panels float on two wings, tilted toward the viewer: the Sun, the mission clock and
 // the launch on the right, Earth's panel at the lower left, under the corner of sky that Earth's
-// limb fills. The middle of the screen is kept for the scene: the Sun on its ring, Earth's limb and
-// their tags never pass behind a panel. Every readout is a Quantity from the data layer, rewritten once per
+// limb fills. The middle of the screen is kept for the scene: the Sun's tick on its ring, Earth's
+// limb, their tags, the lines of sunlight and the glow at the frame's edge never pass behind a panel. Every readout is a Quantity from the data layer, rewritten once per
 // frame as the previewed time runs: the calculations are seen running.
 
 import { useId, useMemo, useRef, useState } from 'react';
@@ -20,10 +20,18 @@ import { EARTH_LINK_TONE, EARTH_LINK_WORD, fixed, missionDates, skyQuantities, s
 import { SOUTH_POLE_SEASON_NOTE } from '../util/season';
 import { HOUR_MS, LTC_MICROSECONDS_PER_DAY, SYNODIC_MONTH_DAYS } from '../util/time';
 import { AnchorTag } from './AnchorTag';
+import { earthSurface } from '../scene/orbitEarth';
+import { isTurned, orbitSun, orbitTurn } from '../scene/orbitTurn';
 import { orbitEarthSide } from '../scene/orbitView';
 import { PREVIEW_HOURS_PER_SECOND } from './Playback';
+import { SunlightField } from './SunlightField';
 import { useEntrance } from './useEntrance';
-
+/** The line under the controls: what the picture shows, and what it does not. (Phones get the same facts in fewer words.) */
+export const ORBIT_CAPTION = 'The Sun is at its true direction and true apparent size. Earth is at true size but drawn much nearer than it is. Drag, or use the arrow keys, to turn the view.';
+export const ORBIT_CAPTION_PHONE = 'Sun: true direction and true apparent size. Earth: true size, drawn much nearer than it is. Drag to turn the view.';
+export const EARTH_MAP_NOTE = 'Earth’s surface is NASA’s Blue Marble map (R. Stöckli, NASA Earth Observatory); it turns once a day, and which face points at the Moon is not computed.';
+export const EARTH_MAP_NOTE_PHONE = 'Earth: NASA Blue Marble map (R. Stöckli, NASA); it turns once a day; which face points at the Moon is not computed.';
+export const EARTH_DRAWN_NOTE = 'Earth’s surface pattern is an illustration, not a map; it turns once a day, and which face points at the Moon is not computed.';
 
 export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?: boolean }) {
   const { track, orbitHorizon, reference, landingMs, orbitEndMs, windowEndMs, landingGeometry, rows } = useData();
@@ -32,13 +40,18 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
   const playing = useStore(appStore, (s) => s.previewPlaying);
   const zoomedOut = useStore(appStore, (s) => s.orbitZoom > 0.5);
   const moonSurface = useStore(appStore, (s) => s.moonSurface);
+  const earthMap = useStore(earthSurface, (s) => s.surface);
+  // The view the visitor has turned by hand, and what hides the Sun's disc there (see scene/orbitTurn.ts).
+  const turned = useStore(orbitTurn, isTurned);
+  const sunHiddenBy = useStore(orbitSun, (s) => s.hiddenBy);
   const isPhone = useIsPhone();
   // Earth stands on one side of the Moon (see scene/orbitView.ts); the panels arrange around it.
   const earthSide = orbitEarthSide(landingGeometry);
   const leaders = useMemo<LeaderSpec[]>(
     () => [
       { anchor: 'sun', to: '[data-leader-target="sun"]', color: 'var(--ch-sun)', side: earthSide === 'right' ? 'left' : 'right' },
-      { anchor: 'earthLimb', to: '[data-leader-target="earth"]', color: 'var(--ch-earth)', edge: 'top' },
+      // Earth's line runs to its panel only while Earth is on the panel's side of the Moon (with the view turned it may not be).
+      { anchor: 'earthLimb', to: '[data-leader-target="earth"]', color: 'var(--ch-earth)', edge: 'top', side: earthSide },
     ],
     [earthSide],
   );
@@ -79,8 +92,12 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
 
   return (
     <div ref={rootRef} className="absolute inset-0" data-testid="orbit-hud" style={{ visibility: revealed ? 'visible' : 'hidden' }}>
+      {/* The Sun's light: under everything else in the HUD, and cut clear of the panels and the controls. */}
+      {webgl ? <SunlightField root={rootRef} active={revealed} isPhone={isPhone} /> : null}
       <Leaders items={leaders} active={revealed && !isPhone} />
-      <AnchorTag anchor="sun" label="Sun" tone="sun" q={sky.subsolarLon} />
+      <AnchorTag anchor="sun" label="Sun overhead" tone="sun" q={sky.subsolarLon} />
+      {/* The Sun's own disc, when the view is turned far enough to bring it into the picture. */}
+      <AnchorTag anchor="sunDisc" label={sunHiddenBy === 'moon' ? 'Sun (behind the Moon)' : sunHiddenBy === 'earth' ? 'Sun (behind the Earth)' : 'Sun'} tone="sun" gap={10} />
       <AnchorTag anchor="earthLimb" label="Earth" tone="earth" toward="moon" gap={12} q={sky.subearthLon} />
       <AnchorTag anchor="lon0" label="0°" tone="muted" plain />
       <AnchorTag anchor="lon90" label="90° E" tone="muted" plain />
@@ -231,7 +248,33 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
       <div className="hud-layer" data-depth="0.5">
         {/* The row spans the screen only to centre its content: presses beside it go to what is behind. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center px-4 max-md:bottom-4">
-        <div className="pointer-events-auto flex w-fit max-w-full flex-col items-center gap-2.5" data-enter="lead">
+        <div className="pointer-events-auto relative flex w-fit max-w-full flex-col items-center gap-2.5" data-enter="lead" data-keep-clear>
+          {/* Shown only while the view is turned. It floats above the controls, so nothing below it moves when it comes and goes. */}
+          {webgl ? (
+            <div
+              className="absolute bottom-full left-1/2 mb-3"
+              style={{
+                visibility: turned ? 'visible' : 'hidden',
+                opacity: turned ? 1 : 0,
+                transform: `translateX(-50%) scale(${turned ? 1 : 0.96})`,
+                // In a little slower than out; "visibility" waits for the fade so the button is never pressable while unseen.
+                transition: turned ? 'opacity 160ms var(--ease-out), transform 160ms var(--ease-out)' : 'opacity 120ms var(--ease-out), transform 120ms var(--ease-out), visibility 0s linear 120ms',
+              }}
+              data-keep-clear
+            >
+              <button
+                type="button"
+                className="btn"
+                style={{ background: 'var(--ch-glass-strong)' }}
+                onClick={() => orbitTurn.set({ lon: 0, lat: 0, via: 'reset' })}
+                title="Return to the standard view. Drag the picture, or use the arrow keys, to turn it."
+                data-testid="orbit-reset-view"
+              >
+                <Icon name="reset" size={14} />
+                Reset view
+              </button>
+            </div>
+          ) : null}
           {waiting ? (
             <p className="m-0 text-[13px] text-ink-2" role="status">
               Working out where the Sun and Earth are…
@@ -304,11 +347,19 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
               <Icon name="right" size={16} />
             </button>
           </div>
-          <p className="m-0 max-w-[36rem] text-balance text-center text-[13px] leading-snug text-ink-2" data-testid="not-to-scale">
-            {webgl ? 'Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only.' : 'This flat picture stands in where 3D is not available: Earth is not drawn, and the Sun’s mark shows a direction only.'}{' '}
+          <p className="m-0 max-w-[40rem] text-balance text-center text-[13px] leading-snug text-ink-2 max-md:text-[12px] max-md:leading-[1.3]" data-testid="not-to-scale">
+            {!webgl ? 'This flat picture stands in where 3D is not available: Earth is not drawn, and the Sun’s mark shows a direction only.' : isPhone ? ORBIT_CAPTION_PHONE : ORBIT_CAPTION}{' '}
             <span data-testid="moon-surface-note" data-surface={moonSurface}>
               {moonSurface === 'map' ? 'The Moon’s surface is NASA’s CGI Moon Kit color map, made for visual use.' : 'The Moon’s surface pattern is an illustration, not a map.'}
             </span>
+            {webgl ? (
+              <>
+                {' '}
+                <span data-testid="earth-surface-note" data-surface={earthMap}>
+                  {earthMap !== 'map' ? EARTH_DRAWN_NOTE : isPhone ? EARTH_MAP_NOTE_PHONE : EARTH_MAP_NOTE}
+                </span>
+              </>
+            ) : null}
           </p>
         </div>
         </div>

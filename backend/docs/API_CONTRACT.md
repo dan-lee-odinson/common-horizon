@@ -77,7 +77,7 @@ stays 0.1.0, but requests accepted before (for example a 61 s step with a 30-day
 | Terrain skyline | `terrain_skyline` (`azimuth_deg[]`, `horizon_elevation_deg[]`); null unless a stored terrain profile was used |
 | Terrain elevation grid | not part of this endpoint (too large); planned as a separate endpoint |
 | Landing-site elevation | `site.elevation_m` (+ `site.elevation_source`) |
-| Landing-site slope | `site.slope_deg` |
+| Landing-site slope | `site.slope_deg`, with `site.slope_source` saying what it is |
 | Sunlight duration / percentage | `metrics.sunlight_hours`, `metrics.sunlight_percentage` |
 | Longest darkness / sunlight | `metrics.longest_darkness_hours`, `metrics.longest_sunlight_hours` |
 | Earth visibility duration / percentage | `metrics.earth_visibility_hours`, `metrics.earth_visibility_percentage` |
@@ -124,7 +124,12 @@ kernels or stored profiles are missing and never falls back to synthetic data. P
    visible fraction and obstruction state against the skyline (`body_visibility`);
 4. aggregates metrics and communication windows (`app/physics/metrics.py`, sample-and-hold).
 
-`slope_deg` is null (no slope data at run time). Without a usable stored skyline, `terrain_skyline` and
+`slope_deg` is the stored slope of a preset site when the request is at that site's own coordinates
+(within 1 m; `backend/data/site_slopes.json`), with `slope_source` = "slope of the best-fit plane to LOLA
+heights within 500 m (NASA Moon Trek)": a regional slope, wider than a lander. Anywhere else `slope_deg` and
+`slope_source` are null. If the slope file is not installed, they are null everywhere, every answer carries
+the warning "Stored site slopes are not installed, so slope_deg is null." and the server logs it once; a slope
+file that exists but is unreadable or invalid answers 503. Without a usable stored skyline, `terrain_skyline` and
 `sky_visibility_fraction` are null. Site elevation, in order: a supplied `altitude_m` (`input`); else the
 elevation of a stored site within 50 m, even when its skyline does not fit the observer height
 (`terrain_model`, with a warning); else a 0 m placeholder labelled `elevation_source = "synthetic_default"`
@@ -171,4 +176,5 @@ response shapes bumps `contract_version`.
 - Runtime with the real kernels on a laptop (not Lambda): 14 days hourly about 0.13 s, with a 30-day sweep
   about 0.4 s; the largest request the work budget accepts (20 000 samples) about 7 s. The deployment is a
   Lambda Function URL with 512 MB and a 60 s timeout; runtime there is not measured yet.
-- Not provided yet: site slope, site elevation away from stored profiles, the terrain elevation grid.
+- Not provided yet: site slope away from the preset sites, site elevation away from stored profiles, the
+  terrain elevation grid.

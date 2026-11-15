@@ -1,6 +1,9 @@
 // The Orbit stage's picture, as plain arithmetic: where the camera sits, how big the ring system
 // is, and where Earth is drawn. Kept free of 3D-library code so the layout can be checked by tests.
 //
+// THE SUN is not a body in this arithmetic: it is a direction. Its ring carries a tick at the
+// longitude where the Sun is overhead; its light is drawn as lines across the scene (sunlight.ts).
+//
 // SIZES TO SCALE, DISTANCES NOT. Earth is drawn at its true size beside the Moon (3.667 times the
 // Moon's radius) and in its true DIRECTION from the Moon, but far nearer than the 221 Moon radii it
 // really is: it stands behind the Moon and to the left, so that in the usual view its limb fills
@@ -39,12 +42,18 @@ export function ringRadii(isPhone: boolean): [number, number, number, number] {
   return [1.28 * k, 1.7 * k, 1.9 * k, 2.15 * k];
 }
 
+/**
+ * The Sun's tick on the Sun ring, at the longitude where the Sun is overhead: how far it reaches
+ * inside and outside the ring, in Moon radii. (The Sun itself is not drawn on the ring.)
+ */
+export const SUN_TICK = { inner: 0.07, outer: 0.11 } as const;
+
 /** Pixels each side column of panels takes on wide screens (panel, margin and breathing room). */
 export const ORBIT_COLUMN_PX = 20 + 288 + 40;
 
 /**
  * Camera distance (Moon radii) at which the Sun ring just fits between the two side columns, so the
- * Sun on its ring never passes behind a panel. Limited so the Moon stays large but inside the frame.
+ * Sun's tick on its ring never passes behind a panel. Limited so the Moon stays large but inside the frame.
  */
 export function orbitDistance(width: number, height: number, isPhone: boolean): number {
   const tanV = Math.tan((ORBIT_VIEW.fov * Math.PI) / 360);
@@ -98,22 +107,40 @@ export interface ScreenPoint {
   scale: number;
 }
 
-/**
- * Where a point of the Moon world lands on screen for the Orbit camera (no roll, no shift).
- * `lat`/`lon` give the point's direction from the Moon's centre and `r` its distance in Moon radii.
- */
-export function projectOrbit(lat: number, lon: number, r: number, cameraLon: number, cameraElevation: number, distance: number, width: number, height: number): ScreenPoint {
+export interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** A point of the Moon world from its direction (latitude, east longitude) and distance in Moon radii. World axes: +x at longitude 0, +y north, -z at longitude 90 E. */
+export function worldPoint(lat: number, lon: number, r = 1): Vec3 {
   const rad = Math.PI / 180;
-  // World axes: +x at longitude 0, +y north, -z at longitude 90 E.
-  const p = { x: r * Math.cos(lat * rad) * Math.cos(lon * rad), y: r * Math.sin(lat * rad), z: -r * Math.cos(lat * rad) * Math.sin(lon * rad) };
-  const cl = cameraLon * rad;
-  const ce = cameraElevation * rad;
-  const c = { x: distance * Math.cos(ce) * Math.cos(cl), y: distance * Math.sin(ce), z: -distance * Math.cos(ce) * Math.sin(cl) };
+  return { x: r * Math.cos(lat * rad) * Math.cos(lon * rad), y: r * Math.sin(lat * rad), z: -r * Math.cos(lat * rad) * Math.sin(lon * rad) };
+}
+
+/** The Orbit camera (no roll, no shift): where it is, and its forward, right and up axes. It looks at the Moon's centre. */
+export function orbitCameraFrame(cameraLon: number, cameraElevation: number, distance: number): { position: Vec3; forward: Vec3; right: Vec3; up: Vec3 } {
+  const c = worldPoint(cameraElevation, cameraLon, distance);
   const f = { x: -c.x / distance, y: -c.y / distance, z: -c.z / distance };
   // right = f x up(0,1,0), then up = right x f
   const rl = Math.hypot(f.z, f.x) || 1;
   const right = { x: -f.z / rl, y: 0, z: f.x / rl };
   const up = { x: right.y * f.z - right.z * f.y, y: right.z * f.x - right.x * f.z, z: right.x * f.y - right.y * f.x };
+  return { position: c, forward: f, right, up };
+}
+
+/**
+ * Where a point of the Moon world lands on screen for the Orbit camera (no roll, no shift).
+ * `lat`/`lon` give the point's direction from the Moon's centre and `r` its distance in Moon radii.
+ */
+export function projectOrbit(lat: number, lon: number, r: number, cameraLon: number, cameraElevation: number, distance: number, width: number, height: number): ScreenPoint {
+  return projectOrbitPoint(worldPoint(lat, lon, r), cameraLon, cameraElevation, distance, width, height);
+}
+
+/** The same, for a point given by its world coordinates. */
+export function projectOrbitPoint(p: Vec3, cameraLon: number, cameraElevation: number, distance: number, width: number, height: number): ScreenPoint {
+  const { position: c, forward: f, right, up } = orbitCameraFrame(cameraLon, cameraElevation, distance);
   const v = { x: p.x - c.x, y: p.y - c.y, z: p.z - c.z };
   const depth = v.x * f.x + v.y * f.y + v.z * f.z;
   const tanV = Math.tan((ORBIT_VIEW.fov * Math.PI) / 360);
@@ -124,4 +151,30 @@ export function projectOrbit(lat: number, lon: number, r: number, cameraLon: num
     depth,
     scale,
   };
+}
+
+/** The line of sight through a pixel of the Orbit picture: it starts at the camera and runs along `dir` (a unit vector). */
+export function orbitRay(x: number, y: number, cameraLon: number, cameraElevation: number, distance: number, width: number, height: number): { origin: Vec3; dir: Vec3 } {
+  const { position, forward: f, right, up } = orbitCameraFrame(cameraLon, cameraElevation, distance);
+  const focal = height / 2 / Math.tan((ORBIT_VIEW.fov * Math.PI) / 360);
+  const a = (x - width / 2) / focal;
+  const b = (height / 2 - y) / focal;
+  const d = { x: f.x + right.x * a + up.x * b, y: f.y + right.y * a + up.y * b, z: f.z + right.z * a + up.z * b };
+  const len = Math.hypot(d.x, d.y, d.z);
+  return { origin: position, dir: { x: d.x / len, y: d.y / len, z: d.z / len } };
+}
+
+/**
+ * Where a line of sight first meets a ball: the unit vector from the ball's centre out through that
+ * point of its surface (the surface's own "up" there), or null when the line misses the ball.
+ */
+export function hitBall(origin: Vec3, dir: Vec3, centre: Vec3, radius: number): Vec3 | null {
+  const o = { x: origin.x - centre.x, y: origin.y - centre.y, z: origin.z - centre.z };
+  const b = o.x * dir.x + o.y * dir.y + o.z * dir.z;
+  const c = o.x * o.x + o.y * o.y + o.z * o.z - radius * radius;
+  const disc = b * b - c;
+  if (disc <= 0) return null;
+  const t = -b - Math.sqrt(disc);
+  if (t <= 0) return null;
+  return { x: (o.x + dir.x * t) / radius, y: (o.y + dir.y * t) / radius, z: (o.z + dir.z * t) / radius };
 }

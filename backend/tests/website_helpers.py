@@ -16,7 +16,7 @@ class ScriptedEngine:
     """The synthetic engine's series, with metrics and slope replaced by what ``script`` returns.
 
     ``script(latitude_deg, longitude_deg, start_utc)`` returns any of: sunlight_percentage,
-    longest_darkness_hours, earth_visibility_percentage, sky_visibility_fraction, slope_deg.
+    longest_darkness_hours, earth_visibility_percentage, sky_visibility_fraction, slope_deg, slope_source.
     """
 
     def __init__(self, script: Script, *, synthetic: bool = False) -> None:
@@ -50,7 +50,9 @@ class ScriptedEngine:
         return base.model_copy(
             update={
                 "metrics": base.metrics.model_copy(update=metric_updates),
-                "site": base.site.model_copy(update={"slope_deg": wanted.get("slope_deg")}),
+                "site": base.site.model_copy(
+                    update={"slope_deg": wanted.get("slope_deg"), "slope_source": wanted.get("slope_source")}
+                ),
                 "warnings": [],
             }
         )
