@@ -722,7 +722,7 @@
           },
           "stay_days": {
             "type": "number",
-            "maximum": 365.0,
+            "maximum": 365.25,
             "minimum": 1.0,
             "title": "Stay Days"
           },
@@ -1048,7 +1048,7 @@
           },
           "stay_days": {
             "type": "number",
-            "maximum": 365.0,
+            "maximum": 365.25,
             "minimum": 1.0,
             "title": "Stay Days"
           },
@@ -1667,7 +1667,7 @@
           },
           "stay_duration_days": {
             "type": "number",
-            "maximum": 365.0,
+            "maximum": 365.25,
             "exclusiveMinimum": 0.0,
             "title": "Stay Duration Days",
             "description": "Length of the surface stay, days."

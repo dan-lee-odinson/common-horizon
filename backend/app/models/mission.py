@@ -143,7 +143,8 @@ class MissionInput(_InputModel):
         if isinstance(value, datetime):
             return value
         if not isinstance(value, str):
-            raise ValueError("must be an ISO 8601 string, e.g. 2027-01-15T00:00:00Z")
+            # ValueError on purpose: Pydantic turns it into a 422; a TypeError would escape as a 500.
+            raise ValueError("must be an ISO 8601 string, e.g. 2027-01-15T00:00:00Z")  # noqa: TRY004
         try:
             parsed = datetime.fromisoformat(value)
         except ValueError:

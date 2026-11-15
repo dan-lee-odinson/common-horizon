@@ -1,11 +1,13 @@
-.venv/
-**/__pycache__/
-.pytest_cache/
-.ruff_cache/
-tests/
-scripts/
-contract/
-docs/
-*.md
-.env
-.env.*
+# Only requirements.txt, app/ and data/horizon/ are copied into the image; keep local artefacts out of the
+# build context so builds are reproducible and nothing private or platform-specific leaks into a layer.
+*
+!requirements.txt
+!app/
+!data/horizon/
+**/__pycache__
+**/*.py[cod]
+**/.env
+**/.env.*
+# Local scientific data (the kernels a developer downloaded, LOLA DEMs): the image gets its kernels from
+# NAIF with pinned checksums instead (Dockerfile), never from a developer's disk.
+app/physics/data/

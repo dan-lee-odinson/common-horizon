@@ -69,11 +69,18 @@ python -m scripts.export_contract
 | Variable | Default | Meaning |
 |---|---|---|
 | `CH_PHYSICS_ENGINE` | `synthetic` | `synthetic` (labelled fixture) or `physics` (real engine: SPICE + stored terrain profiles; answers 503 while its data is missing, never falls back to synthetic). |
-| `CH_SPICE_KERNEL_DIR` | `app/physics/data/datasets/spice` | Folder holding the four NAIF kernels, lowercase names: `naif0012.tls`, `de440s.bsp`, `moon_pa_de440_200625.bpc`, `moon_de440_250416.tf`. Only read with `CH_PHYSICS_ENGINE=physics`. |
-| `CH_HORIZON_PROFILE_DIR` | `data/horizon` | Folder of the stored terrain horizon profiles. Only read with `CH_PHYSICS_ENGINE=physics`. |
+| `CH_SPICE_KERNEL_DIR` | `app/physics/data/datasets/spice` (image: `/opt/common-horizon/spice`) | Folder holding the four NAIF kernels, lowercase names: `naif0012.tls`, `de440s.bsp`, `moon_pa_de440_200625.bpc`, `moon_de440_250416.tf`. Only read with `CH_PHYSICS_ENGINE=physics`. |
+| `CH_HORIZON_PROFILE_DIR` | `data/horizon` (image: `/var/task/data/horizon`) | Folder of the stored terrain horizon profiles. Only read with `CH_PHYSICS_ENGINE=physics`. |
 | `CH_MAX_TOTAL_SAMPLES` | `20000` | Work budget of one evaluation: distinct sample timestamps over the baseline and all launch-delay cases. Larger requests get 422. |
-| `CH_CORS_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Comma-separated origins allowed to call the API from a browser. |
-| `PORT` | `8080` (Docker) | Port uvicorn listens on inside the container. |
+| `CH_CORS_ORIGINS` | `https://commonhorizon.study,https://www.commonhorizon.study,http://localhost:5173` | Comma-separated browser origins allowed to call the API. Setting it **replaces** the defaults. |
+| `CH_CORS_EXTRA_ORIGINS` | *(empty)* | Comma-separated origins **added** to the list above, e.g. the Amplify branch URL `https://main.<app-id>.amplifyapp.com`. |
+| `AWS_LWA_PORT` | `8080` (Docker) | Port uvicorn listens on and the Lambda Web Adapter forwards to. |
+
+CORS origins are normalised to the exact form browsers send (`scheme://host[:port]`, lowercase,
+no trailing slash, no default port), so `https://commonhorizon.study/` and
+`https://commonhorizon.study` are the same entry. Wildcards (`*`), paths, and plain `http` for
+anything other than `localhost` / `127.0.0.1` / `[::1]` are refused: the app fails at startup
+rather than run with a broken or open CORS policy. Credentials are not allowed cross-origin.
 
 No secrets are needed or stored. Later AWS access (Bedrock) must use the standard AWS
 credential chain (an IAM role on Lambda, a local profile in development), never values in this
@@ -108,15 +115,17 @@ The runtime needs `spiceypy` and `numpy` only. `rasterio` and the LOLA elevation
 by offline tools (`scripts/compute_horizon_profiles.py`, `app/physics/engine/terrain.py`), never by
 the service; a test checks that the adapter does not import them.
 
-**Not in the container image yet** (the Docker image still defaults to `synthetic`): the image
-copies only `app/`, so serving real physics needs
+**Packaged in the container image** (which still defaults to `CH_PHYSICS_ENGINE=synthetic`):
 
-1. `data/horizon/` in the image (six JSON files, about 280 kB) at `/var/task/data/horizon`, or
-   `CH_HORIZON_PROFILE_DIR` pointing at them;
-2. the four kernels (tens of MB; `de440s.bsp` alone is about 32 MB), for example downloaded from
-   NAIF during the build with pinned SHA-256 checksums, and `CH_SPICE_KERNEL_DIR` set to their folder.
-   Kernels and DEMs are never committed;
-3. `CH_PHYSICS_ENGINE=physics` on the Lambda function, only after the real-sky check passes.
+1. the four kernels, downloaded from NAIF during the build (`ADD --checksum`, the SHA-256 values in
+   the table below; any mismatch fails the build), read-only at `/opt/common-horizon/spice`, with
+   `CH_SPICE_KERNEL_DIR` set to that folder. Kernels and DEMs are never committed, and the
+   developer's local `app/physics/data/` is excluded from the build context;
+2. `data/horizon/` (six JSON files, about 290 kB) at `/var/task/data/horizon`, with
+   `CH_HORIZON_PROFILE_DIR` set to it;
+3. switching production to real physics is then only `CH_PHYSICS_ENGINE=physics` on the Lambda
+   function, a configuration change that needs explicit team authorisation and a measurement on
+   Lambda first (below).
 
 `/health` reports `physics_engine.available` from a file check only, so the Lambda readiness
 check stays fast; kernels and profiles load on the first evaluation. SPICE is not thread-safe:
@@ -151,18 +160,46 @@ before `CH_PHYSICS_ENGINE=physics` is enabled, and `CH_MAX_TOTAL_SAMPLES` lowere
 
 ## Docker and AWS Lambda
 
+Measured on the linux/amd64 image locally with Docker limited to **512 MB and 0.29 CPU** (Lambda's
+share of a vCPU at 512 MB), read-only root filesystem, all capabilities dropped, an arbitrary
+non-root user, `CH_PHYSICS_ENGINE=physics`. **This approximates Lambda; it is not a Lambda
+measurement.** Container start to `/health` 200: about 4.0-4.6 s. First physics evaluation (loads
+the kernels): 0.6 s for 14 days hourly; warm repeats 0.5-0.6 s; 14 days with a 30-day sweep 1.9 s;
+365.25 days hourly 14.8-15.1 s; the largest accepted request (exactly 20 000 samples) 30.5-32.8 s,
+against the 60 s timeout; 20 001 samples get 422 in 70 ms. Peak memory 88 MiB.
+
 The same image runs locally and on Lambda through the
-[AWS Lambda Web Adapter](https://github.com/awslabs/aws-lambda-web-adapter):
+[AWS Lambda Web Adapter](https://github.com/aws/aws-lambda-web-adapter):
 
 ```bash
 docker build -t common-horizon-backend backend/
 docker run --rm -p 8080:8080 common-horizon-backend
 ```
 
-- The adapter extension is copied to `/opt/extensions/lambda-adapter`.
+- The adapter extension (1.1.0) is copied to `/opt/extensions/lambda-adapter`.
 - `AWS_LWA_READINESS_CHECK_PATH=/health`; `/health` never runs the engine, so it stays fast.
 - The app writes nothing to disk, so it runs on Lambda's read-only filesystem.
 - Responses are capped (`MAX_SAMPLES`) to stay under Lambda's 6 MB synchronous payload limit.
+- **CORS belongs to FastAPI.** Leave CORS unconfigured on the Lambda Function URL (or any proxy in
+  front of it); configuring both produces duplicate `Access-Control-Allow-Origin` headers, which
+  browsers reject. Add the Amplify origin with `CH_CORS_EXTRA_ORIGINS`.
+
+### Reproducible build
+
+| Component | Pin |
+|---|---|
+| Base image | `python:3.12.16-slim-trixie@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b` (multi-arch index: amd64 + arm64) |
+| Lambda Web Adapter | `public.ecr.aws/awsguru/aws-lambda-adapter:1.1.0@sha256:17cfd08eff1dfea3f6a9a1e9c65fdac80aa4919b6085e746615530f43f57d2f1` (multi-arch index) |
+| pip (build tool) | `26.3`, replacing the base image's `pip 25.0.1`, which has known advisories |
+| Python packages | `requirements.txt` pins every runtime package, transitive ones included; installed with `--no-deps`, then `pip check` |
+| NAIF kernels | Official NAIF URLs, SHA-256 pinned in the Dockerfile (`ADD --checksum`) |
+
+The image runs as an unprivileged user (UID 10001) and has `.dockerignore` limiting the build
+context to `requirements.txt`, `app/` and `data/horizon/`. Debian's `libexpat1` is the one system
+package added: rasterio's wheel needs it, and the build fails if `numpy`, `spiceypy` or `rasterio`
+cannot be imported. To update a pin, resolve the new digest
+(`docker buildx imagetools inspect <image>:<tag>`) or package version, rebuild, and rerun the tests,
+`pip-audit` against the image's site-packages and the container smoke test.
 
 Every merge to `main` that changes `backend/`, `planner/` or the workflow itself deploys this
 image: `.github/workflows/deploy-backend.yml` first runs the backend and planner tests and, only
