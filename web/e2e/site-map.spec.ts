@@ -71,6 +71,20 @@ async function openMap(page: Page) {
   await expect(page.getByTestId('site-map')).toBeVisible();
 }
 
+/** The scene's labelled markers that show on top of the open map panel. */
+function tagsOverPanel(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const p = document.querySelector('[data-testid="site-map"]')!.getBoundingClientRect();
+    return Array.from(document.querySelectorAll<HTMLElement>('[data-testid="site-marker"]'))
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        const shown = r.width > 0 && getComputedStyle(el).visibility !== 'hidden';
+        return shown && r.left < p.right && p.left < r.right && r.top < p.bottom && p.top < r.bottom;
+      })
+      .map((el) => el.textContent ?? '');
+  });
+}
+
 /** Every combination of the rows and columns given, as "zoom/row/col.ext". */
 function grid(zoom: number, rows: number[], cols: number[], ext: string): string[] {
   return rows.flatMap((r) => cols.map((c) => `${zoom}/${r}/${c}.${ext}`));
@@ -101,6 +115,8 @@ test('site map: the stored picture at once, the live tiles over it, the layers, 
   await expect(page.getByTestId('site-map-scale')).toHaveText('20 km');
   await expect(page.getByTestId('site-map-caption')).toHaveText('LRO WAC Mosaic v2 · NASA Moon Trek · 167 m per pixel');
   await expect(page.getByTestId('site-map-status')).toHaveText('');
+  // The scene's name tags (drawn above the HUD) never show over the panel.
+  await expect.poll(() => tagsOverPanel(page)).toEqual([]);
 
   // The layers this site has: no "Slope under 10°" outside the south polar grid.
   const layers = page.getByTestId('site-map-layers').getByRole('button');
@@ -248,6 +264,7 @@ test('site map on a phone: opens over the scene, inside the window and above the
   expect(panel.x).toBeGreaterThanOrEqual(0);
   expect(panel.x + panel.width).toBeLessThanOrEqual(view.width);
   expect(panel.y + panel.height).toBeLessThanOrEqual(dock.y);
+  await expect.poll(() => tagsOverPanel(page)).toEqual([]);
   await page.getByTestId('site-map-close').click();
   await expect(page.getByTestId('site-map')).toHaveCount(0);
   await expect(page.getByTestId('site-map-toggle')).toBeFocused();

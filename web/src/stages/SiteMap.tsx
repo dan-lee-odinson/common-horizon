@@ -10,7 +10,7 @@
 // arithmetic is in util/moonTrek.ts, ported from tools/site-context/moon_trek_tiles.py. The view
 // keeps the site at its centre: three zoom steps, no panning.
 
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import type { SiteRef } from '../api/types';
 import { Icon } from '../components/Icon';
 import { Glass } from '../hud/Glass';
@@ -62,6 +62,7 @@ export function SiteMap({ site, phone }: { site: SiteRef | null; phone: boolean 
   const panelId = useId();
   const toggleRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   // Focus follows a press: into the panel when it opens, back to the button when it closes.
   const moveFocus = useRef(false);
   useEffect(() => {
@@ -69,6 +70,7 @@ export function SiteMap({ site, phone }: { site: SiteRef | null; phone: boolean 
     moveFocus.current = false;
     (open ? closeRef.current : toggleRef.current)?.focus();
   }, [open]);
+  useSceneTagsClear(panelRef, open);
 
   if (!site || !frame.measured || (phone && sheetOpen)) return null;
 
@@ -99,6 +101,7 @@ export function SiteMap({ site, phone }: { site: SiteRef | null; phone: boolean 
       {open ? (
         <Glass
           as="section"
+          ref={panelRef}
           id={panelId}
           className="absolute flex flex-col gap-2 overflow-y-auto overscroll-contain p-3"
           style={phone ? { top: panelTop, left: GAP, right: GAP, maxHeight: room } : { top: panelTop, right, width, maxHeight: room }}
@@ -133,6 +136,40 @@ export function SiteMap({ site, phone }: { site: SiteRef | null; phone: boolean 
       )}
     </div>
   );
+}
+
+/** The scene's labelled markers (scene/SiteMarkers.tsx). They are drawn above the HUD, so they would show through the panel. */
+const SCENE_TAGS = '[data-testid="site-marker"]';
+
+/**
+ * While the panel is open, a scene tag that it covers is hidden, and shown again once it is clear:
+ * the stage's rule that a tag never touches a glass panel. Checked once per frame, as the scene
+ * moves its tags once per frame. `visibility` only, so the scene's own showing and hiding (by
+ * `display`) is left alone.
+ */
+function useSceneTagsClear(panelRef: RefObject<HTMLElement | null>, open: boolean): void {
+  useEffect(() => {
+    if (!open) return;
+    const hidden = new Set<HTMLElement>();
+    let raf = 0;
+    const tick = () => {
+      const p = panelRef.current?.getBoundingClientRect();
+      for (const el of document.querySelectorAll<HTMLElement>(SCENE_TAGS)) {
+        const r = el.getBoundingClientRect();
+        const under = p !== undefined && r.width > 0 && r.left < p.right && p.left < r.right && r.top < p.bottom && p.top < r.bottom;
+        if (under === hidden.has(el)) continue;
+        el.style.visibility = under ? 'hidden' : '';
+        if (under) hidden.add(el);
+        else hidden.delete(el);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => {
+      cancelAnimationFrame(raf);
+      for (const el of hidden) el.style.visibility = '';
+    };
+  }, [panelRef, open]);
 }
 
 /** The controls, the map and what it says. A new site starts afresh at the stored picture's view. */
