@@ -2,8 +2,8 @@
 //
 // Four glass panels float on two wings, tilted toward the viewer: the Sun, the mission clock and
 // the launch on the right, Earth's panel at the lower left, under the corner of sky that Earth's
-// limb fills. The middle of the screen is kept for the scene: the Sun on its ring, Earth's limb and
-// their tags never pass behind a panel. Every readout is a Quantity from the data layer, rewritten once per
+// limb fills. The middle of the screen is kept for the scene: the Sun's tick on its ring, Earth's
+// limb, their tags, the lines of sunlight and the glow at the frame's edge never pass behind a panel. Every readout is a Quantity from the data layer, rewritten once per
 // frame as the previewed time runs: the calculations are seen running.
 
 import { useId, useMemo, useRef, useState } from 'react';
@@ -20,10 +20,17 @@ import { EARTH_LINK_TONE, EARTH_LINK_WORD, fixed, missionDates, skyQuantities, s
 import { SOUTH_POLE_SEASON_NOTE } from '../util/season';
 import { HOUR_MS, LTC_MICROSECONDS_PER_DAY, SYNODIC_MONTH_DAYS } from '../util/time';
 import { AnchorTag } from './AnchorTag';
+import { earthSurface } from '../scene/orbitEarth';
 import { orbitEarthSide } from '../scene/orbitView';
 import { PREVIEW_HOURS_PER_SECOND } from './Playback';
+import { SunlightField } from './SunlightField';
 import { useEntrance } from './useEntrance';
-
+/** The line under the controls: what the picture shows, and what it does not. (Phones get the same facts in fewer words.) */
+export const ORBIT_CAPTION = 'Earth and Moon sizes to scale; Earth is drawn much nearer than it is. The lines of light run along the Sun’s true direction; the Sun itself is outside this picture.';
+export const ORBIT_CAPTION_PHONE = 'Earth and Moon sizes to scale; Earth is drawn much nearer than it is. Lines of light: the Sun’s true direction.';
+export const EARTH_MAP_NOTE = 'Earth’s surface is NASA’s Blue Marble map (Reto Stöckli, NASA Earth Observatory); it turns once a day, and which face points at the Moon is not computed.';
+export const EARTH_MAP_NOTE_PHONE = 'Earth: NASA Blue Marble map (R. Stöckli, NASA); it turns once a day; which face points at the Moon is not computed.';
+export const EARTH_DRAWN_NOTE = 'Earth’s surface pattern is an illustration, not a map; it turns once a day, and which face points at the Moon is not computed.';
 
 export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?: boolean }) {
   const { track, orbitHorizon, reference, landingMs, orbitEndMs, windowEndMs, landingGeometry, rows } = useData();
@@ -32,6 +39,7 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
   const playing = useStore(appStore, (s) => s.previewPlaying);
   const zoomedOut = useStore(appStore, (s) => s.orbitZoom > 0.5);
   const moonSurface = useStore(appStore, (s) => s.moonSurface);
+  const earthMap = useStore(earthSurface, (s) => s.surface);
   const isPhone = useIsPhone();
   // Earth stands on one side of the Moon (see scene/orbitView.ts); the panels arrange around it.
   const earthSide = orbitEarthSide(landingGeometry);
@@ -79,8 +87,10 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
 
   return (
     <div ref={rootRef} className="absolute inset-0" data-testid="orbit-hud" style={{ visibility: revealed ? 'visible' : 'hidden' }}>
+      {/* The Sun's light: under everything else in the HUD, and cut clear of the panels and the controls. */}
+      {webgl ? <SunlightField root={rootRef} active={revealed} isPhone={isPhone} /> : null}
       <Leaders items={leaders} active={revealed && !isPhone} />
-      <AnchorTag anchor="sun" label="Sun" tone="sun" q={sky.subsolarLon} />
+      <AnchorTag anchor="sun" label="Sun overhead" tone="sun" q={sky.subsolarLon} />
       <AnchorTag anchor="earthLimb" label="Earth" tone="earth" toward="moon" gap={12} q={sky.subearthLon} />
       <AnchorTag anchor="lon0" label="0°" tone="muted" plain />
       <AnchorTag anchor="lon90" label="90° E" tone="muted" plain />
@@ -231,7 +241,7 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
       <div className="hud-layer" data-depth="0.5">
         {/* The row spans the screen only to centre its content: presses beside it go to what is behind. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center px-4 max-md:bottom-4">
-        <div className="pointer-events-auto flex w-fit max-w-full flex-col items-center gap-2.5" data-enter="lead">
+        <div className="pointer-events-auto flex w-fit max-w-full flex-col items-center gap-2.5" data-enter="lead" data-keep-clear>
           {waiting ? (
             <p className="m-0 text-[13px] text-ink-2" role="status">
               Working out where the Sun and Earth are…
@@ -304,11 +314,19 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
               <Icon name="right" size={16} />
             </button>
           </div>
-          <p className="m-0 max-w-[36rem] text-balance text-center text-[13px] leading-snug text-ink-2" data-testid="not-to-scale">
-            {webgl ? 'Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only.' : 'This flat picture stands in where 3D is not available: Earth is not drawn, and the Sun’s mark shows a direction only.'}{' '}
+          <p className="m-0 max-w-[40rem] text-balance text-center text-[13px] leading-snug text-ink-2 max-md:text-[12px] max-md:leading-[1.3]" data-testid="not-to-scale">
+            {!webgl ? 'This flat picture stands in where 3D is not available: Earth is not drawn, and the Sun’s mark shows a direction only.' : isPhone ? ORBIT_CAPTION_PHONE : ORBIT_CAPTION}{' '}
             <span data-testid="moon-surface-note" data-surface={moonSurface}>
               {moonSurface === 'map' ? 'The Moon’s surface is NASA’s CGI Moon Kit color map, made for visual use.' : 'The Moon’s surface pattern is an illustration, not a map.'}
             </span>
+            {webgl ? (
+              <>
+                {' '}
+                <span data-testid="earth-surface-note" data-surface={earthMap}>
+                  {earthMap !== 'map' ? EARTH_DRAWN_NOTE : isPhone ? EARTH_MAP_NOTE_PHONE : EARTH_MAP_NOTE}
+                </span>
+              </>
+            ) : null}
           </p>
         </div>
         </div>

@@ -12,15 +12,17 @@ the website runs on **example answers** (mock mode) so it can be shown and teste
 The interface is one continuous 3D space in three stages. These pictures are taken from the running
 app on example data (`npm run screens`), at 1440 x 900.
 
-**Stage 1, Orbit.** The Moon with the Sun riding its ring and the readouts running; Earth's limb,
-to scale beside the Moon, fills the top-left corner.
+**Stage 1, Orbit.** The Moon with its ring system and the readouts running; Earth's limb, to
+scale beside the Moon, fills the top-left corner. Sunlight crosses the picture as faint lines along
+the Sun's true direction, and both bodies are lit from that one side: here the part of Earth on
+screen is its night side.
 
-![Stage 1, Orbit: the Moon inside a tilted ring system, Earth's limb in the top-left corner, with glass panels of Sun and Earth readouts](docs/screens/stage-1-orbit-1440x900.png)
+![Stage 1, Orbit: the Moon inside a tilted ring system, half lit from the left, with faint lines of sunlight; the dark limb of Earth in the top-left corner; glass panels of Sun and Earth readouts](docs/screens/stage-1-orbit-1440x900.png)
 
 Zoomed all the way out with **Show whole Earth**: Earth and the Moon at their true sizes beside
-each other (their distance apart is not to scale).
+each other (their distance apart is not to scale), each lit from the Sun's side.
 
-![Orbit zoomed out: the whole Earth, much larger than the Moon and its rings](docs/screens/stage-1-orbit-whole-earth-1440x900.png)
+![Orbit zoomed out: the whole Earth, showing NASA's Blue Marble map with its day side toward the Sun, much larger than the Moon and its rings](docs/screens/stage-1-orbit-whole-earth-1440x900.png)
 
 The landing card that opens over it on first load:
 
@@ -207,9 +209,10 @@ the same visit (one browser tab); **About** opens it again. While it is open, Ta
 equatorial plane and is seen at an angle. From the inside out:
 
 * a **longitude scale** with a tick every 5 degrees (0, 90 E, 180 and 270 E are numbered);
-* the **Sun ring**: the Sun rides it at the longitude where the Sun is overhead on the Moon (that
-  point really does circle the Moon once each lunar day). The brighter arc is what the Sun has swept
-  since the landing, with an afterglow behind the Sun's line;
+* the **Sun ring**: a tick rides it at the longitude where the Sun is overhead on the Moon (that
+  point really does circle the Moon once each lunar day), with a tag giving that longitude. The
+  brighter arc is what the Sun has swept since the landing, with an afterglow behind the Sun's
+  line. The Sun itself is not drawn on the ring: it is a direction, not a body beside the Moon;
 * a **ring of days**: one segment for each day of the lunar day (29.53 days), lit for each day since
   the landing;
 * **Earth's bracket**: not a ring, because Earth does not circle the Moon's sky. A short arc with
@@ -219,24 +222,50 @@ equatorial plane and is seen at an angle. From the inside out:
 **Earth** itself is drawn at its **true size beside the Moon** (3.667 times the Moon's radius),
 behind the Moon and out along its true direction, joined to its bracket by a line. In the usual
 view only part of it shows: a large limb, with a thin glow of atmosphere, filling the top-left
-corner of the screen behind the navigation; its lit side faces the Sun, as the Moon's does.
-**Show whole Earth** (or the mouse wheel) zooms out until the whole disc is in view, and **Back to
-the Moon** returns. Earth can never come between the camera and the Moon or cover a site marker.
-The Sun on its ring is a **direction marker** with a soft glow, not a body to scale. A line on
-screen says it: *Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction
-marker only.* (Really Earth is about 221 Moon radii away.) The navigation bar keeps a dark backing
-so its words stay readable over Earth's sunlit limb.
+corner of the screen behind the navigation. **Show whole Earth** (or the mouse wheel) zooms out
+until the whole disc is in view, and **Back to the Moon** returns. Earth can never come between the
+camera and the Moon or cover a site marker. (Really Earth is about 221 Moon radii away.) The
+navigation bar keeps a dark backing so its words stay readable over Earth's sunlit limb.
+
+*Earth's surface and light.* Earth shows **NASA's Blue Marble map** (the November picture, without
+clouds; 4096 x 2048 on desktop, 2048 x 1024 on phones; a drawn surface stands in until it has
+loaded, and the caption says which is showing). It **turns once for each day of previewed time**.
+Which face of Earth points at the Moon at a given instant is **not computed**, and Earth's axis is
+drawn upright; only the rate of turning is real. Earth is lit by the **same direction that lights
+the Moon** (one vector in the code feeds both, `src/scene/MoonWorld.tsx`), so its day side always
+faces the Sun. Its night side is dim but still reads as Earth: faint land, a trace of blue air and
+a thin line at the limb (`src/scene/orbitEarth.ts` holds the numbers; a browser test reads the
+real picture and checks that the night side is dark and the day side is the Sun's side).
+
+*The Sun's light.* The Sun is far outside this picture, so it is shown by its light:
+
+* **lines of light**: faint amber lines cross the scene along the Sun's direction. They are parallel
+  in space and drawn in perspective like everything else, so they all head for the one point where
+  the Sun's direction meets the picture; with the Sun off to one side they run almost parallel on
+  screen. A line that reaches the Moon stops at its lit edge and is not drawn beyond it: the empty
+  strip behind the Moon is its shadow. A line is never drawn across Earth's face, but Earth casts
+  no shadow on the lines: it is drawn far nearer than it is, and its real shadow reaches the Moon
+  only during an eclipse. Zoomed out, every second and then every fourth line is left out so they
+  never crowd;
+* **a soft glow at the frame's edge**, where the Sun's direction leaves the picture, shown only
+  while the Sun itself is outside the frame.
+
+Both keep clear of the glass panels and the controls, which are measured from the page
+(`src/scene/sunlight.ts` is the arithmetic, `src/stages/SunlightField.tsx` draws it). A line on
+screen says what is drawn: *Earth and Moon sizes to scale; Earth is drawn much nearer than it is.
+The lines of light run along the Sun's true direction; the Sun itself is outside this picture.*
 
 The camera looks from the side of the Moon away from Earth, so Earth stands behind the Moon, always
 at the left, where its limb holds the top-left corner; the camera keeps to the longitude Earth is
 over, so the limb stays put while time runs. The camera sways a few degrees and
-leans a little with the pointer. The panels are laid out so the Sun on its ring, Earth and their
-tags never pass behind a glass panel (`src/scene/orbitView.test.ts` checks the arithmetic, and a
-browser test checks the real screen through a whole lunar day).
+leans a little with the pointer. The panels are laid out so the Sun's tick on its ring, Earth, their
+tags, the lines of light and the edge glow never pass behind a glass panel
+(`src/scene/orbitView.test.ts` and `src/scene/sunlight.test.ts` check the arithmetic, and a browser
+test checks the real screen through a whole lunar day).
 
 The Sun lights the Moon from its own side, and the day-night line and both overhead points are
-marked on the surface. The Sun and Earth each carry a small tag with their longitude. A tag hides
-while its body is behind the Moon.
+marked on the surface. The Sun's tick and Earth each carry a small tag with their longitude. A tag
+hides while its point is behind the Moon.
 
 Time previews forward on its own, 6 hours each second, from the landing through one lunar day, then
 starts again. **Pause preview** stops it and the **Preview** scrubber moves it by hand. The preview
@@ -414,6 +443,7 @@ web/
     SitePanels.tsx         its reading panels: Sun, mission clock, Earth, hardware
     SiteVeil.tsx           the veil over the picture while the camera changes worlds
     LanderReticle.tsx      the reticle that rides the landing point from the Moon down to the lander
+    SunlightField.tsx      Orbit: draws the lines of sunlight and the glow at the frame's edge
     Playback.tsx           the clocks: the Orbit preview, and Play through the stay
   src/hud/                 reusable HUD pieces: glass panel, readout, ring dial, reticle, line graph,
                            drawer, sheet, leader lines, parallax; HorizonPanel.tsx (the horizon plot),
@@ -421,6 +451,8 @@ web/
                            (play, pause, speed)
   src/scene/               the 3D space: Moon world, ring system, camera director, 2D fallback;
                            orbitView.ts and missionView.ts (where things sit on screen, as arithmetic)
+    orbitEarth.ts          Earth in Orbit: NASA's map, how it turns, how it is lit (and its shader)
+    sunlight.ts            the Sun's light in Orbit as arithmetic: the lines of light and the edge glow
     SiteWorld.tsx          the site's world: lights, anchors, and the parts below
     SiteSky.tsx            the sky dome: stars, Earth, the Sun and its path, the terrain skyline
     SiteGround.tsx         the level ground with its range rings (siteShaders.ts)
@@ -439,6 +471,8 @@ web/
   src/styles/              theme.css (every colour), fonts.css, index.css
   src/assets/fonts/        the three font families and their licences
   e2e/path.spec.ts         the browser tests: landing card, Orbit, mission select
+  e2e/orbit.spec.ts        the browser tests: the Orbit picture itself (Earth's day and night sides
+                           read from the screen, Earth's map, the Sun's tick)
   e2e/site.spec.ts         the browser tests: the site stage
   e2e/hud.spec.ts          the browser tests: glass panels keep a dark backing; a press after a rest
   e2e/moon.spec.ts         the browser tests: the right Moon maps for the device, from the app itself
@@ -446,6 +480,7 @@ web/
   e2e/screens.capture.ts   takes the pictures in docs/screens/
   docs/screens/            pictures of the app
   public/textures/moon/    the Moon's surface maps, made from NASA's CGI Moon Kit (see its README)
+  public/textures/earth/   Earth's surface map, made from NASA's Blue Marble (see its README)
 ```
 
 `public/models/` belongs to another part of the team; this folder does not touch it.

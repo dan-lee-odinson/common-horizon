@@ -17,7 +17,7 @@ import { SiteWorld } from './SiteWorld';
 import { Stars } from './Stars';
 
 const STAGE_LABEL = {
-  orbit: 'The Moon with the Sun and Earth on their rings, in the directions the data gives. Sizes and distances are not to scale.',
+  orbit: 'The Moon inside its ring system, with Earth beside it at true size (drawn much nearer than it is). Both are lit from the Sun’s direction, which faint lines of light show; the Sun itself is outside the picture.',
   mission: 'The Moon with landing site markers. The selected site carries a reticle.',
   site: 'The selected site: the terrain skyline from the data, the Sun and Earth at their true apparent size, the Sun’s path over the stay as a thin line across the sky, and the mission’s hardware at true scale on level ground. The ground is an illustration.',
 } as const;

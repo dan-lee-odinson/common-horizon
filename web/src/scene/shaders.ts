@@ -196,9 +196,10 @@ void main() {
  * The ring system in the Moon's equatorial plane. Plane coordinates are Moon radii; the angle is
  * east longitude (0 at +x, 90 E at +y), matching the Moon above it. From the inside out:
  *   scale ring      a longitude scale with a tick every 5 degrees
- *   Sun ring        the Sun rides it at the longitude where the Sun is overhead (that point really
+ *   Sun ring        a tick rides it at the longitude where the Sun is overhead (that point really
  *                   does circle the Moon once a lunar day); the brighter arc is what it has swept
- *                   since the landing, with an afterglow behind the Sun's line
+ *                   since the landing, with an afterglow behind the Sun's line. The Sun itself is
+ *                   not drawn here: it is a direction, not a body beside the Moon
  *   ring of days    one segment per day of the lunar day, lit for each day since the landing
  *   Earth bracket   NOT a ring: Earth does not circle the Moon's sky. A short arc with end caps
  *                   spanning the range Earth's overhead longitude moves through over the stay, and
@@ -217,6 +218,7 @@ uniform float uEarthArcMax;
 uniform float uDays;        // days since the landing
 uniform float uMonth;       // length of the lunar day, in days
 uniform vec4 uRadii;        // scale ring, Sun ring, ring of days, Earth bracket
+uniform vec2 uSunTick;      // how far the Sun's tick reaches inside and outside its ring
 uniform vec3 uCyan;
 uniform vec3 uSun;
 uniform vec3 uEarth;
@@ -262,6 +264,8 @@ void main() {
   col += uSun * (sunLine * mix(0.3, 1.0, done * uData) + exp(-abs(r - rsun) * 24.0) * 0.09);
   float dSun = abs(wrap180(lon - uSunLon)) * arc;
   col += uSun * line(dSun, fwT, 0.8) * band(r, 1.05, rsun, fwR) * 0.85 * uData;
+  // the Sun's tick: a short bold mark across the ring at the longitude where the Sun is overhead
+  col += uSun * line(dSun, fwT, 1.7) * band(r, rsun - uSunTick.x, rsun + uSunTick.y, fwR) * 1.25 * uData;
   // afterglow behind the Sun's line (east of it: the Sun moves west), no longer than what was swept
   float behind = mod(lon - uSunLon, 360.0);
   float glow = exp(-behind / 13.0) * step(behind, min(swept + 0.001, 70.0)) * band(r, rs, rsun, fwR);
