@@ -20,6 +20,7 @@ test('landing card: says what the app is, traps focus, and Begin, Escape and Abo
   const card = page.getByTestId('landing-card');
   await expect(card).toBeVisible();
   await expect(card.getByRole('heading', { name: 'Common Horizon' })).toBeVisible();
+  await expect(card.getByTestId('tagline')).toHaveText('A Sunrise on Humanity’s Next Frontier');
   await expect(card).toContainText('Where to land on the Moon, and when.');
   await expect(card).toContainText('Common Horizon ranks lunar landing sites for a mission you define.');
   await expect(card).toContainText('Set your mission: lander, hardware, launch date and length of stay.');
