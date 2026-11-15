@@ -60,9 +60,11 @@ describe.each(Object.entries(MODEL_FOR))('%s model', (_catalogId, modelId) => {
         triangles += (prim.indices !== undefined ? gltf.accessors![prim.indices].count : position.count) / 3;
       }
     }
-    expect(hi[0] - lo[0]).toBeCloseTo(meta.dimensions.width, 5);
+    // Width and depth to the millimetre the descriptions give them in (the imported and generated
+    // shapes are measured, then rounded); the height, the published figure, exactly.
+    expect(hi[0] - lo[0]).toBeCloseTo(meta.dimensions.width, 3);
     expect(hi[1] - lo[1]).toBeCloseTo(meta.dimensions.height, 5);
-    expect(hi[2] - lo[2]).toBeCloseTo(meta.dimensions.depth, 5);
+    expect(hi[2] - lo[2]).toBeCloseTo(meta.dimensions.depth, 3);
     // The lowest point is on the ground, and the footprint is centred on the origin.
     expect(lo[1]).toBeCloseTo(0, 5);
     expect(lo[0] + hi[0]).toBeCloseTo(0, 5);

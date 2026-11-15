@@ -11,30 +11,36 @@ function file(modelId: string): unknown {
 }
 
 describe('catalog items and their models', () => {
-  it('maps the five planner items that have a model, by the planner ids, and nothing else', () => {
+  it('maps the nine planner items that have a model, by the planner ids, and nothing else', () => {
     expect(MODEL_FOR).toEqual({
       starship_hls: 'starship-lander',
       griffin: 'griffin-lander',
+      blue_moon_mk1: 'blue-moon-mk1',
       surface_habitat: 'habitat-unit',
       fsp_40kwe: 'fission-power-unit',
       vsat: 'solar-array-mast',
+      astrolab_clv1: 'crew-rover',
+      jaxa_pressurized_rover: 'pressurized-rover',
+      science_rover_recharge: 'viper-rover',
     });
     // The power rows of a landed object have no model of their own (its payload row has it), and
     // neither has an id the catalog may add later, nor the old example ids.
     expect(modelFor('fission_40kwe')).toBeNull();
     expect(modelFor('hab_crewed')).toBeNull();
-    expect(modelFor('astrolab_clv1')).toBeNull();
+    expect(modelFor('vsat_xl')).toBeNull();
     expect(modelFor('starship')).toBeNull();
     expect(modelFor('toString')).toBeNull();
     expect(modelFor('starship_hls')).toBe('starship-lander');
   });
 
-  it('the Starship HLS lander takes the landing point before the Griffin lander', () => {
+  it('the Starship HLS lander takes the landing point before the Griffin lander, and Griffin before Blue Moon Mark 1', () => {
     expect(primaryLanderId(['surface_habitat', 'astrolab_clv1', 'vsat', 'starship_hls'])).toBe('starship_hls');
     expect(primaryLanderId(['griffin', 'starship_hls'])).toBe('starship_hls');
     expect(primaryLanderId(['griffin', 'vsat'])).toBe('griffin');
-    // A lander with no model (Blue Moon) stands as a marker, not at the landing point.
-    expect(primaryLanderId(['blue_moon_mk1', 'vsat'])).toBeNull();
+    expect(primaryLanderId(['blue_moon_mk1', 'griffin'])).toBe('griffin');
+    expect(primaryLanderId(['blue_moon_mk1', 'vsat'])).toBe('blue_moon_mk1');
+    // A rover is not a lander.
+    expect(primaryLanderId(['science_rover_recharge', 'astrolab_clv1'])).toBeNull();
     expect(primaryLanderId(['surface_habitat', 'vsat'])).toBeNull();
     expect(primaryLanderId([])).toBeNull();
   });

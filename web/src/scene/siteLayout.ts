@@ -10,7 +10,7 @@
 // is the point (d sin b, -d cos b).
 
 import type { HardwareChoice } from '../api/types';
-import { isLanderModel, modelFor, primaryLanderId } from '../state/models';
+import { isLanderModel, LANDER_MODELS, modelFor, primaryLanderId } from '../state/models';
 import { DEG } from '../util/geo';
 
 /** What the layout needs of a model's description (see state/models.ts). */
@@ -86,6 +86,8 @@ const LANDER_SLOTS = {
   // A second kind of lander stands off to the south-west; more of the kind on the landing point, further south.
   lander2: { bearingDeg: 240, distance: 60, quarterTurns: 0, pitch: 0 },
   landerMore: { bearingDeg: 200, distance: 110, quarterTurns: 0, pitch: 0 },
+  // A third kind of lander stands off to the south-east.
+  lander3: { bearingDeg: 150, distance: 95, quarterTurns: 0, pitch: 0 },
 } as const satisfies Record<string, Slot>;
 
 /** Places by model (see state/models.ts for which catalog item has which model). */
@@ -96,6 +98,11 @@ const SLOTS: Readonly<Record<string, Slot | undefined>> = {
   'fission-power-unit': { bearingDeg: 300, distance: 120, quarterTurns: 0, pitch: 0 },
   // Solar masts stand in a row north of the lander, nine metres apart.
   'solar-array-mast': { bearingDeg: 0, distance: 45, quarterTurns: 0, pitch: 9 },
+  // The rovers park round the lander: the crew rovers in a row to the south-south-west, the
+  // pressurized rover to the east-south-east beyond the habitat, the science rover to the west.
+  'crew-rover': { bearingDeg: 200, distance: 35, quarterTurns: 0, pitch: 0 },
+  'pressurized-rover': { bearingDeg: 120, distance: 60, quarterTurns: 0, pitch: 0 },
+  'viper-rover': { bearingDeg: 270, distance: 28, quarterTurns: 0, pitch: 0 },
 };
 
 /** Markers for items with no model stand in a row this far south-east of the landing point, this far apart (metres). */
@@ -149,6 +156,12 @@ export function siteLayout(choices: readonly HardwareChoice[], models: Readonly<
   };
   const counted = choices.filter((c) => Number.isFinite(c.count) && c.count >= 1).map((c) => ({ id: c.id, count: Math.floor(c.count) }));
   const primary = primaryLanderId(counted.filter((c) => known(c.id) !== null).map((c) => c.id));
+  // The other kinds of lander, in the order of LANDER_MODELS: the first stands to the south-west, the next to the south-east.
+  const rank = (id: string) => LANDER_MODELS.indexOf(modelFor(id) ?? '');
+  const secondary = counted
+    .map((c) => c.id)
+    .filter((id) => id !== primary && isLanderModel(id) && known(id) !== null)
+    .sort((a, b) => rank(a) - rank(b));
 
   for (const { id, count } of [...counted].sort((a, b) => a.id.localeCompare(b.id))) {
     const modelId = modelFor(id);
@@ -166,7 +179,7 @@ export function siteLayout(choices: readonly HardwareChoice[], models: Readonly<
       if (rest <= 0) continue;
     }
     const lander = isLanderModel(id);
-    const slot = lander ? (id === primary ? LANDER_SLOTS.landerMore : LANDER_SLOTS.lander2) : SLOTS[modelId];
+    const slot = lander ? (id === primary ? LANDER_SLOTS.landerMore : secondary.indexOf(id) === 0 ? LANDER_SLOTS.lander2 : LANDER_SLOTS.lander3) : SLOTS[modelId];
     if (!slot) {
       // A model with no place in this layout is not drawn (and is listed with the others that are not).
       noModel.push(id);
