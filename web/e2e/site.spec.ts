@@ -1054,3 +1054,18 @@ test('site ground: when only the far file cannot be loaded, the near ground stay
   await expect(page.getByTestId('site-ground-source')).toContainText('true scale to 640 m, then level (an illustration)');
   await expect(page.getByTestId('site-ground-smooth-horizon')).toHaveCount(0);
 });
+
+for (const name of ['Apollo 17', 'Shackleton Connecting Ridge']) {
+  test(`site: on arrival at ${name} the skyline is in the clear part of the picture, with sky above it`, async ({ page }) => {
+    await enterMission(page);
+    test.skip(isPhone(page), 'the phone layout has its own test');
+    await spotlight(page, name);
+    await zoomIn(page);
+    const world = page.getByTestId('world');
+    // The real ground, near and far, is in: the view has settled to it.
+    await expect(world).toHaveAttribute('data-site-ground', 'terrain');
+    // The data's skyline line and the drawn terrain's top, toward the way the camera faces, both
+    // project inside the clear part of the window, at least 24 px below its top.
+    await expect(world).toHaveAttribute('data-site-skyline', 'in-view');
+  });
+}

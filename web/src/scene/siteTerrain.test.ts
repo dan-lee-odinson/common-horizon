@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { azElToLocal } from '../util/geo';
-import { buildGroundMesh, everyOtherPost, FAR_RADIUS_M, gridHalf, gridHeight, groundHeight, meshLines, NEAR_BLEND_M, parseGrid, type TerrainGrid } from './siteTerrain';
+import { buildGroundMesh, everyOtherPost, FAR_RADIUS_M, gridHalf, gridHeight, groundHeight, meshLines, NEAR_BLEND_M, parseGrid, terrainSkylineDeg, type TerrainGrid } from './siteTerrain';
 
 /**
  * A made-up grid that rises 1 m for every 10 m to the north and 2 m for every 10 m to the east,
@@ -146,5 +146,24 @@ describe('the edge of the drawn ground', () => {
     expect(lines[lines.length - 1]).toBeLessThanOrEqual(FAR_RADIUS_M);
     // The site itself keeps its own height.
     expect(groundHeight(shape, 0, 0)).toBe(0);
+  });
+});
+
+describe('the skyline of the drawn ground', () => {
+  it('is the highest angle up to the ground along a direction', () => {
+    // A wall 100 m high from 1 km north of the site onward, on level ground.
+    const posts = 129;
+    const near = slopeGrid(posts, 10, 0, 0);
+    const far = slopeGrid(257, 250, 0, 0);
+    const half = gridHalf(far);
+    for (let row = 0; row < 257; row++) for (let col = 0; col < 257; col++) if (half - row * 250 >= 1000) far.heights[row * 257 + col] = 100;
+    const shape = { near, far };
+    const eye = { x: 0, y: 10, z: 0 };
+    const north = terrainSkylineDeg(shape, eye, 0);
+    // The wall's top edge, at about 1 km (the far grid blends up to it over one 250 m cell).
+    expect(north).toBeGreaterThan((Math.atan2(90, 1000) * 180) / Math.PI - 0.5);
+    expect(north).toBeLessThan((Math.atan2(90, 750) * 180) / Math.PI + 0.1);
+    // South there is only level ground below the eye.
+    expect(terrainSkylineDeg(shape, eye, 180)).toBeLessThan(0);
   });
 });

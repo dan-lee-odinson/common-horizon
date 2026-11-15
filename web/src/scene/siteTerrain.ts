@@ -204,3 +204,26 @@ export function buildGroundMesh(shape: SiteGroundShape): GroundMesh {
   }
   return { positions, normals, flat, index: Uint32Array.from(index) };
 }
+
+/**
+ * How high the drawn ground reaches seen from `eye` (metres, x east, y up, z south) toward compass
+ * direction `azDeg`, degrees above level: the highest angle up to any point of the ground along
+ * that direction, out to the edge of the drawn ground. Negative where everything in that direction
+ * lies below the eye's level.
+ */
+export function terrainSkylineDeg(shape: SiteGroundShape, eye: { x: number; y: number; z: number }, azDeg: number): number {
+  const a = (azDeg * Math.PI) / 180;
+  const east = Math.sin(a);
+  const south = -Math.cos(a);
+  const reach = groundReach(shape);
+  let best = -Infinity;
+  // Steps 1 % longer each time: 2 m apart near the eye, a few hundred metres apart far away.
+  for (let d = 2; d <= reach * 1.42; d *= 1.01) {
+    const x = eye.x + east * d;
+    const z = eye.z + south * d;
+    if (Math.max(Math.abs(x), Math.abs(z)) > reach || (shape.far && Math.hypot(x, z) > FAR_RADIUS_M)) break;
+    const angle = Math.atan2(groundHeight(shape, x, z) - eye.y, d);
+    if (angle > best) best = angle;
+  }
+  return Number.isFinite(best) ? (best * 180) / Math.PI : -90;
+}
