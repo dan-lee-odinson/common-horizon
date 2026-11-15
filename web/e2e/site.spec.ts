@@ -167,7 +167,9 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
     if (url.origin !== 'http://localhost:4173') foreign.push(r.url());
   });
   await enterMission(page);
-  const name = (await page.getByTestId('spotlight-name').textContent())!;
+  // A site with the Sun up, low in the east, at the landing (the best site's Sun has not yet risen).
+  await spotlight(page, 'Apollo 14');
+  const name = 'Apollo 14';
   // One 3D space throughout: the same single canvas before the dive and at the site.
   await expect(page.locator('canvas')).toHaveCount(1);
   await zoomIn(page);

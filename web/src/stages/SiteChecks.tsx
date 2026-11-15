@@ -8,7 +8,7 @@
 // both directions and the angle between them. It is asked only when pressed, never per frame. Any
 // failure falls back to the stored figure and says so.
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { api, isMockMode } from '../api/client';
 import { isAbortError } from '../api/errors';
 import type { HorizonResponse, HorizonsCheckFile, HorizonsCompareResponse, SiteEvaluation, SiteRef } from '../api/types';
@@ -50,22 +50,25 @@ export function SiteChecks({
   const stored = site && check?.sites && Object.hasOwn(check.sites, site.id) ? check.sites[site.id] : null;
   const warnings = [...new Set(horizon?.warnings ?? [])];
   const [compare, setCompare] = useState<Compare>({ state: 'idle' });
-  const [controller, setController] = useState<AbortController | null>(null);
+  // The question on its way, if any: a new site or a new press drops it.
+  const pending = useRef<AbortController | null>(null);
   const resultId = useId();
 
   // A new site starts afresh, and a question still on its way is dropped.
   const siteKey = site ? `${site.id}:${site.lat}:${site.lon_east}` : '';
   useEffect(() => {
     setCompare({ state: 'idle' });
-    return () => controller?.abort();
-    // Only the site resets it.
+    return () => {
+      pending.current?.abort();
+      pending.current = null;
+    };
   }, [siteKey]);
 
   function compareNow() {
     if (!site) return;
-    controller?.abort();
+    pending.current?.abort();
     const c = new AbortController();
-    setController(c);
+    pending.current = c;
     setCompare({ state: 'waiting' });
     // The instant on the site clock, read once, when pressed.
     const tMs = simClock.get().nowMs ?? landingMs;

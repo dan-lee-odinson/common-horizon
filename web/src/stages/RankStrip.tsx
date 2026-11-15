@@ -179,7 +179,7 @@ export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
               <span className="text-right font-display text-[12px] font-semibold uppercase tracking-[0.1em]" data-tone={q.verdict.tone} data-testid="verdict" data-result={q.result ?? ''} title={q.verdict.text}>
                 {q.verdictWord}
                 {/* The requirement behind a fail or an unknown, for screen readers (the title carries it on hover). */}
-                {q.result === 'pass' ? null : <span className="sr-only">: {q.verdict.text}</span>}
+                {q.result !== 'pass' && e.verdict.requirement ? <span className="sr-only">: {e.verdict.requirement}</span> : null}
               </span>
             </div>
           );

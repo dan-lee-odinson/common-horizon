@@ -340,7 +340,7 @@ test('mission select: one site in the spotlight, a short strip, and the delay re
   await expect(page.getByTestId('site-drawer')).toHaveAttribute('data-open', 'false');
   await expect(page.getByTestId('preset').first()).toBeHidden();
   await expect(rows.first().getByTestId('row-name')).toHaveText(best);
-  await expect(rows.first().getByTestId('verdict')).toHaveText(/pass|fail/);
+  await expect(rows.first().getByTestId('verdict')).toHaveText(/pass|fail|unknown/);
 
   // Rows slide only when the ranking reorders.
   await watchRows(page);

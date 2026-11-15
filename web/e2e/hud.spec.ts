@@ -61,9 +61,10 @@ for (const motion of ['reduce', 'no-preference'] as const) {
     for (const wait of [3000, 2500, 2500]) {
       await page.waitForTimeout(wait);
       const box = (await panel.boundingBox())!;
-      // The panel's own bottom padding (no text there) against the open scene just below the panel.
+      // The panel's own bottom padding (no text there) against the open scene just beside it (below
+      // it the wing holds the Data checks panel).
       const inside = await brightness(page, box.x + box.width / 2, box.y + box.height - 9);
-      const outside = await brightness(page, box.x + box.width / 2, box.y + box.height + 14);
+      const outside = await brightness(page, box.x + box.width + 24, box.y + box.height - 9);
       expect(outside).toBeGreaterThan(40);
       // Whether or not the browser dims the backdrop, the backing is under half as bright as the scene.
       expect(inside).toBeLessThan(outside * 0.5);
