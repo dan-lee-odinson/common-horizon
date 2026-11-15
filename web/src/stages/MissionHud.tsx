@@ -64,8 +64,19 @@ export function MissionHud() {
 
       {/* Across the top: the mission line and the launch delay. It stops short of the drawer's place. */}
       <div className="hud-layer" data-depth="0.6">
-        <div className={`absolute left-[27.5rem] top-[4.75rem] max-lg:right-5 max-md:left-3 max-md:right-3 max-md:top-[4.25rem] ${drawerOpen ? 'right-[25rem]' : 'right-[18.5rem]'}`} data-enter="lead">
+        {/* On phones this holder is a flat plane of its own (translateZ(0), as .flat-plane in the
+            styles). The button under the bar shrinks when pressed, and a part that takes a
+            transform straight inside the tilted HUD space can end up behind its holder for the
+            pointer: the press would then be lost. */}
+        <div className={`absolute left-[27.5rem] top-[4.75rem] max-lg:right-5 max-md:left-3 max-md:right-3 max-md:top-[4.25rem] max-md:[transform:translateZ(0)] ${drawerOpen ? 'right-[25rem]' : 'right-[18.5rem]'}`} data-enter="lead">
           <MissionBar />
+          {/* Phones have no spotlight panel: the way down to the site sits under the mission bar. */}
+          {focus ? (
+            <button type="button" className="btn btn-primary btn-lg mt-2 w-full md:hidden" onClick={() => actions.zoomToSite(focus)} disabled={flight !== null} data-testid="zoom-to-site-phone">
+              <Icon name="zoom-in" size={16} />
+              Zoom in to this site
+            </button>
+          ) : null}
         </div>
       </div>
 

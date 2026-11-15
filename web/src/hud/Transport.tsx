@@ -42,27 +42,35 @@ export function Transport({ playing, speed, speeds, onTogglePlay, onRestart, onS
       <button type="button" className="btn btn-icon" onClick={onRestart} aria-label="Back to the landing" title="Back to the landing" disabled={disabled} data-testid="site-restart">
         <Icon name="reset" size={15} />
       </button>
-      <div role="radiogroup" aria-label="Speed, days per second" className="seg" onKeyDown={onSpeedKey} data-testid="site-speed">
-        {speeds.map((q) => (
-          <button
-            key={q.key}
-            type="button"
-            role="radio"
-            aria-checked={q.value === chosen}
-            aria-label={`${q.text} days per second`}
-            tabIndex={q.value === chosen ? 0 : -1}
-            disabled={disabled}
-            onClick={() => q.value !== null && onSpeed(q.value)}
-            data-speed={q.value ?? undefined}
-            data-q={q.key}
-            data-testid={`speed-${q.text}`}
-          >
-            <span className="num normal-case tracking-normal">
-              <span data-q-text>{q.text}</span>
-              <span data-q-unit> {q.unit}</span>
-            </span>
-          </button>
-        ))}
+      <div className="flex items-center gap-1.5">
+        <div role="radiogroup" aria-label="Speed, days per second" className="seg" onKeyDown={onSpeedKey} data-testid="site-speed">
+          {speeds.map((q) => (
+            <button
+              key={q.key}
+              type="button"
+              role="radio"
+              aria-checked={q.value === chosen}
+              aria-label={`${q.text} days per second`}
+              tabIndex={q.value === chosen ? 0 : -1}
+              disabled={disabled}
+              onClick={() => q.value !== null && onSpeed(q.value)}
+              className="site-speed"
+              data-speed={q.value ?? undefined}
+              data-q={q.key}
+              data-testid={`speed-${q.text}`}
+            >
+              <span className="num text-[13px] tracking-normal" data-q-text>
+                {q.text}
+              </span>
+            </button>
+          ))}
+        </div>
+        {/* The unit is the same for every speed: said once, beside the group. */}
+        {speeds[0] ? (
+          <span className="num text-[12px] text-muted" title="Simulated days for each second of play" aria-hidden>
+            {speeds[0].unit}
+          </span>
+        ) : null}
       </div>
     </div>
   );

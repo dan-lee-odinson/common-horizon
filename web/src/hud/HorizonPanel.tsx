@@ -158,6 +158,18 @@ export function HorizonPanel({ data, fromMs, toMs, elRange = null, label, getSun
     written.current = { sun: '', earth: '' };
   }, [layout]);
 
+  // "Earth" stands above its box, or beside it when the box reaches the top of the plot.
+  const earthLabel = useMemo(() => {
+    if (!earthBox || shapes.earth.length === 0) return null;
+    const first = shapes.earth[0];
+    const topY = scale.y(earthBox.el_max);
+    if (topY - 5 >= box.top + 12) return { x: Math.min(first.x + 1, box.right - 36), y: topY - 5, anchor: 'start' as const };
+    const midY = Math.min(box.bottom - 4, Math.max(box.top + 12, (topY + scale.y(earthBox.el_min)) / 2 + 4));
+    const last = shapes.earth[shapes.earth.length - 1];
+    const roomRight = box.right - (last.x + last.w) >= 44;
+    return roomRight ? { x: last.x + last.w + 6, y: midY, anchor: 'start' as const } : { x: first.x - 6, y: midY, anchor: 'end' as const };
+  }, [earthBox, shapes.earth, scale, box]);
+
   const breakY = scale.breakEl === null ? null : scale.y(scale.breakEl);
   const levelY = scale.min <= 0 && scale.max >= 0 ? scale.y(0) : null;
 
@@ -220,8 +232,8 @@ export function HorizonPanel({ data, fromMs, toMs, elRange = null, label, getSun
               />
             ))}
           </g>
-          {earthBox && shapes.earth.length ? (
-            <text x={Math.min(shapes.earth[0].x + 3, box.right - 38)} y={Math.max(box.top + 13, scale.y(earthBox.el_max) - 5)} fontSize={12} fill="var(--ch-earth-text)" className="font-display">
+          {earthLabel ? (
+            <text x={earthLabel.x} y={earthLabel.y} textAnchor={earthLabel.anchor} fontSize={12} fill="var(--ch-earth-text)" className="font-display">
               Earth
             </text>
           ) : null}
@@ -281,7 +293,7 @@ export function SkyLegend({ scaleBreak = null, className = '' }: { scaleBreak?: 
       </li>
       {scaleBreak ? (
         <li>
-          Double line: the height scale changes at{' '}
+          Double line: scale changes at{' '}
           <span className="num" data-q={scaleBreak.key}>
             {scaleBreak.text}
             {scaleBreak.unit}

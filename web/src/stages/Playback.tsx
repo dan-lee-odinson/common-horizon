@@ -56,7 +56,9 @@ export function SitePlayback() {
       simClock.set({ nowMs: step.nowMs });
       if (step.ended) actions.setPlaying(false);
     };
-    gsap.ticker.add(tick);
+    // First in each frame, so every reader of the clock (the readouts, the plot, the scene) shows
+    // this frame's instant and none is a frame behind.
+    gsap.ticker.add(tick, false, true);
     return () => gsap.ticker.remove(tick);
   }, [stage, playing, landingMs, windowEndMs]);
   return null;

@@ -208,6 +208,12 @@
     transform: rotateX(5deg);
     transform-origin: 50% 100%;
   }
+  /* A holder that is not glass and holds controls: one flat plane of its own in the HUD space.
+     A button shrinks a little when pressed; a part that takes a transform straight inside the
+     tilted space can end up behind its holder for the pointer, and the press is then lost. */
+  .flat-plane {
+    transform: translateZ(0);
+  }
 
   /* ---------- readouts ---------- */
   .readout {
@@ -624,6 +630,338 @@
     transition: opacity 220ms ease 120ms;
   }
 
+  /* ---------- the site stage ---------- */
+  /* The wings stop where the console begins (its top is measured: see stages/SiteHud.tsx). */
+  .site-wing {
+    max-height: calc(var(--site-console-top, 100vh) - 8rem - 0.75rem);
+  }
+  .site-wing-r {
+    max-height: calc(var(--site-console-top, 100vh) - 4.75rem - 0.75rem);
+  }
+  /* Panels without glass of their own (inside a sheet): a rule between one and the next. */
+  .site-section + .site-section {
+    border-top: 1px solid var(--ch-line);
+    padding-top: 0.75rem;
+  }
+  /* "Before landing" shows only while the clock is inside the launch delay. */
+  .site-hud[data-phase='stay'] .site-before {
+    display: none;
+  }
+  /* Phones: the dock along the bottom. (The sheet that rests on it is styled at the end of this file.) */
+  .site-dock {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  /* The speed switch holds bare figures: narrower buttons than a switch of words. */
+  .seg > button.site-speed {
+    min-width: 2.5rem;
+    padding: 0 0.6rem;
+  }
+
+  /* ---------- horizon plot markers ---------- */
+  /* Placed by transform once per frame. They show where a body is, not how large it looks. */
+  .hz-mark {
+    position: absolute;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    will-change: transform;
+  }
+  .hz-sun {
+    width: 11px;
+    height: 11px;
+    margin: -5.5px 0 0 -5.5px;
+    border-radius: 50%;
+    background: var(--ch-sun);
+    box-shadow:
+      0 0 0 1.5px var(--ch-space),
+      0 0 10px 1px var(--ch-sun-glow);
+  }
+  /* The terrain hides the Sun: a hollow, dashed dot. */
+  .hz-sun[data-state='dark'] {
+    background: var(--ch-space);
+    border: 1.5px dashed var(--ch-sun);
+    box-shadow: none;
+  }
+  /* A direction with no lit or dark word: hollow, solid. */
+  .hz-sun[data-state='unknown'] {
+    background: var(--ch-space);
+    border: 1.5px solid var(--ch-sun);
+    box-shadow: none;
+  }
+  /* Below the plotted range: a chevron on the bottom edge, at the Sun's compass direction. */
+  .hz-sun[data-below='true'] {
+    margin-top: -9px;
+    border: 0;
+    border-radius: 0;
+    background: var(--ch-sun);
+    box-shadow: none;
+    clip-path: polygon(0 0, 50% 45%, 100% 0, 100% 40%, 50% 100%, 0 40%);
+  }
+  .hz-earth {
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border-radius: 50%;
+    border: 1.5px solid var(--ch-earth);
+    background: var(--ch-earth-soft);
+  }
+
+  /* ---------- stay timeline (the scrubber) ---------- */
+  .stay {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .stay-head {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    height: 16px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .stay-head .num {
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .stay-head-start {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stay-head-landing {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+  }
+  .stay-head-end {
+    flex: none;
+    margin-left: auto;
+    color: var(--ch-accent);
+  }
+  /* The lane takes the pointer: 44 px tall, so it is a full touch target. */
+  .stay-lane {
+    position: relative;
+    height: 44px;
+    cursor: ew-resize;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .stay-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 15px;
+    height: 14px;
+    overflow: hidden;
+    background: var(--ch-space);
+    outline: 1px solid var(--ch-line-strong);
+  }
+  /* Lit: full height, solid. Dark: a low hollow outline. Shape carries the state as well as colour. */
+  .stay-period {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    min-width: 1px;
+  }
+  .stay-period[data-lit='true'] {
+    background: var(--ch-sun);
+  }
+  .stay-period[data-lit='false'] {
+    top: 4px;
+    bottom: 4px;
+    background: var(--ch-dark-period);
+    box-shadow: inset 0 0 0 1px var(--ch-line-strong);
+  }
+  .stay-swatch-dark {
+    background: var(--ch-dark-period);
+    box-shadow: inset 0 0 0 1px var(--ch-line-strong);
+  }
+  /* Before the landing (the launch delay): hatched over, so it reads as outside the stay. */
+  .stay-lead {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(135deg, rgb(2 5 11 / 0.82) 0 3px, rgb(2 5 11 / 0.3) 3px 6px);
+    border-right: 1px solid var(--ch-ink);
+  }
+  /* The stay: a bracket under the bar, from the landing to the end. */
+  .stay-bracket {
+    position: absolute;
+    right: 0;
+    top: 33px;
+    height: 5px;
+    border: solid var(--ch-accent);
+    border-width: 0 1.5px 1.5px;
+  }
+  /* The planned landing, when the launch slipped: a dashed marker at the lane's start. */
+  .stay-ghost {
+    position: absolute;
+    left: 0;
+    top: 7px;
+    bottom: 5px;
+    width: 0;
+    border-left: 2px dashed var(--ch-ink-2);
+  }
+  /* As wide as the lane and moved by translateX(percent), so its left edge is at an instant. */
+  .stay-slide {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    will-change: transform;
+  }
+  .stay-notch {
+    position: absolute;
+    left: -0.5px;
+    top: 11px;
+    width: 1px;
+    height: 22px;
+    background: var(--ch-ink-2);
+  }
+  /* The needle: light with dark edges, so it reads over amber and over the dark bar alike. */
+  .stay-needle {
+    position: absolute;
+    left: -1.5px;
+    top: 9px;
+    bottom: 5px;
+    width: 3px;
+    border-radius: 1px;
+    background: var(--ch-ink);
+    box-shadow: 0 0 0 1px var(--ch-accent-ink);
+  }
+  /* Its cap sits in its own lane above the bar (cyan on amber would not read). */
+  .stay-cap {
+    position: absolute;
+    left: -6px;
+    top: 0;
+    width: 12px;
+    height: 10px;
+    background: var(--ch-accent);
+    clip-path: polygon(0 0, 100% 0, 100% 45%, 50% 100%, 0 45%);
+    transform-origin: 50% 100%;
+    transition: transform 140ms var(--ease-out);
+  }
+  .stay-lane:active .stay-cap {
+    transform: scale(1.25);
+  }
+  .stay-flag {
+    position: absolute;
+    left: 11px;
+    top: -2px;
+    font-size: 12px;
+    line-height: 14px;
+    color: var(--ch-ink);
+    white-space: nowrap;
+  }
+  .stay-handle[data-side='left'] .stay-flag {
+    left: auto;
+    right: calc(100% + 11px);
+  }
+  /* The native slider, laid over the lane for the keyboard and for screen readers. */
+  .stay-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .stay-input:focus-visible ~ .stay-handle .stay-needle {
+    outline: 2px solid var(--ch-focus);
+    outline-offset: 2px;
+  }
+  .stay-input:focus-visible ~ .stay-handle .stay-cap {
+    background: var(--ch-focus);
+  }
+  .stay-scale {
+    position: relative;
+    height: 18px;
+  }
+  .stay-tick {
+    position: absolute;
+    top: 0;
+    width: 0;
+  }
+  .stay-tick::before {
+    content: '';
+    position: absolute;
+    left: -0.5px;
+    top: 0;
+    width: 1px;
+    height: 4px;
+    background: var(--ch-line-strong);
+  }
+  .stay-tick[data-landing]::before {
+    height: 6px;
+    background: var(--ch-ink-2);
+  }
+  .stay-tick > span {
+    position: absolute;
+    left: 0;
+    top: 7px;
+    transform: translateX(-50%);
+    font-size: 12px;
+    line-height: 11px;
+    color: var(--ch-muted);
+    white-space: nowrap;
+  }
+  .stay-tick:first-child > span {
+    transform: none;
+  }
+  /* Read-only and small: the comparison sheet. */
+  .stay[data-compact] .stay-lane {
+    height: 26px;
+    cursor: default;
+    touch-action: auto;
+  }
+  .stay[data-compact] .stay-bar {
+    top: 6px;
+    height: 10px;
+  }
+  .stay[data-compact] .stay-period[data-lit='false'] {
+    top: 2.5px;
+    bottom: 2.5px;
+  }
+  .stay[data-compact] .stay-bracket {
+    top: 19px;
+    height: 4px;
+  }
+  .stay[data-compact] .stay-ghost {
+    top: 2px;
+    bottom: 5px;
+  }
+  .stay[data-compact] .stay-needle {
+    top: 2px;
+    bottom: 5px;
+    width: 2px;
+    left: -1px;
+  }
+  /* No answer yet: the lane waits, and takes no pointer. */
+  .stay[data-disabled] .stay-lane {
+    cursor: default;
+  }
+  .stay[data-disabled] .stay-bar {
+    background: linear-gradient(90deg, rgb(95 230 245 / 0.06), rgb(95 230 245 / 0.16), rgb(95 230 245 / 0.06));
+    background-size: 200% 100%;
+    animation: ch-shimmer 1.4s linear infinite;
+  }
+  .stay[data-disabled] .stay-handle,
+  .stay[data-disabled] .stay-bracket {
+    opacity: 0;
+  }
+
   /* ---------- reticle ---------- */
   .reticle-pulse {
     transform-box: fill-box;
@@ -753,6 +1091,15 @@
     animation: none;
     opacity: 0;
   }
+  .stay-cap {
+    transition: none;
+  }
+  .stay-lane:active .stay-cap {
+    transform: none;
+  }
+  .stay[data-disabled] .stay-bar {
+    animation: none;
+  }
 }
 
 /* Forced colours (high contrast modes): states drawn with backgrounds get system colours. */
@@ -767,6 +1114,30 @@
     color: HighlightText;
     forced-color-adjust: none;
   }
+  /* The timeline's periods are drawn with backgrounds: lit is a solid block, dark an outline. */
+  .stay-period[data-lit='true'] {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+  .stay-period[data-lit='false'] {
+    background: Canvas;
+    box-shadow: inset 0 0 0 1px CanvasText;
+    forced-color-adjust: none;
+  }
+  .stay-needle,
+  .stay-cap,
+  .hz-sun {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+}
+
+/* Site stage on phones: the sheet rests on top of the dock (whose height is measured) and leaves
+   the upper part of the scene in view. Outside the layers above, so it outranks the drawer's own
+   placement at the bottom edge. */
+.site-sheet {
+  bottom: var(--site-dock, 0px);
+  max-height: 62%;
 }
 
 /* Carried over for the screens that are not rebuilt yet; removed as each one is replaced. */

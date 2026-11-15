@@ -681,11 +681,11 @@ describe('site stage readouts that run with the clock', () => {
       expect(live.shadow.perMetre).toBeGreaterThan(50);
       expect(live.shadow.perMetre).toBeLessThan(150);
       expect(live.shadowPerMetre.value).toBe(live.shadow.perMetre);
-      expect(live.shadowPerMetre.label).toBe('Shadow per metre of height, about');
+      expect(live.shadowPerMetre.label).toBe('Per metre of height, about');
       expect(live.shadowPerMetre.text).toMatch(/^[1-9]0{1,2}$/);
       expect(live.shadowPerMetre.unit).toBe('m');
       expect(live.shadowLander.value).toBe(52 * live.shadow.perMetre);
-      expect(live.shadowLander.label).toBe('Starship lander shadow, about');
+      expect(live.shadowLander.label).toBe('Starship lander, about');
       expect(live.shadowLander.text).toMatch(/^[1-9]$/);
       expect(live.shadowLander.unit).toBe('km');
       expect(live.shadowBearing.text).toBe(String(Math.round(wrap180(sun!.az + 180) + 360) % 360));
@@ -703,8 +703,8 @@ describe('site stage readouts that run with the clock', () => {
       const live = liveSiteQuantities({ track, tMs, landingMs: LANDING, site: a11, horizon: h11, lander });
       if (live.shadow.kind !== 'length' || live.shadow.figures !== 2) continue;
       seen++;
-      expect(live.shadowPerMetre.label).toBe('Shadow per metre of height');
-      expect(live.shadowLander.label).toBe('Starship lander shadow');
+      expect(live.shadowPerMetre.label).toBe('Per metre of height');
+      expect(live.shadowLander.label).toBe('Starship lander');
       const factor = live.shadow.perMetre;
       // Two significant figures of the value, nothing more.
       expect(Math.abs(Number(live.shadowPerMetre.text) - factor)).toBeLessThanOrEqual(factor * 0.05 + 1e-9);
@@ -750,7 +750,7 @@ describe('site stage readouts that run with the clock', () => {
     const tMs = LANDING + HOUR_MS;
     expect(at(tMs, { lander: { name: 'Starship lander', heightM: null } }).shadowLander.text).toBe(DASH);
     const bare = at(tMs, { lander: null });
-    expect(bare.shadowLander.label).toMatch(/^Lander shadow/);
+    expect(bare.shadowLander.label).toMatch(/^Lander/);
     expect(bare.shadowLander.text).toBe(DASH);
     // The per-metre figure needs no lander.
     expect(bare.shadowPerMetre.text).not.toBe(DASH);

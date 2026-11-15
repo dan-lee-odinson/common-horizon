@@ -453,9 +453,10 @@ export function liveSiteQuantities(input: SiteLiveInput): SiteLiveQuantities {
 
   const width = sky.earth ? earthWidthDeg(sky.earth.el) : Number.NaN;
   const shadow = shadowFigures(sky.sun, sky.lit);
-  const landerName = input.lander?.name ?? 'Lander';
-  const perMetreLabel = 'Shadow per metre of height';
-  const landerLabel = `${landerName} shadow`;
+  // The three shadow readouts sit together under one heading ("Shadows, level ground"), so their
+  // own labels only say which shadow: of a metre of height, of the lander, and where they point.
+  const perMetreLabel = 'Per metre of height';
+  const landerLabel = input.lander?.name ?? 'Lander';
 
   let shadowPerMetre: Quantity;
   let shadowLander: Quantity;
@@ -463,15 +464,15 @@ export function liveSiteQuantities(input: SiteLiveInput): SiteLiveQuantities {
   if (shadow.kind === 'unknown') {
     shadowPerMetre = missing('shadow_per_metre', perMetreLabel);
     shadowLander = missing('shadow_lander', landerLabel);
-    shadowBearing = missing('shadow_bearing', 'Shadows point');
+    shadowBearing = missing('shadow_bearing', 'Pointing');
   } else if (shadow.kind === 'dark') {
     // The terrain hides the Sun: nothing casts a shadow, and there is no direction to give.
     shadowPerMetre = quantity('shadow_per_metre', perMetreLabel, null, 'none', '', 'muted');
     shadowLander = quantity('shadow_lander', landerLabel, null, 'none', '', 'muted');
-    shadowBearing = missing('shadow_bearing', 'Shadows point');
+    shadowBearing = missing('shadow_bearing', 'Pointing');
   } else {
     const bearing = Math.round(shadow.bearingDeg) % 360;
-    shadowBearing = quantity('shadow_bearing', 'Shadows point', shadow.bearingDeg, String(bearing), `° ${compassWord(shadow.bearingDeg)}`);
+    shadowBearing = quantity('shadow_bearing', 'Pointing', shadow.bearingDeg, String(bearing), `° ${compassWord(shadow.bearingDeg)}`);
     if (shadow.kind === 'grazing') {
       // The Sun's disc touches the level plane: a shadow has no far end to measure.
       shadowPerMetre = quantity('shadow_per_metre', perMetreLabel, null, 'past the horizon', '');

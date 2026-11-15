@@ -70,6 +70,9 @@
   --ch-bad-soft: rgb(255 106 61 / 0.16);
   --ch-bad-glow: rgb(255 106 61 / 0.34);
 
+  /* The dark well a graph is drawn in, laid over the glass of its panel. */
+  --ch-well: rgb(2 5 11 / 0.6);
+
   /* 3D scenes and the horizon plot */
   --ch-moon: #a2a6ad;
   --ch-moon-dark: #1c2026;

@@ -49,7 +49,7 @@ function Shell({
 }) {
   if (bare) {
     return (
-      <section className={`flex flex-col gap-2.5 border-t border-line pt-3 first:border-t-0 first:pt-0 ${className}`} aria-label={label} data-testid={testId}>
+      <section className={`site-section flex flex-col gap-2.5 ${className}`} aria-label={label} data-testid={testId}>
         {children}
       </section>
     );
@@ -66,12 +66,14 @@ export interface SunPanelProps {
   nextChange: Quantity;
   sunAz: Quantity;
   sunEl: Quantity;
-  sunWidth: Quantity;
+  /** The Sun's apparent width, where the panel is the place to show it (it is also in the line about true size). */
+  sunWidth?: Quantity;
   shadowPerMetre: Quantity;
   shadowLander: Quantity;
   shadowBearing: Quantity;
   sunlightPercent: Quantity;
   sunlightHours: Quantity;
+  longestDark: Quantity;
   /** Fewer rows, whatever the window's height. */
   dense?: boolean;
   /** No glass of its own: inside a sheet. */
@@ -91,6 +93,7 @@ export function SunPanel({
   shadowBearing,
   sunlightPercent,
   sunlightHours,
+  longestDark,
   dense = false,
   bare = false,
   className = '',
@@ -108,22 +111,23 @@ export function SunPanel({
         <Readout q={sunAz} size="sm" />
         <Readout q={sunEl} size="sm" />
       </div>
-      <div className="hairline" />
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 border-t border-line pt-2.5">
         <p className="label m-0 text-ink-2">Shadows, level ground</p>
         <ReadoutRow q={shadowPerMetre} />
         <ReadoutRow q={shadowLander} />
         <ReadoutRow q={shadowBearing} className={extra} />
       </div>
       <div className={`flex flex-col gap-1.5 border-t border-line pt-2.5 ${extra}`}>
-        <ReadoutRow q={sunWidth} />
+        <p className="label m-0 text-ink-2">Over the stay</p>
         <div className="flex items-baseline justify-between gap-4">
-          <span className="label">Sunlight, stay</span>
+          <span className="label">{sunlightPercent.label}</span>
           <span className="readout-value" data-size="sm">
             <Inline q={sunlightPercent} />
             <Inline q={sunlightHours} className="ml-2 text-[13px] text-ink-2" />
           </span>
         </div>
+        <ReadoutRow q={longestDark} />
+        {sunWidth ? <ReadoutRow q={sunWidth} /> : null}
       </div>
     </Shell>
   );
@@ -140,20 +144,25 @@ export interface ClockPanelProps {
   className?: string;
 }
 
-/** The mission clock: UTC, the LTC model value beside it, and where the instant sits in the stay. */
+/**
+ * The mission clock: UTC, the LTC model value beside it, and where the instant sits in the stay.
+ * `dense` is the form that sits beside the play controls: the two clocks and nothing else.
+ */
 export function ClockPanel({ utc, ltc, ltcOffset, sinceLanding, stayEnd, dense = false, bare = false, className = '' }: ClockPanelProps) {
   return (
     <Shell bare={bare} label="Mission clock" testId="clock-panel" className={className}>
-      <h3 className="panel-title m-0">Mission clock</h3>
+      {dense ? null : <h3 className="panel-title m-0">Mission clock</h3>}
       <Readout q={utc} />
       <div className="grid grid-cols-[auto_1fr] gap-x-4">
         <Readout q={ltc} size="sm" />
         <Readout q={ltcOffset} size="sm" />
       </div>
-      <div className={`flex flex-col gap-1.5 ${dense ? 'hidden' : 'short:hidden'}`}>
-        <ReadoutRow q={sinceLanding} />
-        <ReadoutRow q={stayEnd} />
-      </div>
+      {dense ? null : (
+        <div className="flex flex-col gap-1.5">
+          <ReadoutRow q={sinceLanding} />
+          <ReadoutRow q={stayEnd} />
+        </div>
+      )}
     </Shell>
   );
 }
@@ -192,7 +201,6 @@ export function EarthPanel({ earthAz, earthEl, earthWidth, earthLink, clearSky, 
 
 export interface HardwarePanelProps {
   rows: readonly HardwareRow[];
-  longestDark: Quantity;
   /** What in the picture is an illustration, in a sentence. */
   note: string;
   bare?: boolean;
@@ -200,7 +208,7 @@ export interface HardwarePanelProps {
 }
 
 /** The mission's hardware: how many of each, how tall each model is and how well founded that size is. */
-export function HardwarePanel({ rows, longestDark, note, bare = false, className = '' }: HardwarePanelProps) {
+export function HardwarePanel({ rows, note, bare = false, className = '' }: HardwarePanelProps) {
   return (
     <Shell bare={bare} label="Hardware" testId="hardware-panel" className={`min-h-0 ${className}`}>
       <h3 className="panel-title m-0">Hardware</h3>
@@ -225,12 +233,9 @@ export function HardwarePanel({ rows, longestDark, note, bare = false, className
           ))}
         </ul>
       )}
-      <div className="flex shrink-0 flex-col gap-2 border-t border-line pt-2.5">
-        <ReadoutRow q={longestDark} />
-        <p className="m-0 text-[13px] leading-snug text-ink-2" data-testid="site-illustration">
-          {note}
-        </p>
-      </div>
+      <p className="m-0 shrink-0 border-t border-line pt-2.5 text-[13px] leading-snug text-ink-2" data-testid="site-illustration">
+        {note}
+      </p>
     </Shell>
   );
 }

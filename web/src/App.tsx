@@ -86,7 +86,7 @@ function FlatWorld() {
   if (stage === 'site') {
     return (
       // Above the horizon plot, which takes the scene's place in the middle of the stage.
-      <p className="absolute inset-x-0 top-[8.5rem] m-0 px-[23rem] text-center text-[14px] leading-snug text-ink-2 max-lg:px-[19rem] max-md:top-[15.5rem] max-md:px-6" data-testid="site-scene-fallback">
+      <p className="absolute left-[23rem] right-[23rem] top-[8.5rem] m-0 text-center text-[14px] leading-snug text-ink-2 max-lg:left-[19rem] max-lg:right-[19rem] max-md:left-6 max-md:right-6 max-md:top-[15.5rem]" data-testid="site-scene-fallback">
         3D is not available in this browser. The horizon plot shows this site’s sky.
       </p>
     );

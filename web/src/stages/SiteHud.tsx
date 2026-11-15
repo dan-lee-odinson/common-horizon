@@ -1,9 +1,9 @@
 // Stage 3, SITE: the instrument around the site's terrain.
 //
 // Time runs through the stay here. A strip across the top names the site; two wings read the sky
-// (the Sun and the mission clock on the left, Earth and the hardware on the right); a console along
-// the bottom holds the horizon plot directly above the stay timeline, which is the scrubber, with
-// play, pause and the speed beside it. On a phone the same parts become a status card, a dock along
+// (the Sun and its shadows on the left, Earth and the hardware on the right); a console along the
+// bottom holds the horizon plot directly above the stay timeline, which is the scrubber, with the
+// mission clock, play, pause and the speed beside it. On a phone the same parts become a status card, a dock along
 // the bottom and a sheet that rises above the dock.
 //
 // One function gives the sky at the instant shown (util/quantities.ts: liveSiteQuantities), and
@@ -258,18 +258,19 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       nextChange={q.nextChange}
       sunAz={q.sunAz}
       sunEl={q.sunEl}
-      sunWidth={fixed.sunWidth}
+      sunWidth={!webgl || isPhone ? fixed.sunWidth : undefined}
       shadowPerMetre={q.shadowPerMetre}
       shadowLander={q.shadowLander}
       shadowBearing={q.shadowBearing}
       sunlightPercent={result.sunlightPercent}
       sunlightHours={result.sunlightHours}
+      longestDark={fixed.longestDark}
       {...extra}
     />
   );
   const clockPanel = (extra: { dense?: boolean; bare?: boolean } = {}) => <ClockPanel utc={q.utcClock} ltc={q.ltcClock} ltcOffset={q.ltcOffset} sinceLanding={q.sinceLanding} stayEnd={fixed.stayEnd} {...extra} />;
   const earthPanel = (extra: { dense?: boolean; bare?: boolean } = {}) => <EarthPanel earthAz={q.earthAz} earthEl={q.earthEl} earthWidth={q.earthWidth} earthLink={fixed.earthLink} clearSky={result.clearSky} {...extra} />;
-  const hardwarePanel = (extra: { bare?: boolean; className?: string } = {}) => <HardwarePanel rows={hardware} longestDark={fixed.longestDark} note={webgl ? HARDWARE_NOTE : HARDWARE_NOTE_FLAT} {...extra} />;
+  const hardwarePanel = (extra: { bare?: boolean; className?: string } = {}) => <HardwarePanel rows={hardware} note={webgl ? HARDWARE_NOTE : HARDWARE_NOTE_FLAT} {...extra} />;
 
   const trueSize = (
     <p className="m-0 text-[13px] leading-snug text-ink-2" data-testid="true-size">
@@ -303,7 +304,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
         {webgl ? <AnchorReticle anchor="lander" label="Landing point" size={56} /> : null}
 
         <div className="hud-layer" data-depth="0.5">
-          <div className="absolute left-3 right-3 top-[4.25rem] flex flex-col gap-2" data-enter="lead" data-site-zone="top">
+          <div className="flat-plane absolute left-3 right-3 top-[4.25rem] flex flex-col gap-2" data-enter="lead" data-site-zone="top">
             <div className="flex items-center gap-2">
               <button type="button" className="btn btn-glass btn-icon shrink-0" onClick={actions.backToMission} aria-label="Back to mission select" data-testid="back-to-mission">
                 <Icon name="back" size={16} />
@@ -385,7 +386,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
       {/* Across the top: the way back, and which site this is. */}
       <div className="hud-layer" data-depth="0.6">
-        <div className="absolute left-5 right-[22.5rem] top-[4.75rem] flex items-center gap-2 max-lg:right-[18.5rem]" data-enter="lead" data-site-zone="top">
+        <div className="flat-plane absolute left-5 right-[22.5rem] top-[4.75rem] flex items-center gap-2 max-lg:right-[18.5rem]" data-enter="lead" data-site-zone="top">
           <button type="button" className="btn btn-glass shrink-0" onClick={actions.backToMission} aria-label="Back to mission select" data-testid="back-to-mission">
             <Icon name="back" size={14} />
             <span>
@@ -420,11 +421,10 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
         </div>
       </div>
 
-      {/* Left wing: the Sun now and the shadows it casts; the mission clock. */}
+      {/* Left wing: the Sun now, the shadows it casts and its light over the stay. */}
       <div className="hud-layer" data-depth="0.9">
         <div className="site-wing wing-l absolute left-5 top-[8rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="left" data-site-zone="left">
           {sunPanel()}
-          {clockPanel()}
         </div>
       </div>
 
@@ -447,11 +447,13 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
         </div>
       )}
 
-      {/* The console: sky and time. The plot sits directly above the timeline that scrubs it. */}
-      <div className="hud-layer" data-depth="0.4">
-        <Glass as="section" strong className="absolute bottom-5 left-5 right-5 grid grid-cols-[17rem_minmax(0,1fr)] gap-x-5 px-4 py-3.5 short:py-3" aria-label="Sky and time" data-enter="rise" data-site-zone="console" data-panel data-testid="site-console">
-          <div className="flex min-w-0 flex-col gap-2.5">
-            <h3 className="panel-title m-0">Sky and time</h3>
+      {/* The console: sky and time. The plot sits directly above the timeline that scrubs it.
+          This layer does not drift with the pointer: the needle stays under the hand that drags it. */}
+      <div className="hud-layer">
+        <Glass as="section" strong className="absolute bottom-5 left-5 right-5 grid grid-cols-[22rem_minmax(0,1fr)] gap-x-5 px-4 py-3.5 short:py-3 max-lg:grid-cols-[17rem_minmax(0,1fr)]" aria-label="Sky and time" data-enter="rise" data-site-zone="console" data-panel data-testid="site-console">
+          <div className="flex min-w-0 flex-col gap-2.5 short:gap-2">
+            <h3 className="sr-only">Sky and time</h3>
+            {clockPanel({ bare: true, dense: true })}
             {transport}
             {webgl ? trueSize : null}
           </div>
