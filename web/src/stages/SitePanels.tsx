@@ -228,7 +228,8 @@ export function HardwarePanel({ rows, note, bare = false, className = '' }: Hard
                   <Inline q={row.height} />
                 </span>
               </div>
-              {row.status ? <span className="text-[12px] leading-tight text-muted">{row.status}</span> : null}
+              {/* In a short window the list keeps to one line an item, so the whole mission stays in view. */}
+              {row.status ? <span className={`text-[12px] leading-tight text-muted ${bare ? '' : 'short:hidden'}`}>{row.status}</span> : null}
             </li>
           ))}
         </ul>
