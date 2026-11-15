@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test --trace off"
+    "test:e2e": "playwright test --trace off",
+    "screens": "playwright test -c playwright.screens.config.ts --trace off"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

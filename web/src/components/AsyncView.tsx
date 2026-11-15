@@ -28,15 +28,17 @@ export function AsyncView<T>({ result, children, waiting, empty, idle, unavailab
       );
     case 'empty':
       return (
-        <div role="status" data-state="empty" className="px-3 py-4 text-[13px] text-muted">
+        <div role="status" data-state="empty" className="px-3 py-4 text-[14px] text-ink-2">
           {empty ?? `Nothing to show for ${what}.`}
         </div>
       );
     case 'error':
       return (
-        <div role="alert" data-state="error" className="flex flex-col items-start gap-2 px-3 py-3 text-[13px]">
+        <div role="alert" data-state="error" className="flex flex-col items-start gap-2 px-3 py-3 text-[14px]">
           <p className="text-ink-2">
-            <span className="font-semibold text-bad">Could not load {what}.</span> {result.error}
+            <span className="font-semibold" data-tone="bad">
+              Could not load {what}.
+            </span> {result.error}
           </p>
           <button type="button" className="btn" onClick={result.retry}>
             Try again
@@ -45,7 +47,7 @@ export function AsyncView<T>({ result, children, waiting, empty, idle, unavailab
       );
     case 'unavailable':
       return (
-        <div role="status" data-state="unavailable" className="px-3 py-3 text-[13px] text-ink-2">
+        <div role="status" data-state="unavailable" className="px-3 py-3 text-[14px] text-ink-2">
           {unavailable ?? `${what} is unavailable right now.`}
         </div>
       );

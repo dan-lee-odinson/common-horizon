@@ -9,8 +9,6 @@ export const DAY_MS = 86_400_000;
 export const HOUR_MS = 3_600_000;
 export const LTC_MICROSECONDS_PER_DAY = 56.02;
 
-export type TimeScale = 'UTC' | 'LTC';
-
 /** Offset of LTC from UTC, in microseconds, at a UTC instant. */
 export function ltcOffsetMicros(utcMs: number, landingUtcMs: number): number {
   const daysSinceLanding = (utcMs - landingUtcMs) / DAY_MS;
@@ -31,40 +29,6 @@ function ymdhms(d: Date): string {
     `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ` +
     `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
   );
-}
-
-/** "2027-02-15 15:00:00 UTC" */
-export function formatUtc(utcMs: number): string {
-  return `${ymdhms(new Date(utcMs))} UTC`;
-}
-
-/** "2027-02-15 15:00:00.000056 LTC" — microseconds shown because the offset is that small. */
-export function formatLtc(utcMs: number, landingUtcMs: number): string {
-  const micros = utcToLtcMicros(utcMs, landingUtcMs);
-  const wholeMs = Math.floor(micros / 1000);
-  const subMs = micros - wholeMs * 1000; // 0..999 microseconds
-  const d = new Date(wholeMs);
-  const fraction = pad(d.getUTCMilliseconds(), 3) + pad(subMs, 3);
-  return `${ymdhms(d)}.${fraction} LTC`;
-}
-
-export function formatTime(utcMs: number, scale: TimeScale, landingUtcMs: number): string {
-  return scale === 'UTC' ? formatUtc(utcMs) : formatLtc(utcMs, landingUtcMs);
-}
-
-/** Short label rounded to the minute: "2027-02-15 15:00 UTC" or "2027-02-15 15:00 LTC". */
-export function formatTimeShort(utcMs: number, scale: TimeScale, landingUtcMs: number): string {
-  const ms = scale === 'UTC' ? utcMs : utcToLtcMicros(utcMs, landingUtcMs) / 1000;
-  const d = new Date(Math.round(ms / 60_000) * 60_000);
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} ${scale}`;
-}
-
-/** "+1.234 ms" style offset text for the LTC note. */
-export function formatLtcOffset(utcMs: number, landingUtcMs: number): string {
-  const us = ltcOffsetMicros(utcMs, landingUtcMs);
-  const sign = us < 0 ? '−' : '+';
-  const abs = Math.abs(us);
-  return abs >= 1000 ? `${sign}${(abs / 1000).toFixed(3)} ms` : `${sign}${abs.toFixed(2)} µs`;
 }
 
 /** Value for <input type="datetime-local">, read as UTC: "2027-02-10T15:00". */
@@ -88,10 +52,6 @@ export function toIsoUtc(utcMs: number): string {
   return new Date(utcMs).toISOString().replace('.000Z', 'Z');
 }
 
-export function addDays(utcMs: number, days: number): number {
-  return utcMs + days * DAY_MS;
-}
-
 /** "3 d 4 h" for durations, "45 h" for short ones. */
 export function formatHours(hours: number): string {
   if (!Number.isFinite(hours)) return '—';
@@ -104,4 +64,53 @@ export function formatHours(hours: number): string {
 
 export function formatDays(days: number): string {
   return Number.isInteger(days) ? `${days}` : days.toFixed(2).replace(/0$/, '');
+}
+
+/** Mean length of the lunar day (new moon to new moon), in days. Standard astronomical value. */
+export const SYNODIC_MONTH_DAYS = 29.530589;
+
+export interface ClockParts {
+  /** "2027-02-15" */
+  date: string;
+  /** "15:00:00" */
+  time: string;
+  /** LTC only: the six digits after the seconds, "000056". Empty for UTC. */
+  fraction: string;
+}
+
+/** A UTC instant split for a running clock display. */
+export function utcClock(utcMs: number): ClockParts {
+  const [date, time] = ymdhms(new Date(utcMs)).split(' ');
+  return { date, time, fraction: '' };
+}
+
+/** The LTC (model value) reading at a UTC instant, split for a running clock display. */
+export function ltcClock(utcMs: number, landingUtcMs: number): ClockParts {
+  const micros = utcToLtcMicros(utcMs, landingUtcMs);
+  const wholeMs = Math.floor(micros / 1000);
+  const subMs = micros - wholeMs * 1000;
+  const d = new Date(wholeMs);
+  const [date, time] = ymdhms(d).split(' ');
+  return { date, time, fraction: pad(d.getUTCMilliseconds(), 3) + pad(subMs, 3) };
+}
+
+/** The LTC offset in microseconds with a sign and two decimals: "+182.07". */
+export function formatLtcOffsetMicros(utcMs: number, landingUtcMs: number): string {
+  const us = ltcOffsetMicros(utcMs, landingUtcMs);
+  const rounded = Math.round(us * 100) / 100;
+  const sign = rounded < 0 ? '−' : '+';
+  return `${sign}${Math.abs(rounded).toFixed(2)}`;
+}
+
+/** "2027-02-15 15:00" (UTC, to the minute) for dates shown beside a control. */
+export function formatUtcMinute(utcMs: number): string {
+  return ymdhms(new Date(Math.round(utcMs / 60_000) * 60_000)).slice(0, 16);
+}
+
+/** Time since (or before) the landing: "+3 d 06 h", "−0 d 12 h". */
+export function formatSinceLanding(utcMs: number, landingUtcMs: number): string {
+  const hours = (utcMs - landingUtcMs) / HOUR_MS;
+  const sign = hours < 0 ? '−' : '+';
+  const total = Math.floor(Math.abs(hours));
+  return `${sign}${Math.floor(total / 24)} d ${pad(total % 24)} h`;
 }

@@ -6,14 +6,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent 
 import gsap from 'gsap';
 import type { Geometry } from '../api/types';
 import type { KnownSite } from '../state/data';
-import type { View } from '../state/app';
 import { actions, appStore, clamp } from '../state/app';
 import { useStore } from '../state/store';
 import { DEG, RAD, normalizeLon360 } from '../util/geo';
 import { Icon } from '../components/Icon';
 
 interface Props {
-  view: Exclude<View, 'scene'>;
+  /** 'orbit' shows the Moon only; 'mission' adds the site markers. */
+  view: 'orbit' | 'mission';
   sites: KnownSite[];
   highlightedId: string | null;
   savedIds: Set<string>;
@@ -105,7 +105,7 @@ export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, o
   }, [flight]);
 
   function onDiscClick(e: MouseEvent<SVGCircleElement>) {
-    if (view === 'globe') return onMoonClick();
+    if (view === 'orbit') return onMoonClick();
     const svg = e.currentTarget.ownerSVGElement!;
     const rect = svg.getBoundingClientRect();
     const scale = 400 / rect.width;
@@ -145,7 +145,7 @@ export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, o
             </g>
           );
         })}
-        {view === 'sites'
+        {view === 'mission'
           ? sites.map((s) => {
               const p = project(s.lat, s.lon_east, center.lat, center.lon);
               if (!p.visible) return null;
@@ -176,17 +176,17 @@ export function MoonFallback({ view, sites, highlightedId, savedIds, geometry, o
               );
             })
           : null}
-        {view === 'sites' && highlighted && activePoint?.visible && flight === null ? (
+        {view === 'mission' && highlighted && activePoint?.visible && flight === null ? (
           <g
             role="button"
             tabIndex={0}
             aria-label={`Zoom in to this site: ${highlighted.name}`}
             className="cursor-pointer"
-            onClick={() => actions.zoomToSite()}
+            onClick={() => actions.zoomToSite(highlighted)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                actions.zoomToSite();
+                actions.zoomToSite(highlighted);
               }
             }}
             data-testid="zoom-to-site-label"

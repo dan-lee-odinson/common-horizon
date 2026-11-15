@@ -17,7 +17,9 @@ as installed by npm from the public npm registry.
 
 Only these five packages (and what they import) end up in the built site. drei pulls in further
 packages (for example three-stdlib, camera-controls, troika-three-text, maath, zustand); the website
-imports only `OrbitControls`, `Html` (marker labels) and `useTexture` from drei.
+imports only `OrbitControls` from drei. The hardware models' shapes are loaded with three.js's own
+`GLTFLoader` (`three/examples/jsm/loaders/GLTFLoader.js`, part of the three.js package above), on
+demand; no other loader and no decoder is used.
 
 ## Tools — used to build and test, not shipped
 
@@ -50,14 +52,27 @@ one for origin; the table above covers every package the website adds directly.
 | Draper SERIES-2 (planned; NASA's later documents name the lander APEX 1.0): Schrodinger basin on the far side; the basin's center (75.0 S, 132.4 E) is shown because the landing point is not published | NASA Science, "Schrodinger Impact Basin" and the CP-12 delivery page | NASA media guidelines | https://science.nasa.gov/lunar-science/clps-deliveries/cp-12/ |
 | Notes on existing entries: Blue Moon Mark 1 is planned for the Shackleton Connecting Ridge; IM-4 is planned for Mons Mouton; Peregrine Mission-1 was bound for Sinus Viscositatis and did not reach the Moon | NASA news release 26-046 (26 May 2026); NASA CLPS IM-2 press kit NP-2025-02-005-JSC; NASA CLPS Peregrine press kit NP-2023-12-017-JSC | NASA media guidelines | https://www.nasa.gov/news-release/nasa-provides-update-on-moon-base-rovers-landers-missions |
 | Hardware catalog numbers (`src/api/examples/catalog.json`) | Invented placeholders for mock mode, not specifications | This project | — |
+| Hardware models: each model's shape (`public/models/*.glb`) and its description (`public/models/*.json`: its name, the words that say how well founded its size is, and its width, height and depth in metres) | The models and their descriptions are made by another part of the team (`tools/models/`), which lists the source of every dimension in the same files; the website reads them and changes nothing. The site view draws each shape at true scale (one model unit is one metre; no shape is ever scaled, and one whose height differs from its description by more than 1 % is not drawn) and shows each height with those words beside it. The five models: Starship lander, Griffin lander, habitat unit, fission power unit, solar array mast. The rover has no model and is not drawn | Team-provided | — |
 | Mock terrain, slopes and skylines (`src/api/examples/mock-model.json`) | Invented for mock mode | This project | — |
 | Assistant example answers (`src/api/examples/assistant.json`) | Written for mock mode | This project | — |
+
+## Fonts
+
+Three families, served from this website only (no font service is called). The files and each
+project's licence text are in `src/assets/fonts/`. Each was taken from the project's own GitHub
+repository, which was cloned and read when this file was written.
+
+| Font | Used for | File in `src/assets/fonts/` | Taken from | Licence | Maintained by | Link |
+| --- | --- | --- | --- | --- | --- | --- |
+| Oxanium (variable, weight 200 to 800) | Titles and labels | `Oxanium-Variable.woff2` | `fonts/variable/Oxanium[wght].ttf` at commit a8f39e0 (30 September 2020), compressed to WOFF2 with fontTools 4.68.0; the glyphs are unchanged | SIL Open Font License 1.1 (`Oxanium-OFL.txt`) | Severin Meyer (The Oxanium Project Authors) | https://github.com/sevmeyer/oxanium |
+| Geist Mono (variable, weight 100 to 900) | Numeric readouts | `GeistMono-Variable.woff2` | `fonts/GeistMono/webfonts/GeistMono[wght].woff2` at commit ef2597c (6 November 2026), copied unchanged | SIL Open Font License 1.1 (`Geist-OFL.txt`) | Vercel, with Basement Studio (The Geist Project Authors) | https://github.com/vercel/geist-font |
+| Geist (variable, weight 100 to 900) | Chat and longer text | `Geist-Variable.woff2` | `fonts/Geist/webfonts/Geist[wght].woff2` at the same commit, copied unchanged | SIL Open Font License 1.1 (`Geist-OFL.txt`) | Vercel, with Basement Studio (The Geist Project Authors) | https://github.com/vercel/geist-font |
 
 ## Images
 
 | What | Where it came from | Licence | Link |
 | --- | --- | --- | --- |
-| Moon colour map (planned, not yet included) | NASA's CGI Moon Kit, NASA's Scientific Visualization Studio, item 4720. Credit: "NASA's Scientific Visualization Studio". Download was blocked in the build environment; slot documented in `public/textures/README.md` | NASA imagery is generally not copyrighted; check the item's own terms when downloading | link to add (not opened: blocked) |
+| Moon surface maps: `public/textures/moon/moon-color-4k.jpg`, `moon-color-2k.jpg` (surface color), `moon-normal-4k.jpg`, `moon-normal-2k.jpg` (terrain relief as normal maps) | NASA's CGI Moon Kit, Scientific Visualization Studio, Goddard Space Flight Center. Credit: NASA's Scientific Visualization Studio (visualizer Ernie Wright, scientist Noah Petro). The color map comes from Lunar Reconnaissance Orbiter Camera imagery and the heights from the Lunar Orbiter Laser Altimeter; NASA describes the color map as made for visual use, not for science. Downloaded 15 November 2026. Made from NASA's files `lroc_color_16bit_srgb_4k.tif`, `lroc_color_2k.jpg` and `ldem_16_uint.tif`: the 4k color map is NASA's 16-bit TIFF saved as an 8-bit JPEG; the 2k color map is NASA's file renamed; the normal maps were computed from the height map at true scale. Checksums of the downloads and the full method are in `public/textures/moon/README.md`. Used as they are: 4k pair on desktop, 2k pair on phones (`src/scene/textures.ts`) | NASA imagery is generally not copyrighted; see the source page for its terms | https://svs.gsfc.nasa.gov/4720 |
 | Hardware picture-slot drawings, icons | Drawn for this project as simple line shapes (`src/components/HardwareGlyph.tsx`, `src/components/Icon.tsx`) | This project | — |
 
 No logos, insignia, flags or agency or company lettering are used anywhere. Names appear as plain text.
@@ -66,7 +81,9 @@ No logos, insignia, flags or agency or company lettering are used anywhere. Name
 
 | Figure | Used for | Source | Link |
 | --- | --- | --- | --- |
-| LTC rate: 56.02 microseconds per day, counted from the landing time | LTC (model value) display | Team brief; lunar time standard still being defined | link to add |
+| Lunar south pole season: summer while the Sun's overhead point is south of the lunar equator, when sunlit periods at the south pole run longer | The "Lunar south pole: summer / winter" line (`src/util/season.ts`) | NASA, "Lunar Site Selection" white paper, 2023 Moon to Mars Architecture Concept Review | link to add |
+| LTC rate: a clock on the Moon's surface gains 56.02 microseconds per day on a clock on Earth | The LTC (model value) clock and the LTC − UTC readout (`src/util/time.ts`) | Neil Ashby and Bijunath R. Patla (National Institute of Standards and Technology), "A Relativistic Framework to Estimate Clock Rates on the Moon", The Astronomical Journal, volume 168, number 3, article 112 (2024), DOI 10.3847/1538-3881/ad643a; preprint arXiv:2402.11150. The citation was confirmed by a web search; the paper's own page could not be opened from the build environment | link to add (not opened: blocked) |
+| Counting the LTC offset from the landing time (offset = 56.02 microseconds x days since landing, so it is zero at the landing) | The same clock and readout | This app's own convention, chosen so the readout starts at zero for each mission. It is not part of the paper and not an agreed standard: the lunar time standard (Coordinated Lunar Time) is still being defined. The interface labels the clock "model" for this reason | — |
 | Synodic month 29.530589 days | Mock Sun motion | Standard astronomical value | link to add |
 | Reference new moon 2000-01-06 18:14 UTC | Mock Sun phase | Standard reference epoch for lunations | link to add |
 | Sub-solar latitude swing ±1.54° over 346.62 days | Mock Sun height at the poles | Moon's axis tilt to the ecliptic (≈1.54°) and the eclipse year; simplified | link to add |
@@ -76,7 +93,16 @@ No logos, insignia, flags or agency or company lettering are used anywhere. Name
 | Power check rules: margin = (available − load) / available × 100; night storage over the longest darkness; day refill | Mock power checks (`src/api/mock/power.ts`) | Planner module, `planner/README.md` ("power_check"), read only | — |
 | One lunar month 708.73 h | Default refill window in the mock power checks | Planner module catalog constant (`planner/README.md`) | — |
 | Earth's diameter about 3.67 times the Moon's (mean diameters about 12,742 km and 3,474.8 km) | Earth's size in the Moon view (Moon radius 1, Earth radius 3.67) | Standard astronomical values | link to add |
-| Moon view distances (Earth 30, Sun 90 Moon radii) and the Sun's radius (8 Moon radii) | Placing Earth and the Sun in the Moon view | Chosen for this website so both fit on screen; not to scale (really about 221 and 86,000 Moon radii, and the Sun about 400 Moon diameters wide) | — |
+| Orbit picture: Earth drawn at its true size beside the Moon (3.667 Moon radii, from the radii above) but only 11.5 Moon radii away; the Sun as a marker on a ring 1.7 Moon radii out | Placing Earth and the Sun in the Orbit stage (`src/scene/orbitView.ts`) | Chosen for this website so both fit on screen. Sizes of Earth and the Moon are to scale; distances are not (really about 221 Moon radii to Earth and about 86,000 to the Sun), and the Sun is a direction marker, not a body to scale. The caption on screen says so | — |
+| Sun radius 695,700 km | The Sun's disc in the site view, drawn at its true apparent size, and the "Sun, apparent width" readout (`src/util/bodies.ts`) | International Astronomical Union, 2015 Resolution B3 (nominal solar radius) | link to add (not opened: blocked) |
+| Sun distance 1 astronomical unit = 149,597,870.7 km (a mean distance) | The same disc and readout | International Astronomical Union, 2012 Resolution B2 (re-definition of the astronomical unit of length) | link to add (not opened: blocked) |
+| Earth mean radius 6,371.0 km | Earth's disc in the site view, drawn at its true apparent size, and the "Earth, apparent width" readout (`src/util/bodies.ts`) | NASA Earth Fact Sheet (National Space Science Data Coordinated Archive), volumetric mean radius | link to add (not opened: blocked) |
+| Earth to Moon mean distance 384,400 km | The same disc and readout | NASA Moon Fact Sheet (National Space Science Data Coordinated Archive), semi-major axis | link to add (not opened: blocked) |
+| Moon mean radius 1,737.4 km | The site's own distance from the Moon's centre, when working out how far Earth is from the site | NASA Moon Fact Sheet (National Space Science Data Coordinated Archive), volumetric mean radius | link to add (not opened: blocked) |
+| Apparent width of a body seen from a site = 2 × asin(radius ÷ distance from the site to the body's centre). Sun: 0.53°. Earth: 1.90° on the horizon to 1.91° overhead (the site is one Moon radius from the Moon's centre; Earth's centre is 384,400 km along the direction to Earth) | Sizes of the two discs in the site view and their two readouts | Geometry, from the five values above. Both distances are mean values, so the screen says "mean distances"; the answers of the data layer carry directions only | — |
+| Brightness of the ground in the site view: (sine of the Sun's elevation) to the power 0.35, times whether the site is lit | The illustrative level ground (`groundSunTerm` in `src/scene/siteView.ts`) | A display curve chosen for this website so that grazing sunlight at a polar site (Sun about 1° up) is still readable. It is not a photometric model of the lunar surface | — |
+| Site view layout: where each piece of hardware stands round the landing point; range rings every 10 m (out to 200 m) and every 100 m (out to 2 km); field of view 42° (58° on phones) | The site view (`src/scene/siteLayout.ts`, `src/scene/siteView.ts`) | Chosen for this website. The data has no positions for hardware and no terrain near the site: the screen says the ground and the places are an illustration | — |
+| Shadow length on level ground = height ÷ tan(Sun's elevation), pointing away from the Sun. No length is given while the Sun's disc touches the level plane (elevation under 0.27°, half the disc's width); one figure, labelled "about", up to 5.3° (ten disc widths); two figures above | The shadow readouts in the site view (`src/util/shadow.ts`), and the shadows drawn on the ground there (each model flattened onto the level ground along the sunlight) | Geometry. The limits follow from the Sun's apparent width above; the site's real ground is not in the data, so every length is for level ground | — |
 
 ## SI/AI use
 

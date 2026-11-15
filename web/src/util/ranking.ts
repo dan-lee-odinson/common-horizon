@@ -39,3 +39,15 @@ export function movedText(moved: number): string {
   const n = Math.abs(moved);
   return `${moved > 0 ? 'up' : 'down'} ${n} place${n === 1 ? '' : 's'}`;
 }
+
+/**
+ * A short window of the ranking around one site: `size` rows that include the site, kept inside the
+ * list. With no site (or one that is not ranked) it is the top of the list.
+ */
+export function rankWindow<T extends { siteId: string }>(rows: readonly T[], siteId: string | null, size: number): T[] {
+  const n = Math.max(1, Math.floor(size));
+  if (rows.length <= n) return [...rows];
+  const at = Math.max(0, siteId === null ? 0 : rows.findIndex((r) => r.siteId === siteId));
+  const start = Math.min(rows.length - n, Math.max(0, at - Math.floor(n / 2)));
+  return rows.slice(start, start + n);
+}
