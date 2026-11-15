@@ -16,6 +16,10 @@ from app.models.website import (
 )
 
 QUESTION_MAX_CHARS = 500
+# The website's launch-to-landing estimate: TRANSIT_DAYS in web/src/util/transit.ts, which the website sends
+# with every POST /evaluate. Used when an assistant request leaves transit_days out, so the assistant evaluates
+# the same landing date the page shows. tests/test_assistant.py fails when the two differ.
+WEBSITE_TRANSIT_DAYS = 5.0
 
 
 class AskContext(_InputModel):
@@ -32,6 +36,15 @@ class AskContext(_InputModel):
     stay_days: float = Field(ge=limits.STAY_MIN_DAYS, le=limits.STAY_DURATION_MAX_DAYS)
     hardware: list[HardwareChoice] = Field(max_length=64)
     storage_kwh: float = StorageField
+    transit_days: float | None = Field(
+        default=None,
+        ge=0,
+        le=limits.TRANSIT_MAX_DAYS,
+        description=(
+            "Launch-to-landing time, days (optional; the website does not send it yet). Left out or null: "
+            f"the website's own value, {WEBSITE_TRANSIT_DAYS:g} days, as on every POST /evaluate it sends."
+        ),
+    )
 
     @field_validator("launch_utc", mode="before")
     @classmethod

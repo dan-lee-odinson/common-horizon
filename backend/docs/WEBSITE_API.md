@@ -262,23 +262,26 @@ field for field; `tests/test_assistant.py` checks them against that file.
 
 **Request** (`AskRequest`): `question` (1 to 500 characters) and `context` with `site_id` (a preset id, a
 custom point `custom:<lat>:<lon_east>` as the website names it, or null), `launch_utc`, `slip_days`,
-`stay_days`, `hardware` and `storage_kwh`, with the same bounds as `POST /evaluate`.
+`stay_days`, `hardware` and `storage_kwh`, with the same bounds as `POST /evaluate`. The backend also accepts an
+optional `context.transit_days` (0 to 30 days), which the website does not send yet.
 
 **Response** (`AskResponse`): `{"answer": "..."}`. The backend never sends the website's `example` flag.
 
 **How it answers:**
 1. It runs the same evaluation as `POST /evaluate` (the same service, `evaluate_sites`) over the 17 preset
-   sites, plus the selected custom point when there is one. `AskRequest` carries no `transit_days`, so the
-   stay starts at `launch_utc + slip_days` and the results carry the usual transit warning. The website's own
-   `/evaluate` sends `transit_days: 5`, so the assistant's landing time is 5 days earlier than the one on
-   screen (see "Open points" below).
+   sites, plus the selected custom point when there is one. Its `transit_days` is the request's, or, when the
+   request leaves it out, the website's own value: `WEBSITE_TRANSIT_DAYS` (5 days) in
+   `backend/app/models/assistant.py`, the same figure as `TRANSIT_DAYS` in `web/src/util/transit.ts`, which
+   the website sends with every `/evaluate`. So the assistant evaluates the landing date the page shows. A test
+   reads `transit.ts` and fails when the two differ.
 2. It sends the language model the question and a compact JSON of those results: per site the rank, score
    (or its range when the slope is unknown), sunlight percent, longest darkness, Earth contact, slope and its
    source, each requirement with `pass`, `fail` or `unknown` and its detail text, and the power status and
    margin, numbers rounded to two decimals. The selected site is marked `"selected": true`. The data source
    (`is_synthetic`) and the evaluation's warnings go with it.
 3. Model: `openai.gpt-oss-120b-1:0` on Amazon Bedrock, `us-east-1`, Converse API through boto3, `maxTokens`
-   500, temperature 0.2, one attempt with a 5 s connect and 20 s read timeout (so the whole request stays
+   1500 (gpt-oss's reasoning counts against it, so this leaves room for the answer; the instructions still ask
+   for about 120 words), temperature 0.2, one attempt with a 5 s connect and 30 s read timeout (35 s at most,
    inside the Lambda's 60 s). Credentials come from the standard AWS chain (the Lambda's role).
 4. The instructions: answer only from the supplied results; never state a number that is not in them; say so
    when the results do not cover the question; plain text, at most about 120 words; decline anything that is
@@ -303,8 +306,8 @@ copy starts, so the total across copies can be higher. The AWS budget is the rea
 Bedrock error, its error code. Never the question's text.
 
 **Open points:**
-- `transit_days` is not in `AskRequest` (point 1 above). The backend can take an optional `transit_days` in
-  `context` once the website sends one; that is a change to both sides, so it is left for the team.
+- If the team changes the transit time, `WEBSITE_TRANSIT_DAYS` changes with `TRANSIT_DAYS` (the test above
+  fails until it does), or the website sends `context.transit_days` with each question.
 - A selected site that is neither a preset nor a `custom:<lat>:<lon_east>` id is not evaluated; the JSON
   says so and the model is told it is not in the results.
 

@@ -20,7 +20,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from app.models import limits
-from app.models.assistant import AskContext
+from app.models.assistant import WEBSITE_TRANSIT_DAYS, AskContext
 from app.models.website import EvaluateRequest, EvaluateResponse, SiteEvaluation, SiteRef
 from app.physics.interface import PhysicsEngine
 from app.services.sites import preset_sites
@@ -28,12 +28,13 @@ from app.services.website_evaluation import evaluate_sites
 
 logger = logging.getLogger(__name__)
 
-MAX_TOKENS = 500
+# gpt-oss's reasoning counts against maxTokens; 1500 leaves room for the answer (about 120 words) after it.
+MAX_TOKENS = 1500
 TEMPERATURE = 0.2
-# One attempt, at most 5 + 20 s: with the evaluation it stays inside the Lambda's 60 s timeout. The website
+# One attempt, at most 5 + 30 s, which leaves the evaluation 25 s of the Lambda's 60 s timeout. The website
 # offers "Try again" on a failure, so botocore does not retry on its own.
 CONNECT_TIMEOUT_S = 5
-READ_TIMEOUT_S = 20
+READ_TIMEOUT_S = 30
 MAX_ATTEMPTS = 1
 
 SYSTEM_PROMPT = """You are the Mission Assistant of the Common Horizon website, which compares lunar landing \
@@ -134,8 +135,8 @@ def custom_point(site_id: str) -> SiteRef | None:
 def evaluation_request(context: AskContext) -> tuple[EvaluateRequest, str | None]:
     """The ``POST /evaluate`` request for the visitor's mission. Raises pydantic's ValidationError (422).
 
-    ``transit_days`` is left out, as ``AskRequest`` does not carry it: the stay starts at launch + delay,
-    and the results' warnings say so.
+    ``transit_days`` is the request's, or the website's own value (``WEBSITE_TRANSIT_DAYS``) when it is left
+    out, so the landing date is the one the page shows.
     """
     sites = [SiteRef(id=s.id, name=s.name, lat=s.lat, lon_east=s.lon_east) for s in preset_sites().sites]
     note = None
@@ -152,6 +153,7 @@ def evaluation_request(context: AskContext) -> tuple[EvaluateRequest, str | None
         stay_days=context.stay_days,
         hardware=context.hardware,
         storage_kwh=context.storage_kwh,
+        transit_days=WEBSITE_TRANSIT_DAYS if context.transit_days is None else context.transit_days,
     )
     return request, note
 
@@ -215,6 +217,7 @@ def results_for_model(results: MissionResults, request: EvaluateRequest) -> dict
         "mission": {
             "launch_utc": evaluation.launch_utc.isoformat().replace("+00:00", "Z"),
             "landing_utc": evaluation.landing_utc.isoformat().replace("+00:00", "Z"),
+            "transit_days": evaluation.transit_days,
             "launch_delay_days": evaluation.slip_days,
             "stay_days": evaluation.stay_days,
             "storage_kwh": request.storage_kwh,

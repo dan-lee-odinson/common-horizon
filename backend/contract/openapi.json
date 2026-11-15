@@ -425,6 +425,20 @@
             "minimum": 0.0,
             "title": "Storage Kwh",
             "description": "Battery storage typed by the visitor, kWh. 0 = none."
+          },
+          "transit_days": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 30.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transit Days",
+            "description": "Launch-to-landing time, days (optional; the website does not send it yet). Left out or null: the website's own value, 5 days, as on every POST /evaluate it sends."
           }
         },
         "additionalProperties": false,

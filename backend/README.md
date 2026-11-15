@@ -94,9 +94,10 @@ files committed to git.
 ## Mission Assistant (`POST /assistant`)
 
 It answers a visitor's question about the current mission in plain text, from the same evaluation
-`POST /evaluate` runs over the 17 preset sites (plus a selected custom point). A language model on
-Amazon Bedrock (`openai.gpt-oss-120b-1:0`, `us-east-1`, Converse API through boto3) words the
-answer; it is told to use only the numbers in those results. The request, the JSON the model is
+`POST /evaluate` runs over the 17 preset sites (plus a selected custom point), with the website's 5-day
+transit unless the request gives its own, so its landing date is the page's. A language model on
+Amazon Bedrock (`openai.gpt-oss-120b-1:0`, `us-east-1`, Converse API through boto3, `maxTokens` 1500,
+one attempt with a 30 s read timeout) words the answer; it is told to use only the numbers in those results. The request, the JSON the model is
 sent, the instructions and the errors are in [docs/WEBSITE_API.md](docs/WEBSITE_API.md), "POST /assistant".
 
 **Switched off by default.** With `CH_ASSISTANT_ENABLED=false` (the default and the Dockerfile's

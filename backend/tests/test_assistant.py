@@ -15,15 +15,20 @@ from fastapi.testclient import TestClient
 
 from app.config import DEFAULT_ASSISTANT_MODEL_ID, Settings, get_settings
 from app.main import create_app
+from app.models.assistant import WEBSITE_TRANSIT_DAYS
+from app.models.website import EvaluateRequest, SiteRef
 from app.services import assistant as service
 from app.services.sites import preset_sites
+from app.services.website_evaluation import evaluate_sites
+
+WEB_TRANSIT = Path(__file__).resolve().parents[2] / "web" / "src" / "util" / "transit.ts"
 
 QUESTION = "Which site keeps the longest sunlight, and does Nobile pass?"
 # What a model following the rules could say for CONTEXT on the synthetic engine (the fake returns it as is).
 ANSWER = (
-    "Apollo 12 ranks first, with 100.0 percent sunlight and 0.0 hours of darkness. Your selected site, Nobile "
-    "region, ranks 13th with 71.73 percent sunlight and passes every requirement. These figures are placeholder "
-    "test data, not physics results."
+    "Shackleton Connecting Ridge has the most sunlight, 100.0 percent with 0.0 hours of darkness, and ranks 3rd. "
+    "Your selected site, Nobile region, ranks 14th with 36.01 percent sunlight and passes every requirement. "
+    "These figures are placeholder test data, not physics results."
 )
 
 CONTEXT = {
@@ -97,6 +102,7 @@ def test_results_sent_to_the_model_carry_the_engines_numbers():
         json={
             "sites": [{"id": s.id, "name": s.name, "lat": s.lat, "lon_east": s.lon_east} for s in presets],
             **{k: v for k, v in CONTEXT.items() if k != "site_id"},
+            "transit_days": WEBSITE_TRANSIT_DAYS,  # what the assistant uses when the request leaves it out
         },
     ).json()
 
@@ -134,6 +140,52 @@ def test_results_sent_to_the_model_carry_the_engines_numbers():
     assert sent["selected_site_id"] == "nobile"
 
 
+def _website_transit_days() -> float:
+    if not WEB_TRANSIT.exists():
+        pytest.skip("web/ is not in this checkout")
+    source = WEB_TRANSIT.read_text(encoding="utf-8")
+    match = re.search(r"^export const TRANSIT_DAYS = ([0-9.]+);", source, re.MULTILINE)
+    assert match, "TRANSIT_DAYS not found in web/src/util/transit.ts"
+    return float(match.group(1))
+
+
+def test_the_backend_transit_constant_is_the_websites():
+    assert WEBSITE_TRANSIT_DAYS == _website_transit_days()
+
+
+def test_the_model_sees_the_landing_and_sunlight_the_page_shows():
+    """The website's own POST /evaluate body for the same mission, through evaluate_sites, against what the model gets."""
+    client, fake = make_client()
+    assert client.post("/assistant", json=ask_body()).status_code == 200  # no transit_days, as the website sends it
+
+    page = evaluate_sites(
+        EvaluateRequest(
+            sites=[SiteRef(id=s.id, name=s.name, lat=s.lat, lon_east=s.lon_east) for s in preset_sites().sites],
+            launch_utc=CONTEXT["launch_utc"],
+            slip_days=CONTEXT["slip_days"],
+            stay_days=CONTEXT["stay_days"],
+            hardware=CONTEXT["hardware"],
+            storage_kwh=CONTEXT["storage_kwh"],
+            transit_days=_website_transit_days(),  # web/src/util/transit.ts, sent with every POST /evaluate
+        ),
+        client.app.state.physics_engine,
+    )
+    sent = fake.sent_results()
+    assert sent["mission"]["landing_utc"] == page.landing_utc.isoformat().replace("+00:00", "Z")
+    assert sent["mission"]["landing_utc"] == "2027-01-23T00:00:00Z"  # 15 January + 5 days transit + 3 days delay
+    (on_page,) = [r for r in page.results if r.site_id == "nobile"]
+    (to_model,) = [s for s in sent["sites"] if s["id"] == "nobile"]
+    assert to_model["sunlight_percent"] == round(on_page.sunlight_percent, 2)
+    assert not any("transit_days was not given" in w for w in sent["warnings"])
+
+
+def test_a_transit_time_in_the_request_is_used():
+    client, fake = make_client()
+    assert client.post("/assistant", json=ask_body(transit_days=0)).status_code == 200
+    assert fake.sent_results()["mission"]["landing_utc"] == "2027-01-18T00:00:00Z"  # launch + 3 days delay
+    assert client.post("/assistant", json=ask_body(transit_days=31)).status_code == 422
+
+
 def test_a_selected_custom_point_is_evaluated_and_marked():
     client, fake = make_client()
     response = client.post("/assistant", json=ask_body(site_id="custom:-84.5000:12.2500"))
@@ -159,7 +211,7 @@ def test_the_model_call_follows_the_brief():
     client.post("/assistant", json=ask_body())
     (call,) = fake.calls
     assert call["modelId"] == DEFAULT_ASSISTANT_MODEL_ID == "openai.gpt-oss-120b-1:0"
-    assert call["inferenceConfig"] == {"maxTokens": 500, "temperature": 0.2}
+    assert call["inferenceConfig"] == {"maxTokens": 1500, "temperature": 0.2}
     system = call["system"][0]["text"]
     for rule in (
         "Answer only from RESULTS",
@@ -377,4 +429,4 @@ def test_the_real_client_is_built_from_the_aws_chain_with_short_timeouts(monkeyp
     assert seen["region_name"] == "us-east-1"
     assert not {"aws_access_key_id", "aws_secret_access_key", "aws_session_token"} & set(seen)
     config = seen["config"]
-    assert (config.connect_timeout, config.read_timeout, config.retries["max_attempts"]) == (5, 20, 1)
+    assert (config.connect_timeout, config.read_timeout, config.retries["max_attempts"]) == (5, 30, 1)

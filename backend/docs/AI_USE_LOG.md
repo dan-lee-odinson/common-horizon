@@ -251,5 +251,12 @@ Drafted with Claude Code (Claude Opus 5.5) on `feat/assistant`, from `origin/mai
 | 20:09-20:10 | 22:09-22:10 | boto3 1.44.3 and its transitive set pinned; the image's install step (`--no-deps`, `pip check`, import) repeated in a fresh venv (Python 3.13, not the image's 3.12) | `pip check` clean; imports pass. No Docker daemon here, so the image was not built |
 | by 20:13:24 | by 22:13:24 | Bedrock timeouts cut to one attempt, 5 s connect and 20 s read (the Lambda's timeout is 60 s); a test that the client gets no keys; Ruff format on the new files; OpenAPI regenerated; full suite | 755 passed, 23 skipped (no kernels); Ruff clean on the changed files (repo-wide count unchanged) |
 
-**Not done:** no call to the real Bedrock model (no AWS access here): the prompt, the 500-token limit with
+### Addition: the page's landing date, and room for the answer (2026-11-15)
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 21:10 | 23:10 | `context.transit_days` (optional) added; when it is left out the backend uses `WEBSITE_TRANSIT_DAYS` (5), the website's `TRANSIT_DAYS`; `maxTokens` 500 → 1500; read timeout 20 → 30 s, one attempt | Tests: the constant against `web/src/util/transit.ts`; the model's landing date and Nobile's sunlight against `evaluate_sites` for the website's own body |
+| ~21:12 | ~23:12 | Set the constant to 4 on purpose | 2 tests failed (the constant check and the landing/sunlight check); reverted, all pass |
+
+**Not done:** no call to the real Bedrock model (no AWS access here): the prompt, the 1500-token limit with
 gpt-oss's reasoning, and the answers themselves are untested against the live model. Image not built.
