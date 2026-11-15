@@ -157,7 +157,7 @@ response shapes bumps `contract_version`.
 - Data: the four NAIF kernels in `CH_SPICE_KERNEL_DIR` (not in Git; not yet in the container image) and the
   stored profiles in `CH_HORIZON_PROFILE_DIR` (default `backend/data/horizon`; not yet copied into the image).
   See `backend/README.md`, "Real physics engine".
-- Runtime: the adapter's own work for the largest allowed request with a 30-day launch-delay sweep is about
-  17 s on a laptop before SPICE time, which is close to the API Gateway limit (~29 s); typical requests
-  (14 days hourly, 30-day sweep) take about 0.5 s. SPICE time per sample is not measured yet.
+- Runtime with the real kernels (laptop): 14 days hourly about 0.13 s, with a 30-day launch-delay sweep about
+  0.4 s; the largest allowed request (10 000 samples) 3.3 s, and 19.2 s with a 30-day sweep, which is close to
+  the API Gateway limit (~29 s).
 - Not provided yet: site slope, site elevation away from stored profiles, the terrain elevation grid.

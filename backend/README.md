@@ -114,10 +114,22 @@ copies only `app/`, so serving real physics needs
 check stays fast; kernels and profiles load on the first evaluation. SPICE is not thread-safe:
 all SPICE work in a process runs under one lock.
 
-Measured cost of the adapter's own work (injected positions, no SPICE, local machine): 14 days
-hourly with a 30-day launch-delay sweep 0.5 s; 365 days hourly 3 s; the largest allowed request
-(10 000 samples at 60 s plus a 30-day sweep) 17 s, mostly disc integration near the skyline.
-Launch-delay runs reuse the samples they share with earlier runs.
+Kernels used for validation (downloaded from `https://naif.jpl.nasa.gov/pub/naif/generic_kernels/`
+on 2026-11-15; sizes equal the server's `Content-Length`; NAIF publishes an MD5 only for `de440s.bsp`
+in `spk/planets/aa_checksums.txt`, and it matches):
+
+| File | Bytes | SHA-256 |
+|---|---|---|
+| `naif0012.tls` | 5 257 | `678e32bdb5a744117a467cd9601cd6b373f0e9bc9bbde1371d5eee39600a039b` |
+| `de440s.bsp` | 32 726 016 | `c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2` (MD5 `3917ee56769db332790c751e2168843d`) |
+| `moon_pa_de440_200625.bpc` | 12 863 488 | `60cd55aa401ea2ea97360636f567554bfe4e37bb829f901b4460a455dfaf783f` |
+| `moon_de440_250416.tf` | 19 478 | `a47c71e9c9f33796bdafb2c9d69a7ee447b6016ecad80f71cd6f3e479f9cf768` |
+
+Measured with these kernels (local laptop, through the HTTP endpoint): 14 days hourly 0.12 to
+0.15 s (first request, which loads kernels and profiles, 0.15 s); the same with a 30-day
+launch-delay sweep 0.38 to 0.44 s. The largest allowed request (10 000 samples at 60 s) takes 3.3 s,
+and 19.2 s with a 30-day sweep, mostly disc integration near the skyline. Launch-delay runs reuse
+the samples they share with earlier runs.
 
 ## Docker and AWS Lambda
 

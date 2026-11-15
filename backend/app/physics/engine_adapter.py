@@ -467,7 +467,7 @@ class PhysicsEngineAdapter:
             + " through app.physics.engine.positions; Moon-centred geometric positions (aberration "
             "correction NONE) in the MOON_ME frame, km.",
             (
-                f"Disc radii: Sun {SUN_RADIUS_KM:g} km (IAU 2015 nominal), Earth {EARTH_RADIUS_KM:g} km "
+                f"Disc radii: Sun {SUN_RADIUS_KM!r} km (IAU 2015 nominal), Earth {EARTH_RADIUS_KM!r} km "
                 "(equatorial); angular radius from the distance at each sample."
             ),
         ]

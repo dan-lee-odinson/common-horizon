@@ -114,3 +114,22 @@ What the AI did and did not decide:
   not been run yet.
 - Not done: Docker image changes for kernels and profiles (kept apart from the open PR #6), production
   switch to the real engine, deployment.
+
+### Real-kernel validation (2026-11-15)
+
+Kernels downloaded with the backend owner's authorisation from `naif.jpl.nasa.gov` into the git-ignored
+`backend/app/physics/data/datasets/spice/` (checksums in `backend/README.md`; not committed).
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| ~10:48 | ~12:48 | Downloaded the four kernels; sizes checked against `Content-Length`, SHA-256 computed | `de440s.bsp` MD5 matches NAIF's `aa_checksums.txt`; no published checksum for the other three |
+| ~10:49 | ~12:49 | Ran the previously skipped real-kernel test | Passed; no skip |
+| by 10:53:21 | by 12:53:21 | Real-kernel tests for `shackleton-ridge` and `nobile` (2027, hourly), API run, runtime measurements; full suite | 9 real-kernel tests passed; suite 394 passed, 9 skipped (LOLA DEM tests only) |
+
+Physical results (adapter vs the stored independent 2027 check, `results_2027.json`): Sun visible
+82.669% vs 82.671% (Shackleton ridge) and 49.058% vs 49.053% (Nobile); Earth visible 50.234% vs
+50.240% and 63.363% vs 63.368%; longest dark period 155 h and 532 h in both. Against the engine's
+`compute_sun_earth_angles`: largest elevation difference 1.2e-6 degree (Sun) and 2.8e-4 / 1.0e-3 degree
+(Earth, the parallax of the 1.7 km / 6.4 km site height that function leaves out); azimuth differences
+5e-7 degree (transport rounding). Bug found and fixed: the provenance text printed Earth's radius as
+6378.14 km (`:g` format) instead of the 6378.1366 km used.

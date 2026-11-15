@@ -505,46 +505,174 @@ def test_adapter_does_not_import_offline_dem_code():
     assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
+def test_provenance_states_the_disc_radii_actually_used():
+    """Regression: the radii were printed with ':g', which showed Earth's 6378.1366 km as 6378.14 km."""
+    sources = PhysicsEngineAdapter()._ephemeris_sources()
+    radii = next(source for source in sources if source.startswith("Disc radii"))
+    assert "Earth 6378.1366 km" in radii
+    assert f"Sun {SUN_RADIUS_KM!r} km" in radii
+    assert f"Earth {EARTH_RADIUS_KM!r} km" in radii
+
+
 # ----------------------------------------------------- opt-in: REAL SPICE kernels (physical output)
+#
+# Everything below runs the real NAIF kernels with the stored profiles: these are the only tests in
+# this file whose numbers are physical. They skip unless CH_SPICE_KERNEL_DIR (or CH_NAIF_DIR) names a
+# folder holding the four kernels.
 
 KERNEL_DIR = os.environ.get("CH_SPICE_KERNEL_DIR") or os.environ.get("CH_NAIF_DIR")
+real_kernels = pytest.mark.skipif(
+    not KERNEL_DIR, reason="set CH_SPICE_KERNEL_DIR to the four NAIF kernels to run the real-sky checks"
+)
+
+# Stored sites and their coordinates (east longitude in 0..360, as in the profiles).
+REAL_SITES = {"shackleton-ridge": (-89.684, 196.739), "nobile": (-85.42088, 31.6218)}
+YEAR_START = datetime(2027, 1, 1, tzinfo=UTC)
+# The adapter's angles against the engine's own compute_sun_earth_angles. That function puts the observer
+# on the 1737.4 km sphere, the adapter at the site's height + 2 m, so Earth's elevation may differ by the
+# parallax of a few km at 384 000 km (about 0.001 degree at Nobile, 6.4 km up). Documented tolerance: 0.01.
+ANGLE_TOLERANCE_DEG = 0.01
 
 
-@pytest.mark.skipif(not KERNEL_DIR, reason="set CH_SPICE_KERNEL_DIR to the four NAIF kernels to run the real-sky check")
-def test_real_kernels_reproduce_the_stored_2027_check_at_shackleton_ridge():
-    """PHYSICAL OUTPUT: real SPICE kernels and the stored profile, compared with an independent run.
+def _east_to_signed(longitude_deg: float) -> float:
+    return longitude_deg - 360.0 if longitude_deg > 180.0 else longitude_deg
 
-    ``backend/data/horizon_validation/results_2027.json`` was produced by scripts/validate_horizon.py
-    (hourly, 2027, the engine's position functions). The adapter must agree with it, and its angles
-    must agree with the engine's own ``compute_sun_earth_angles``.
-    """
-    from app.physics.engine.ephemeris import compute_sun_earth_angles
 
-    stored = json.loads((BACKEND_DIR / "data/horizon_validation/results_2027.json").read_text(encoding="utf-8"))
-    expected = stored["sites"]["shackleton-ridge"]["results"]["terrain"]
+@pytest.fixture(scope="module")
+def real_year_runs():
+    """One adapter, one hourly 2027 run per site (8760 samples, as in the stored validation)."""
     adapter = PhysicsEngineAdapter(spice_kernel_dir=KERNEL_DIR)
-    request = SimulationRequest(
-        latitude_deg=-89.684,
-        longitude_deg=196.739 - 360.0,
-        altitude_m=None,
-        observer_height_m=2.0,
-        start_utc=datetime(2027, 1, 1, tzinfo=UTC),
-        duration_s=8759 * 3600.0,  # 8760 hourly samples, as in the stored check
-        time_step_s=3600,
-    )
+    runs = {}
+    for site, (latitude, longitude) in REAL_SITES.items():
+        request = SimulationRequest(
+            latitude_deg=latitude,
+            longitude_deg=_east_to_signed(longitude),
+            altitude_m=None,
+            observer_height_m=2.0,
+            start_utc=YEAR_START,
+            duration_s=8759 * 3600.0,
+            time_step_s=3600,
+        )
+        runs[site] = (request, adapter.simulate(request))
+    return adapter, runs
 
-    result = adapter.simulate(request)
 
-    assert result.site.elevation_source == "terrain_model"
+@real_kernels
+@pytest.mark.parametrize("site", sorted(REAL_SITES))
+def test_real_kernels_reproduce_the_stored_2027_check(real_year_runs, site):
+    """results_2027.json came from scripts/validate_horizon.py (hourly 2027, the engine's position
+    functions, the same profiles). The adapter, with sample-and-hold, must agree with it."""
+    stored = json.loads((BACKEND_DIR / "data/horizon_validation/results_2027.json").read_text(encoding="utf-8"))
+    expected = stored["sites"][site]["results"]["terrain"]
+    _, runs = real_year_runs
+    _, result = runs[site]
+
     assert result.metrics.sunlight_percentage == pytest.approx(expected["sun_any_part_visible_percent"], abs=0.05)
     assert result.metrics.earth_visibility_percentage == pytest.approx(
         expected["earth_any_part_visible_percent"], abs=0.05
     )
     assert result.metrics.longest_darkness_hours == pytest.approx(expected["longest_dark_period_hours"], abs=1.0)
 
-    angles = compute_sun_earth_angles(-89.684, 196.739, request.start_utc, 48 * 3600.0, 3600.0)
-    for k, sample in enumerate(angles):
-        assert result.timeseries.sun.elevation_deg[k] == pytest.approx(sample["sun_elevation_deg"], abs=0.01)
-        assert result.timeseries.earth.elevation_deg[k] == pytest.approx(sample["earth_elevation_deg"], abs=0.01)
-        sun_azimuth_gap = (result.timeseries.sun.azimuth_deg[k] - sample["sun_azimuth_deg"] + 180.0) % 360.0 - 180.0
-        assert abs(sun_azimuth_gap) < 0.01
+
+@real_kernels
+@pytest.mark.parametrize("site", sorted(REAL_SITES))
+def test_real_output_geometry_terrain_time_and_provenance(real_year_runs, site):
+    adapter, runs = real_year_runs
+    request, result = runs[site]
+    series = result.timeseries
+    latitude, longitude = REAL_SITES[site]
+
+    # UTC timestamps on the backend grid.
+    assert series.timestamps_utc == build_time_grid(YEAR_START, request.duration_s, 3600)
+    assert all(moment.utcoffset() == timedelta(0) for moment in series.timestamps_utc)
+    assert len(series.timestamps_utc) == 8760
+
+    # Finite Moon-centred positions at the right distances, MOON_ME, unit directions.
+    assert series.frame == "MOON_ME"
+    sun_distances = [math.hypot(*p) for p in series.sun.position_km]
+    earth_distances = [math.hypot(*p) for p in series.earth.position_km]
+    assert all(math.isfinite(d) for d in sun_distances + earth_distances)
+    assert 1.46e8 < min(sun_distances) and max(sun_distances) < 1.53e8  # 0.98 .. 1.02 au
+    assert 356_000 < min(earth_distances) and max(earth_distances) < 407_000  # perigee .. apogee
+    for body in (series.sun, series.earth):
+        assert all(abs(math.hypot(*u) - 1.0) < 1e-8 for u in body.direction_unit)
+
+    # Azimuth/elevation agree with direction_unit in the local east/north/up frame.
+    up, east, north = local_frame(latitude, longitude)
+    for body in (series.sun, series.earth):
+        for unit, azimuth, elevation in zip(body.direction_unit, body.azimuth_deg, body.elevation_deg, strict=True):
+            e, n, z = (sum(a * b for a, b in zip(unit, axis, strict=True)) for axis in (east, north, up))
+            assert math.degrees(math.atan2(z, math.hypot(e, n))) == pytest.approx(elevation, abs=1e-5)
+            gap = (math.degrees(math.atan2(e, n)) - azimuth + 180.0) % 360.0 - 180.0
+            assert abs(gap) * math.cos(math.radians(elevation)) < 1e-5
+    # Near the pole the Sun stays within the colatitude plus the 1.54 degree tilt of the lunar equator.
+    assert max(abs(e) for e in series.sun.elevation_deg) < 90.0 - abs(latitude) + 1.6
+
+    # Terrain: the stored profile, and every state consistent with its fraction.
+    assert result.site.elevation_source == "terrain_model"
+    assert result.terrain_skyline is not None
+    assert len(result.terrain_skyline.azimuth_deg) == 720
+    assert 0.0 < result.metrics.sky_visibility_fraction <= 1.0
+    for body in (series.sun, series.earth):
+        for fraction, state in zip(body.visibility_fraction, body.obstruction_state, strict=True):
+            assert (fraction == 1.0) == (state == ObstructionState.VISIBLE)
+            assert (0.0 < fraction < 1.0) == (state == ObstructionState.PARTIAL)
+        assert ObstructionState.TERRAIN_BLOCKED in body.obstruction_state
+
+    # Provenance: real kernels and the site's own profile, not synthetic, not injected.
+    assert adapter.info.is_synthetic is False
+    assert adapter.info.available is True
+    assert any("de440s.bsp" in source and "MOON_ME" in source for source in result.sources)
+    assert any(f"stored horizon profile '{site}'" in source for source in result.sources)
+    assert not any("INJECTED" in source for source in result.sources)
+    assert not any("NOT included" in warning for warning in result.warnings)
+
+
+@real_kernels
+@pytest.mark.parametrize("site", sorted(REAL_SITES))
+def test_real_angles_match_compute_sun_earth_angles_within_tolerance(real_year_runs, site):
+    from app.physics.engine.ephemeris import compute_sun_earth_angles
+
+    _, runs = real_year_runs
+    request, result = runs[site]
+    latitude, longitude = REAL_SITES[site]
+    angles = compute_sun_earth_angles(latitude, longitude, YEAR_START, request.duration_s, 3600.0)
+
+    assert [datetime.fromisoformat(a["timestamp"]) for a in angles] == result.timeseries.timestamps_utc
+    worst = 0.0
+    for body_name in ("sun", "earth"):
+        body = getattr(result.timeseries, body_name)
+        for k, sample in enumerate(angles):
+            elevation_gap = abs(body.elevation_deg[k] - sample[f"{body_name}_elevation_deg"])
+            azimuth_gap = abs((body.azimuth_deg[k] - sample[f"{body_name}_azimuth_deg"] + 180.0) % 360.0 - 180.0)
+            worst = max(worst, elevation_gap, azimuth_gap)
+    assert worst < ANGLE_TOLERANCE_DEG
+
+
+@real_kernels
+def test_real_evaluation_through_the_api_is_labelled_physics(app, client, mission_payload):
+    adapter = PhysicsEngineAdapter(spice_kernel_dir=KERNEL_DIR)
+    app.dependency_overrides[get_physics_engine] = lambda: adapter
+    mission_payload["landing_site"] = {"latitude_deg": -85.42088, "longitude_deg": 31.6218}  # nobile
+    mission_payload["stay_duration_days"] = 14
+    mission_payload["launch_delay_days"] = 3
+
+    response = client.post(URL, json=mission_payload)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert response.headers["X-Data-Source"] == "physics_engine"
+    assert body["provenance"]["is_synthetic"] is False
+    assert body["provenance"]["source"] == "physics_engine"
+    assert any("de440s.bsp" in source for source in body["provenance"]["sources"])
+    assert body["timeseries"]["timestamps_utc"][0] == "2027-01-15T00:00:00Z"
+    assert len(body["launch_delay_results"]) == 4
+
+
+@real_kernels
+def test_missing_kernels_stay_explicit_after_real_kernels_were_loaded(real_year_runs, tmp_path):
+    """SPICE's kernel pool is process-wide; an adapter pointed at a missing folder must still refuse."""
+    adapter = PhysicsEngineAdapter(spice_kernel_dir=tmp_path / "no-kernels")
+    with pytest.raises(PhysicsEngineUnavailable, match="SPICE kernel directory not found"):
+        adapter.simulate(_request(latitude_deg=-85.42088, longitude_deg=31.6218))
+    assert adapter.info.available is False
