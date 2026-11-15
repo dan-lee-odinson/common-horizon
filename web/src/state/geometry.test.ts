@@ -102,6 +102,24 @@ describe('loading a track in example mode', () => {
     expect(trackCovers(track, track.endMs - HOUR_MS)).toBe(false);
   });
 
+  it('covers the last instant of the Orbit preview and of the stay, for every launch delay', async () => {
+    // The app asks for the delay plus the longer of the stay and one lunar day (state/data.tsx), and
+    // works out the ends of its windows from the delayed landing. The two sums can differ in the last
+    // bit of a millisecond; the end of a window must still be inside the track.
+    for (const stayDays of [1, 14, 45.25, 365.25]) {
+      for (let slipDays = 0; slipDays <= 30; slipDays += stayDays > 100 ? 15 : 1) {
+        const track = await loadTrack(LAUNCH, slipDays + Math.max(stayDays, SYNODIC_MONTH_DAYS));
+        const landingMs = LANDING + slipDays * DAY_MS;
+        expect(trackCovers(track, LANDING)).toBe(true);
+        expect(trackCovers(track, landingMs)).toBe(true);
+        expect(trackCovers(track, landingMs + SYNODIC_MONTH_DAYS * DAY_MS)).toBe(true);
+        expect(trackCovers(track, landingMs + stayDays * DAY_MS)).toBe(true);
+        // A second past the longer of the two is outside.
+        expect(trackCovers(track, landingMs + Math.max(stayDays, SYNODIC_MONTH_DAYS) * DAY_MS + 1000)).toBe(false);
+      }
+    }
+  });
+
   it('ends the valid range where the answers end when the window is longer than the cap', async () => {
     const track = await loadTrack(LAUNCH, 2000);
     expect(track.samples).toHaveLength(MAX_TRACK_SAMPLES);

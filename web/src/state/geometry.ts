@@ -22,8 +22,8 @@ import { buildTrack, isWholeSample, type GeometryTrack, type TrackSample } from 
 export const GEOMETRY_PROBE: SiteRef = { id: 'geometry-probe', name: 'Geometry probe', lat: 0, lon_east: 0 };
 
 /**
- * Most answers asked for one window: one a day for the longest window the controls allow
- * (a 365.25-day stay after a 30-day delay is 396 days), plus the spare answers at the two ends.
+ * Most answers asked for one window. The longest window the controls allow, a 365.25-day stay after
+ * a 30-day delay, takes 399: one a day across its 395.25 days, plus the spare answers at the ends.
  */
 export const MAX_TRACK_SAMPLES = 400;
 

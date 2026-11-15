@@ -151,7 +151,8 @@ function horizonCovers(horizon: HorizonResponse | null, site: SiteRef | null, tM
 
 /** "Sunrise in 12.3 h", or "Sunrise in about 12 h" when the horizon samples are too far apart for the tenth. */
 function nextChangeQuantity(change: SunChange | null, horizon: HorizonResponse | null, lit: boolean | null): Quantity {
-  if (change && Number.isFinite(change.hours)) {
+  if (change) {
+    if (!Number.isFinite(change.hours)) return missing('next_change', 'Next sunrise or sunset');
     const word = change.kind === 'sunrise' ? 'Sunrise' : 'Sunset';
     // One decimal (six minutes) only when the change was read off a crossing between two close
     // samples. Otherwise whole hours, and the label says "about".

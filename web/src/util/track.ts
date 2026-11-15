@@ -6,10 +6,10 @@
 // between. Nothing here invents a value: outside the first and last answers the track holds the
 // end values, and it is null until answers arrive.
 //
-// How good the join is: with answers a day apart the curve stays within 0.002° of the mock model
-// (src/util/track.test.ts), which carries the two decimals the readouts show. That only holds
-// between answers that have a neighbour on both sides, so a loaded track also says which part of
-// itself readouts may be taken from (`validStartMs` .. `validEndMs`, see `trackCovers`).
+// How good the join is: with answers a day apart the curve stays within 0.005° of the mock model,
+// half of the last digit the readouts show (src/util/track.test.ts). That only holds between
+// answers that have a neighbour on both sides, so a loaded track also says which part of itself
+// readouts may be taken from (`validStartMs` .. `validEndMs`, see `trackCovers`).
 
 import type { Geometry } from '../api/types';
 import { normalizeLon360, wrap180 } from './geo';
