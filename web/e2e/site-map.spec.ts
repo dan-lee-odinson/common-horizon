@@ -143,8 +143,12 @@ test('site map: the stored picture at once, the live tiles over it, the layers, 
   // Closed until asked for: the stage looks as it did.
   await expect(page.getByTestId('site-map')).toHaveCount(0);
   await expect(page.getByTestId('site-map-toggle')).toHaveText('Site map · NASA Moon Trek');
+  const band = page.locator('[data-site-zone="checks"]');
+  await expect(band).toBeVisible();
   await openMap(page);
   await expect(page.getByTestId('site-map-close')).toBeFocused();
+  // The panel takes the room down to the console: the Data checks band steps aside while it is open.
+  await expect(band).toBeHidden();
 
   const frame = page.getByTestId('site-map-frame');
   await expect(page.getByTestId('site-map-stored')).toHaveAttribute('src', /(^|\/)site-context\/apollo-15\.jpg$/);
@@ -212,6 +216,7 @@ test('site map: the stored picture at once, the live tiles over it, the layers, 
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('site-map')).toHaveCount(0);
   await expect(page.getByTestId('site-map-toggle')).toBeFocused();
+  await expect(band).toBeVisible();
 });
 
 test('site map: keeps the stored picture when Moon Trek is refused, and when six seconds pass', async ({ page }) => {

@@ -1,6 +1,8 @@
-// How the Site map panel shares its room, at the window sizes the browser tests use. The free part
-// of the window was measured on the Site stage: at 1440 x 900 it runs from 111.4 px (below the top
-// strip) to 599.1 px (the console's top), and from 352.5 px to 1099.3 px across.
+// How the Site map panel shares its room, at the window sizes the browser tests use. The panel's
+// room was measured on the Site stage at 1440 x 900: from below the top strip (114 to 131 px, as
+// the strip's text wraps) down to the console's top (609 to 611 px; the Data checks band, which
+// rests on the console, steps aside while the panel is open), and from 344.6 px to 1114.9 px across
+// between the wings. The tighter of each is used here.
 
 import { describe, expect, it } from 'vitest';
 import { layerByLabel, VIEW_H, VIEW_W } from '../util/moonTrek';
@@ -10,7 +12,8 @@ import { legendSize, mapHeight, PANEL, panelFit } from './siteMapLayout';
 function roomAt(top: number, bottom: number, left: number, right: number) {
   return { room: bottom - top - 12, freeW: right - left - 24 };
 }
-const DESK = roomAt(111.4, 599.1, 352.5, 1099.3);
+const DESK = roomAt(131.3, 609.1, 344.6, 1114.9);
+/** A shorter window: 316 px from the top strip to the console (1280 x 720 before the band came). */
 const SMALL = roomAt(110.7, 427.1, 350.5, 940.8);
 const TALL = layerByLabel('LRO_LOLA_ClrSlope_Global_16ppd')!.legend!;
 const WIDE = layerByLabel('ColorSlope_LRO_LOLA_DEM_SPole875_5mp_v04')!.legend!;

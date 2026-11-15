@@ -7,6 +7,10 @@
 // the panel says so. A custom point has no stored picture: a plain placeholder stands until the
 // tiles are in.
 //
+// On a wide screen the panel takes the height from the top strip down to the console. The Data
+// checks band rests on the console there, so it steps aside while the panel is open and comes back
+// when it closes: a tall legend at 3x is 450 px, more than the room above the band at 1440 x 900.
+//
 // The tiles are plain <img> elements placed in a clipped box (no canvas, no map library). All the
 // arithmetic is in util/moonTrek.ts, ported from tools/site-context/moon_trek_tiles.py. The view
 // keeps the site at its centre: three zoom steps, no panning. A slope layer shows Moon Trek's own
@@ -16,7 +20,8 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import type { SiteRef } from '../api/types';
 import { Icon } from '../components/Icon';
 import { Glass } from '../hud/Glass';
-import { siteFrame } from '../scene/siteView';
+import { layoutBox } from '../hud/layoutBox';
+import { siteFrame, type SiteFrame } from '../scene/siteView';
 import { appStore } from '../state/app';
 import { createStore, useStore } from '../state/store';
 import {
@@ -74,7 +79,8 @@ export function SiteMap({ site, phone }: { site: SiteRef | null; phone: boolean 
     moveFocus.current = false;
     (open ? closeRef.current : toggleRef.current)?.focus();
   }, [open]);
-  useSceneTagsClear(panelRef, open);
+  const consoleTop = useConsoleTop(frame, phone);
+  useClearUnderPanel(panelRef, open && !(phone && sheetOpen), !phone);
 
   if (!site || !frame.measured || (phone && sheetOpen)) return null;
 
@@ -94,7 +100,9 @@ export function SiteMap({ site, phone }: { site: SiteRef | null; phone: boolean 
   const right = Math.max(GAP, frame.width - frame.right + GAP);
   const toggleTop = frame.top + (phone ? 8 : GAP);
   const panelTop = phone ? 68 : frame.top + EDGE;
-  const bottom = Math.max(EDGE, frame.height - frame.bottom + (phone ? 8 : EDGE));
+  // Down to the console on a wide screen (the Data checks band steps aside), to the dock on a phone.
+  const floor = phone || consoleTop === null ? frame.bottom : consoleTop;
+  const bottom = Math.max(EDGE, frame.height - floor + (phone ? 8 : EDGE));
   const room = Math.max(0, frame.height - panelTop - bottom);
   const freeW = phone ? frame.width - 2 * GAP : frame.right - frame.left - 2 * GAP;
 
@@ -128,28 +136,48 @@ export function SiteMap({ site, phone }: { site: SiteRef | null; phone: boolean 
 
 /** The scene's labelled markers (scene/SiteMarkers.tsx). They are drawn above the HUD, so they would show through the panel. */
 const SCENE_TAGS = '[data-testid="site-marker"]';
+/** The Site stage's console and its Data checks band, by the marks the stage measures them by (useSiteFrame in SiteHud.tsx). */
+const CONSOLE = '[data-site-zone="console"]';
+const CHECKS_BAND = '[data-site-zone="checks"]';
+
+/** Where the console begins, from layout alone (as the stage measures it): the floor of the panel's room on a wide screen. */
+function useConsoleTop(frame: SiteFrame, phone: boolean): number | null {
+  const [top, setTop] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = phone ? null : document.querySelector<HTMLElement>(CONSOLE);
+    const root = el?.closest<HTMLElement>('[data-testid="site-hud"]');
+    const next = el && root && el.offsetHeight > 0 ? layoutBox(el, root).top : null;
+    setTop((p) => (p === next ? p : next));
+    // The stage measures again whenever a size changes, and `frame` changes with it.
+  }, [frame, phone]);
+  return top;
+}
 
 /**
- * While the panel is open, a scene tag that it covers is hidden, and shown again once it is clear:
- * the stage's rule that a tag never touches a glass panel. Checked once per frame, as the scene
- * moves its tags once per frame. `visibility` only, so the scene's own showing and hiding (by
- * `display`) is left alone.
+ * While the panel is open, what it would cover is set aside, and shown again once it is clear or
+ * the panel closes: a scene tag the panel covers (the stage's rule is that a tag never touches a
+ * glass panel), and on a wide screen the Data checks band, whose room the panel takes. Checked once
+ * per frame, as the scene moves its tags once per frame. `visibility` only, so the stage's own
+ * showing and hiding (by `display`, or by leaving an element out) is left alone.
  */
-function useSceneTagsClear(panelRef: RefObject<HTMLElement | null>, open: boolean): void {
+function useClearUnderPanel(panelRef: RefObject<HTMLElement | null>, open: boolean, band: boolean): void {
   useEffect(() => {
     if (!open) return;
     const hidden = new Set<HTMLElement>();
     let raf = 0;
+    const set = (el: HTMLElement, hide: boolean) => {
+      if (hide === hidden.has(el)) return;
+      el.style.visibility = hide ? 'hidden' : '';
+      if (hide) hidden.add(el);
+      else hidden.delete(el);
+    };
     const tick = () => {
       const p = panelRef.current?.getBoundingClientRect();
       for (const el of document.querySelectorAll<HTMLElement>(SCENE_TAGS)) {
         const r = el.getBoundingClientRect();
-        const under = p !== undefined && r.width > 0 && r.left < p.right && p.left < r.right && r.top < p.bottom && p.top < r.bottom;
-        if (under === hidden.has(el)) continue;
-        el.style.visibility = under ? 'hidden' : '';
-        if (under) hidden.add(el);
-        else hidden.delete(el);
+        set(el, p !== undefined && r.width > 0 && r.left < p.right && p.left < r.right && r.top < p.bottom && p.top < r.bottom);
       }
+      if (band) for (const el of document.querySelectorAll<HTMLElement>(CHECKS_BAND)) set(el, p !== undefined);
       raf = requestAnimationFrame(tick);
     };
     tick();
@@ -157,7 +185,7 @@ function useSceneTagsClear(panelRef: RefObject<HTMLElement | null>, open: boolea
       cancelAnimationFrame(raf);
       for (const el of hidden) el.style.visibility = '';
     };
-  }, [panelRef, open]);
+  }, [panelRef, open, band]);
 }
 
 interface TileLoad {
