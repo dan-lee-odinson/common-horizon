@@ -2,6 +2,7 @@
   "id": "starship-lander",
   "name": "Starship lander (stand-in)",
   "file": "starship-lander.glb",
+  "kind": "code-built",
   "status": "NASA figure, secondary source",
   "note": "illustrative shape, built with SI/AI-written code",
   "units": "meters",

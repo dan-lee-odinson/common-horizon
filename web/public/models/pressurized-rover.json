@@ -1,0 +1,106 @@
+{
+  "id": "pressurized-rover",
+  "name": "Pressurized rover (crewed, six wheels)",
+  "file": "pressurized-rover.glb",
+  "kind": "generated",
+  "status": "JAXA figure",
+  "note": "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 4.304,
+    "height_y": 4.85,
+    "depth_z": 6.854
+  },
+  "dimension_sources": [
+    {
+      "dimension": "width_x",
+      "value_m": 4.304,
+      "meaning": "overall width (X, side to side) of the finished shape",
+      "source": "measured on the finished shape, after scaling it evenly to the published height",
+      "status": "our estimate",
+      "published": {
+        "value_m": 4.84,
+        "source": "same JAXA report: width 4.84 m",
+        "link": "https://www.mext.go.jp/content/20250929-mxt_uchukai01-000045059_005.pdf",
+        "status": "JAXA figure"
+      },
+      "difference_percent": -11.1
+    },
+    {
+      "dimension": "height_y",
+      "value_m": 4.85,
+      "meaning": "overall height of the full-size vehicle (the source does not say whether it includes the dish antenna)",
+      "source": "JAXA Human Spaceflight Technology Directorate, progress report on the crewed pressurized rover (document 99-3, 29 September 2025, filed with the MEXT space development committee), page 8: L x W x H = 6.44 m x 4.84 m x 4.85 m",
+      "link": "https://www.mext.go.jp/content/20250929-mxt_uchukai01-000045059_005.pdf",
+      "status": "JAXA figure"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 6.854,
+      "meaning": "overall length (Z, front to back) of the finished shape",
+      "source": "measured on the finished shape, after scaling it evenly to the published height",
+      "status": "our estimate",
+      "published": {
+        "value_m": 6.44,
+        "source": "same JAXA report: length 6.44 m",
+        "link": "https://www.mext.go.jp/content/20250929-mxt_uchukai01-000045059_005.pdf",
+        "status": "JAXA figure"
+      },
+      "difference_percent": 6.4
+    }
+  ],
+  "generation": {
+    "picture": {
+      "description": "Photo of a scale model of the rover in a display case at an exhibition on 8 November 2026, seen from the left side and a little from the front; before sending, everything outside the model (people behind the case, two astronaut figurines, floor and reflections) was painted white",
+      "credit": "Dan Lee-Odinson (team member's own photo of a scale model)",
+      "in_repository": false
+    },
+    "model": "TRELLIS.2",
+    "model_maker": "Microsoft",
+    "model_license": "MIT",
+    "endpoint": "fal-ai/trellis-2",
+    "service": "fal.ai",
+    "request_id": "01a1e085-3896-7211-8d26-39bed833541a",
+    "date": "2026-11-15",
+    "settings": {
+      "seed": 42,
+      "resolution": 1024,
+      "texture_size": 1024,
+      "decimation_target": 18000,
+      "remesh": true
+    },
+    "cleanup": null
+  },
+  "triangles": 17401,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "Made from a photo of a scale model, not of the vehicle; the model may differ from the current design.",
+    "The picture shows the left side and a little of the front; the generator guessed the right side, the back and the underside.",
+    "A figurine stood in front of the rear wheel in the photo, so the rear wheels came out only as partial arcs.",
+    "The dish antenna came out as a rough lump, and thin parts (masts, ladder) are rough.",
+    "The generated shape is slightly warped: it rests on one middle wheel, and the other wheels are 6 to 17 cm above the ground.",
+    "Scaled evenly to JAXA's height of 4.85 m for the full-size vehicle; width and length are measured from the shape and shown beside JAXA's 4.84 m and 6.44 m for comparison.",
+    "All colours, textures and markings removed; one plain grey material."
+  ],
+  "finishing": {
+    "rotate_deg": [
+      0,
+      180,
+      0
+    ],
+    "drop_loose_parts_below": 0,
+    "flatten_below": 0,
+    "flattened_vertices": 0,
+    "input_file": "trellis2_8668336e5ddf46e8a9e0f18d449fac1f.glb",
+    "input_sha256": "52be3275f5f5503c74f7c042e1d3c6c80c1672fd62e3e58f23013df500903909",
+    "input_triangles": 17401,
+    "removed_loose_parts": {
+      "pieces": 0,
+      "triangles": 0
+    },
+    "scale_factor": 6.877817,
+    "material": "one neutral material; every texture, image, UV coordinate, per-vertex colour and original material removed"
+  },
+  "built_by": "tools/models/finish-model.mjs"
+}

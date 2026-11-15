@@ -2,6 +2,7 @@
   "id": "griffin-lander",
   "name": "Griffin lander",
   "file": "griffin-lander.glb",
+  "kind": "code-built",
   "status": "company figure, secondary source",
   "note": "illustrative shape, built with SI/AI-written code",
   "units": "meters",

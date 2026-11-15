@@ -6,8 +6,10 @@
 //   2. counts the triangles and fails if the count is 20,000 or more, or differs from the JSON;
 //   3. checks the frame: lowest point on the ground (y = 0) and footprint centred on the
 //      origin, both within 1 mm;
-//   4. checks the JSON against the brief (status label, brief sizes, required fields,
-//      the "illustrative shape, built with SI/AI-written code" note);
+//   4. checks the JSON against the brief (kind of model, status label, brief sizes, required
+//      fields, and the exact note for the kind of model: code-built, imported or generated);
+//      imported models must name the author, source address and terms; generated models must
+//      name the picture's credit, the model (TRELLIS.2), the service, the request id and the date;
 //   5. checks for plain colours only: no images, textures or vertex colours;
 //   6. runs the Khronos glTF validator and fails on any error.
 // It also fails if a brief model is missing or a .glb has no .json.
@@ -23,7 +25,16 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import validator from 'gltf-validator';
 import { measureGLB } from './shared/glb-reader.mjs';
-import { BRIEF, TRIANGLE_LIMIT, SIZE_TOLERANCE, ORIGIN_TOLERANCE_M, REQUIRED_NOTE } from './brief-figures.mjs';
+import {
+  BRIEF,
+  TRIANGLE_LIMIT,
+  SIZE_TOLERANCE,
+  ORIGIN_TOLERANCE_M,
+  REQUIRED_NOTES,
+  KINDS,
+  GENERATOR_MODEL,
+  CLEANUP_MODEL,
+} from './brief-figures.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_DIR = path.resolve(here, '../../web/public/models');
@@ -41,6 +52,58 @@ function percent(value) {
 
 function isPositiveNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function isText(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A real calendar date written like 2026-11-15. */
+export function isIsoDate(value) {
+  if (!(isText(value) && ISO_DATE.test(value))) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** An https address with a real host name (for example https://example.org/page). */
+export function isHttpsAddress(value) {
+  if (!isText(value) || /\s/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Where an imported model comes from: author, source address and terms. */
+export function checkImportedSource(json) {
+  const problems = [];
+  const s = json.source;
+  if (!s || typeof s !== 'object') return ['JSON: an imported model needs a "source" with its author, address and terms'];
+  if (!isText(s.author)) problems.push('JSON: imported model: "source.author" (who made the CAD model) is missing');
+  if (!isHttpsAddress(s.url)) problems.push('JSON: imported model: "source.url" (the source address, https://...) is missing');
+  if (!isText(s.terms)) problems.push('JSON: imported model: "source.terms" (the terms we rely on) is missing');
+  return problems;
+}
+
+/** How a generated model was made: picture credit, model, service, request id and date. */
+export function checkGeneration(json) {
+  const problems = [];
+  const g = json.generation;
+  if (!g || typeof g !== 'object') return ['JSON: a generated model needs a "generation" record'];
+  if (!isText(g.picture?.credit)) problems.push("JSON: generated model: \"generation.picture.credit\" (the picture's credit) is missing");
+  if (g.model !== GENERATOR_MODEL) problems.push(`JSON: generated model: "generation.model" must be "${GENERATOR_MODEL}" (got ${JSON.stringify(g.model)})`);
+  if (!isText(g.service)) problems.push('JSON: generated model: "generation.service" is missing');
+  if (!isText(g.request_id)) problems.push('JSON: generated model: "generation.request_id" is missing');
+  if (!isIsoDate(g.date)) problems.push('JSON: generated model: "generation.date" must be a real date like 2026-11-15');
+  if (g.cleanup !== undefined && g.cleanup !== null) {
+    if (g.cleanup.model !== CLEANUP_MODEL) problems.push(`JSON: generated model: the cleanup step must name "${CLEANUP_MODEL}" as its model`);
+    if (!isText(g.cleanup.request_id)) problems.push('JSON: generated model: the cleanup step has no request id');
+  }
+  return problems;
 }
 
 function compareSizes(label, measuredSize, declared, problems) {
@@ -71,7 +134,13 @@ export function checkDescription(json, { fileBase } = {}) {
   need(typeof json.name === 'string' && json.name.length > 0, 'JSON: "name" is missing');
   need(json.file === `${json.id}.glb`, `JSON: "file" should be "${json.id}.glb"`);
   need(typeof json.status === 'string' && json.status.length > 0, 'JSON: "status" label is missing');
-  need(json.note === REQUIRED_NOTE, `JSON: "note" must read exactly "${REQUIRED_NOTE}"`);
+  const kindKnown = KINDS.includes(json.kind);
+  need(kindKnown, `JSON: "kind" must be one of ${KINDS.join(', ')} (got ${JSON.stringify(json.kind)})`);
+  if (kindKnown) {
+    need(json.note === REQUIRED_NOTES[json.kind], `JSON: "note" for ${json.kind === 'imported' ? 'an' : 'a'} ${json.kind} model must read exactly "${REQUIRED_NOTES[json.kind]}"`);
+  }
+  if (json.kind === 'imported') problems.push(...checkImportedSource(json));
+  if (json.kind === 'generated') problems.push(...checkGeneration(json));
   need(json.units === 'meters', 'JSON: "units" must be "meters"');
   need(json.dimensions_m && typeof json.dimensions_m === 'object', 'JSON: "dimensions_m" is missing');
   need(Number.isInteger(json.triangles), 'JSON: "triangles" must be a whole number');
@@ -88,6 +157,12 @@ export function checkDescription(json, { fileBase } = {}) {
     need(typeof entry.source === 'string' && entry.source.length > 0, `JSON: source text for ${dim} is empty`);
     need(typeof entry.status === 'string' && entry.status.length > 0, `JSON: status label for ${dim} is empty`);
     need(entry.value_m === json.dimensions_m?.[dim], `JSON: source entry for ${dim} says ${entry.value_m} m but dimensions_m says ${json.dimensions_m?.[dim]} m`);
+    if (entry.published !== undefined) {
+      const p = entry.published;
+      need(isPositiveNumber(p?.value_m) && isText(p?.source) && isText(p?.status),
+        `JSON: the published figure beside ${dim} needs a positive value_m, a source and a status`);
+      need(Number.isFinite(entry.difference_percent), `JSON: the published figure beside ${dim} has no difference_percent`);
+    }
   }
   for (const part of json.parts ?? []) {
     need(typeof part.node === 'string' && part.node.length > 0, 'JSON: a part has no "node" name');
@@ -105,8 +180,20 @@ export function checkAgainstBrief(json, brief) {
     problems.push(`brief: "${json.id}" is not one of the models in the brief`);
     return { problems, warnings };
   }
+  if (json.kind !== brief.kind) {
+    problems.push(`brief: kind should be "${brief.kind}" but the JSON says "${json.kind}"`);
+  }
   if (json.status !== brief.status) {
     problems.push(`brief: status should be "${brief.status}" but the JSON says "${json.status}"`);
+  }
+  if (brief.author && !String(json.source?.author ?? '').startsWith(brief.author)) {
+    problems.push(`brief: the author should be ${brief.author} but the JSON says ${JSON.stringify(json.source?.author)}`);
+  }
+  if (brief.picture_credit && !String(json.generation?.picture?.credit ?? '').startsWith(brief.picture_credit)) {
+    problems.push(`brief: the picture credit should name ${brief.picture_credit} but the JSON says ${JSON.stringify(json.generation?.picture?.credit)}`);
+  }
+  if (brief.triangles !== undefined && json.triangles !== brief.triangles) {
+    problems.push(`brief: the model should have ${brief.triangles} triangles but the JSON says ${json.triangles}`);
   }
   for (const [dim, value] of Object.entries(brief.dimensions_m ?? {})) {
     const declared = json.dimensions_m?.[dim];
