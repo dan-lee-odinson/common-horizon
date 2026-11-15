@@ -221,3 +221,9 @@ __marimo__/
 
 # Private local notes: personal coordination, meeting notes, timelines. Never committed.
 /.local-notes/
+
+# Large scientific datasets
+backend/app/physics/data/datasets/
+
+# Local VS Code settings
+.vscode/
