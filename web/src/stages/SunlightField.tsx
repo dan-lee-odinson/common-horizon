@@ -7,7 +7,8 @@
 // the controls, which are measured from the page itself. The arithmetic is in scene/sunlight.ts and is tested there.
 
 import { useId, useRef, type RefObject } from 'react';
-import { clipLine, edgeGlow, lineLevel, sunExit, sunlightView, SUNLIGHT, type Box } from '../scene/sunlight';
+import { orbitTurn } from '../scene/orbitTurn';
+import { clipLine, edgeGlow, lineLevel, rowInFrame, sunExit, sunlightView, SUNLIGHT, type Box } from '../scene/sunlight';
 import { useTicker } from '../hud/useTicker';
 
 /** Frames between two measurements of the panels (they move a little as the HUD leans with the pointer). */
@@ -38,7 +39,15 @@ export function SunlightField({ root, active, isPhone }: { root: RefObject<HTMLD
         const r = node.getBoundingClientRect();
         return r.width > 0 && r.height > 0 ? [{ left: r.left - base.left, top: r.top - base.top, right: r.right - base.left, bottom: r.bottom - base.top }] : [];
       });
+      // The scene keeps the Sun's own tag off the panels too.
+      light.keepClear = s.keep;
     }
+    // How far the view is turned, for anyone reading the page (the tests do).
+    const turn = orbitTurn.get();
+    const lon = turn.lon.toFixed(1);
+    const lat = turn.lat.toFixed(1);
+    if (host.dataset.turnLon !== lon) host.dataset.turnLon = lon;
+    if (host.dataset.turnLat !== lat) host.dataset.turnLat = lat;
 
     // ---- the lines of light ----
     const d = ['', '', ''];
@@ -46,7 +55,7 @@ export function SunlightField({ root, active, isPhone }: { root: RefObject<HTMLD
     if (on && light.strength > 0.01) {
       for (const line of light.lines) {
         const level = lineLevel(line.k, light.gapPx);
-        if (level <= 0.01) continue;
+        if (level <= 0.01 || !rowInFrame(line, s.frame)) continue;
         const bucket = Math.abs(line.k) % 4 === 0 ? 0 : Math.abs(line.k) % 2 === 0 ? 1 : 2;
         for (const piece of clipLine(line, s.frame, light.bodies, s.keep)) {
           d[bucket] += `M${piece.x1.toFixed(1)} ${piece.y1.toFixed(1)}L${piece.x2.toFixed(1)} ${piece.y2.toFixed(1)}`;

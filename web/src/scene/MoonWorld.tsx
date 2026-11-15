@@ -10,7 +10,11 @@
 //   Earth is drawn at its true size beside the Moon, behind it and out along its true direction,
 //   joined to its bracket by a line; its distance is not to scale. It shows NASA's Blue Marble map,
 //   turns once a day of previewed time and is lit from the same direction as the Moon. Earth is
-//   never drawn between the camera and the Moon.
+//   never drawn between the camera and the Moon: when the visitor turns the view to Earth's side
+//   it fades out.
+//   The far sky (FarSky, below) rides with the camera: the stars, and the Sun's own disc at its
+//   true direction and true apparent size. Being infinitely far away, they keep their places
+//   against each other however the camera turns or zooms.
 //   Site markers, and a pulsing reticle on the site in the spotlight. (Both fade out as the camera
 //   dives to a site: the HUD's own reticle carries the landing point from there.)
 
@@ -29,10 +33,12 @@ import { glowTexture } from './glow';
 import { hiddenByMoon } from './occlusion';
 import { MISSION_VIEW } from './missionView';
 import { EARTH_MAPS, earthSurface, earthTurnDeg, ORBIT_ATMOSPHERE_FRAGMENT, ORBIT_EARTH_FRAGMENT, ORBIT_EARTH_VERTEX } from './orbitEarth';
+import { earthFade, orbitSun, SUN_DRAW_DISTANCE, sunBallRadius, sunHiddenBy, sunRadiusPx } from './orbitTurn';
 import { ORBIT_VIEW, ringRadii, SUN_TICK } from './orbitView';
 import { geometryNow, sceneTimeMs, toVector, type SceneData } from './sceneData';
 import { DISC_FRAGMENT, DISC_VERTEX, MOON_FRAGMENT, MOON_VERTEX, RETICLE_FRAGMENT, RETICLE_VERTEX } from './shaders';
-import { sunlightSheet, sunlightStrength, sunlightView, SUNLIGHT, type Circle, type ScreenLine } from './sunlight';
+import { lineReach, sunlightSheet, sunlightStrength, sunlightView, SUNLIGHT, type Circle, type ScreenLine } from './sunlight';
+import { Stars } from './Stars';
 import { MOON_MAPS, MOON_RELIEF_STRENGTH } from './textures';
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -269,21 +275,35 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
       k.uniforms.uDays.value = t !== null && d.landingMs !== null ? Math.max(0, (t - d.landingMs) / DAY_MS) : 0;
     }
 
-    // Earth: out along its true direction. It is drawn only while it is farther from the camera
-    // than the Moon's centre, so it can never cover the Moon's face or a site marker.
+    // Earth: out along its true direction. It can never cover the Moon's face or a site marker: in
+    // the standard view it stands behind the Moon, and when the visitor turns the view so that it
+    // would come between the camera and the Moon, it fades out (see earthFade).
     const earthPos = earthGroup.current?.position.copy(earthDir).multiplyScalar(earthDistance);
-    const camDist = camera.position.length();
-    const behind = earthPos ? earthPos.distanceTo(camera.position) > camDist + 0.2 && earthPos.dot(camera.position) < 0 : false;
-    const earthShown = bodies && behind;
-    shown.current.earth = earthShown;
+    const fadeE = earthPos ? earthFade(camera.position, earthPos, earthRadius) : 0;
+    const earthShown = bodies && fadeE > 0.01;
+    // Its tag, its leader line and the lines of sunlight treat it as there only while it is mostly drawn.
+    shown.current.earth = bodies && fadeE > 0.5;
     if (earthGroup.current) {
       earthGroup.current.visible = earthShown;
       earthGroup.current.scale.setScalar(Math.max(0.001, show));
     }
+    if (earth.current) {
+      const e = earth.current;
+      e.uniforms.uOpacity.value = fadeE;
+      // Solid while fully drawn (it then hides what is behind it, the Sun included); see-through while fading.
+      const solid = fadeE > 0.999;
+      if (e.transparent === solid) {
+        e.transparent = !solid;
+        e.needsUpdate = true;
+      }
+      e.depthWrite = fadeE > 0.5;
+    }
+    if (atmosphere.current) atmosphere.current.uniforms.uOpacity.value = fadeE;
     if (earthLine.current) {
       // The line from the bracket on toward Earth.
       const from = radii[3];
       const to = earthDistance - earthRadius * 1.15;
+      (earthLine.current.material as THREE.MeshBasicMaterial).opacity = 0.55 * fadeE;
       earthLine.current.visible = earthShown;
       earthLine.current.position.copy(earthDir).multiplyScalar((from + to) / 2);
       earthLine.current.quaternion.setFromUnitVectors(UP, earthDir);
@@ -515,6 +535,7 @@ function MoonAnchors({
       a.r = radius > 0 && depth > 0 ? (radius / depth) * pxPerUnit : 0;
       a.visible = inFront && onScreen && clear;
     };
+    if (!g || !shown.current.bodies) anchors.sunDisc.visible = false;
     if (g && shown.current.bodies) {
       // The Sun's tag stands at its tick on the Sun ring (in the ring's plane), not at a body.
       place('sun', toVector(0, g.subsolar_lon_east, radii[1], v), false);
@@ -537,7 +558,8 @@ function MoonAnchors({
       limb.x = e.x + (dx / len) * e.r;
       limb.y = e.y + (dy / len) * e.r;
       limb.r = 0;
-      limb.visible = e.r > 0 && limb.x >= 0 && limb.x <= size.width && limb.y >= 0 && limb.y <= size.height;
+      // With the view turned, Earth can stand behind a glass panel: its tag is then left out rather than laid over the panel.
+      limb.visible = e.r > 0 && limb.x >= 0 && limb.x <= size.width && limb.y >= 0 && limb.y <= size.height && !nearPanel(limb.x, limb.y, 150, 44);
     } else {
       anchors.earth.visible = false;
       anchors.earthLimb.visible = false;
@@ -559,6 +581,7 @@ function MoonAnchors({
     if (!g || !shown.current.bodies || !inOrbit) {
       light.shown = false;
       light.lines.length = 0;
+      anchors.sunDisc.visible = false;
       return;
     }
     const toPx = (ndc: THREE.Vector3, out: { x: number; y: number }) => {
@@ -592,8 +615,9 @@ function MoonAnchors({
         line.y = a2.y;
         line.ux = (b2.x - a2.x) / len;
         line.uy = (b2.y - a2.y) / len;
-        line.to = light.sun ? Math.hypot(light.sun.x - a2.x, light.sun.y - a2.y) : Infinity;
-        line.from = opposite ? -Math.hypot(opposite.x - a2.x, opposite.y - a2.y) : -Infinity;
+        const reach = lineReach(a2, light.sun, opposite);
+        line.to = reach.to;
+        line.from = reach.from;
         light.lines[n++] = line;
       }
     }
@@ -611,6 +635,22 @@ function MoonAnchors({
       light.heading.ux = 0;
       light.heading.uy = -1;
     }
+    // The Sun's own disc: where its direction meets the picture, at its true apparent size. Its tag
+    // says what hides it, and stands aside from the glass panels.
+    const disc = anchors.sunDisc;
+    light.sunRadius = sunRadiusPx(size.height);
+    const hiddenBy = sunHiddenBy(cam.position, sun, shown.current.earth ? toVector(g.subearth_lat, g.subearth_lon_east, earthDistance, v) : null, earthRadius);
+    light.sunHiddenBy = hiddenBy;
+    orbitSun.set({ hiddenBy });
+    if (light.sun) {
+      disc.x = light.sun.x;
+      disc.y = light.sun.y;
+      disc.r = light.sunRadius;
+      const onScreen = disc.x >= 0 && disc.x <= size.width && disc.y >= 0 && disc.y <= size.height;
+      // Under or beside a panel the tag would cover it: the disc is still drawn, the tag is not.
+      disc.visible = onScreen && !nearPanel(disc.x, disc.y, 200, 48) && shown.current.opacity > 0.5;
+    } else disc.visible = false;
+
     // The Moon and Earth as outlines on screen: a line of light stops at the Moon, and is not drawn across Earth.
     toPx(p.copy(cam.position).add(forward).project(cam), a2);
     light.bodies.length = 0;
@@ -621,6 +661,11 @@ function MoonAnchors({
 }
 
 const scratch = new THREE.Vector3();
+
+/** Is a point of the picture under a glass panel or the controls, or within reach of one (so a tag there would touch it)? */
+function nearPanel(x: number, y: number, reachX: number, reachY: number): boolean {
+  return sunlightView.keepClear.some((b) => x > b.left - reachX && x < b.right + reachX && y > b.top - reachY && y < b.bottom + reachY);
+}
 
 /**
  * A ball's outline on screen. Away from the middle of a perspective picture a ball is drawn as an
@@ -657,4 +702,73 @@ function outline(cam: THREE.PerspectiveCamera, forward: THREE.Vector3, centrePx:
   out.long.r = (outer - inner) / 2;
   out.r = cos2 > 1e-6 ? Math.min(out.long.r, (pxPerUnit * Math.sin(half)) / Math.sqrt(cos2)) : out.long.r;
   return out;
+}
+
+// ---------- the far sky ----------
+
+/** The Sun's glow is this many disc widths across, in two layers: a bright one close in and a faint wide one. */
+const SUN_GLOW = { near: 9, nearOpacity: 0.55, far: 34, farOpacity: 0.16 } as const;
+
+/**
+ * What is infinitely far away: the stars, and (in Orbit) the Sun's own disc with its glow.
+ * The whole group rides with the camera, so nothing in it shifts when the camera moves: only when
+ * it turns. The Sun stands along its true direction from the camera, as a ball exactly as wide as
+ * the Sun looks (0.53 degrees), so its size on screen is true at any zoom. It is drawn behind
+ * everything else: the Moon and Earth hide it, and its glow, whenever they are in front of it.
+ */
+export function FarSky({ data, visible }: { data: SceneData; visible: boolean }) {
+  const stage = useStore(appStore, (s) => s.stage);
+  const group = useRef<THREE.Group>(null);
+  const sun = useRef<THREE.Group>(null);
+  const discMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  const nearGlow = useRef<THREE.SpriteMaterial>(null);
+  const farGlow = useRef<THREE.SpriteMaterial>(null);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  const colors = useMemo(() => {
+    const amber = color('--ch-sun');
+    // The disc is the Sun's amber burnt toward white, so its edge stays crisp inside the glow.
+    return { disc: amber.clone().lerp(new THREE.Color(1, 1, 1), 0.6), glow: amber };
+  }, []);
+  const glow = useMemo(() => glowTexture(), []);
+  const radius = sunBallRadius();
+  // The Sun belongs to the Orbit stage: it fades out with the rings on the way to mission select.
+  const fade = useRef({ k: stage === 'orbit' ? 1 : 0 });
+  useEffect(() => {
+    const tween = gsap.to(fade.current, { k: stage === 'orbit' ? 1 : 0, duration: data.reducedMotion ? 0 : 0.6, ease: 'power2.out' });
+    return () => {
+      tween.kill();
+    };
+  }, [stage, data.reducedMotion]);
+  useFrame(({ camera }) => {
+    group.current?.position.copy(camera.position);
+    const s = sun.current;
+    if (!s) return;
+    const g = geometryNow(dataRef.current);
+    const k = fade.current.k;
+    s.visible = Boolean(g) && k > 0.01;
+    if (!g) return;
+    toVector(g.subsolar_lat, g.subsolar_lon_east, SUN_DRAW_DISTANCE, s.position);
+    if (discMaterial.current) discMaterial.current.opacity = k;
+    if (nearGlow.current) nearGlow.current.opacity = SUN_GLOW.nearOpacity * k;
+    if (farGlow.current) farGlow.current.opacity = SUN_GLOW.farOpacity * k;
+  });
+  return (
+    <group ref={group} visible={visible}>
+      <Stars />
+      <group ref={sun} visible={false}>
+        <mesh name="sun-disc" renderOrder={-3} frustumCulled={false}>
+          <sphereGeometry args={[radius, 32, 20]} />
+          <meshBasicMaterial ref={discMaterial} color={colors.disc} transparent depthWrite={false} toneMapped={false} />
+        </mesh>
+        {/* The glow is light round the disc, not the disc: the caption says so. */}
+        <sprite scale={[radius * 2 * SUN_GLOW.near, radius * 2 * SUN_GLOW.near, 1]} renderOrder={-4}>
+          <spriteMaterial ref={nearGlow} map={glow} color={colors.glow} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        </sprite>
+        <sprite scale={[radius * 2 * SUN_GLOW.far, radius * 2 * SUN_GLOW.far, 1]} renderOrder={-5}>
+          <spriteMaterial ref={farGlow} map={glow} color={colors.glow} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        </sprite>
+      </group>
+    </group>
+  );
 }

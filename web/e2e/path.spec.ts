@@ -70,10 +70,13 @@ test('orbit: the readouts run from real data, the preview pauses, and mission se
   await page.getByTestId('begin').click();
 
   await expect(page.getByTestId('example-badge')).toHaveText('Example data');
-  // The caption says what is drawn: sizes to scale, Earth nearer than it is, the light's direction, and what is not computed.
+  // The caption says what is drawn: the Sun at its true direction and size, Earth at true size but nearer than it is, and what is not computed.
   const caption = page.getByTestId('not-to-scale');
-  await expect(caption).toContainText('Earth and Moon sizes to scale; Earth is drawn much nearer than it is.');
-  await expect(caption).toContainText(isPhone(page) ? 'Lines of light: the Sun’s true direction.' : 'The lines of light run along the Sun’s true direction; the Sun itself is outside this picture.');
+  await expect(caption).toContainText(
+    isPhone(page)
+      ? 'Sun: true direction and true apparent size. Earth: true size, drawn much nearer than it is. Drag to turn the view.'
+      : 'The Sun is at its true direction and true apparent size. Earth is at true size but drawn much nearer than it is. Drag, or use the arrow keys, to turn the view.',
+  );
   await expect(caption).toContainText('which face points at the Moon is not computed.');
   await expect(caption).not.toContainText('direction marker');
 
@@ -218,7 +221,7 @@ test('orbit: through a whole lunar day, markers, their tags, the lines of sunlig
   expect(glowSeen).toBeGreaterThanOrEqual(8);
 
   // The caption says what is to scale, and the zoom control takes the picture out to the whole Earth and back.
-  await expect(page.getByTestId('not-to-scale')).toContainText('Earth and Moon sizes to scale; Earth is drawn much nearer than it is.');
+  await expect(page.getByTestId('not-to-scale')).toContainText('Earth is at true size but drawn much nearer than it is.');
   const zoom = page.getByTestId('orbit-zoom');
   await expect(zoom).toHaveAttribute('aria-pressed', 'false');
   await zoom.click();

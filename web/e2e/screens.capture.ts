@@ -20,6 +20,25 @@ test('stage 1: orbit', async ({ page }, info) => {
     await page.getByTestId('orbit-zoom').click();
     await page.waitForTimeout(4000);
     await page.screenshot({ path: `${DIR}/stage-1-orbit-whole-earth-${size}.png` });
+    await page.getByTestId('orbit-zoom').click();
+
+    // The view turned by hand: the Moon's night side faces the camera and the Sun, at its true
+    // direction and true apparent size, rises over the Moon's edge.
+    // Held at 45 hours after the landing (2027-02-17 12:00 UTC), the instant the Earth-lighting test
+    // uses, and with the camera's sway at rest so the picture is the same on every run.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByTestId('preview-scrub').fill('45');
+    await page.waitForTimeout(1500);
+    // Drag the picture: 300 pixels left carries the camera 90 degrees east, to the side of the Moon
+    // away from the Sun; 67 pixels up lowers it to 10 degrees above the ring plane, where the Sun
+    // stands just clear of the Moon's top edge (the Moon is 8.3 degrees in radius from here).
+    await page.mouse.move(930, 640);
+    await page.mouse.down();
+    await page.mouse.move(630, 573, { steps: 12 });
+    await page.mouse.up();
+    await page.mouse.move(720, 560);
+    await page.waitForTimeout(4000);
+    await page.screenshot({ path: `${DIR}/stage-1-orbit-sunrise-${size}.png` });
   }
 });
 

@@ -67,6 +67,15 @@ export const SUNLIGHT = {
   glowRadiusPhone: 120,
   /** Neighbouring lines closer on screen than this many pixels are thinned out (every second, then every fourth, line stays). */
   minGapPx: 34,
+  /**
+   * With the view turned, the lines can be seen in steep perspective: they all meet at the Sun's
+   * point on screen (or, with the Sun behind the camera, at the point straight opposite it). A line
+   * is drawn only if the point where it passes nearest the Moon is in the frame (grown by this
+   * share of its size), and it stops this many pixels short of the meeting point, so the lines
+   * never pile up there.
+   */
+  rowSlack: 0.15,
+  apexGap: 150,
   /** The lines fade out as the Sun's direction comes within this sine of the line of sight (they would be seen end-on). */
   endOnFrom: 0.16,
   endOnTo: 0.4,
@@ -130,6 +139,25 @@ export interface ScreenLine {
   uy: number;
   from: number;
   to: number;
+}
+
+/** Is a line's own point (where it passes nearest the Moon) inside the frame, grown a little? Lines that are not are left out. */
+export function rowInFrame(line: { x: number; y: number }, frame: Box, slack: number = SUNLIGHT.rowSlack): boolean {
+  const mx = (frame.right - frame.left) * slack;
+  const my = (frame.bottom - frame.top) * slack;
+  return line.x > frame.left - mx && line.x < frame.right + mx && line.y > frame.top - my && line.y < frame.bottom + my;
+}
+
+/**
+ * How far a line runs along its heading, given the Sun's point on screen and the point straight
+ * opposite it (each null when it is behind the camera): it ends short of the Sun's point, or starts
+ * short of the opposite point.
+ */
+export function lineReach(at: { x: number; y: number }, sun: { x: number; y: number } | null, opposite: { x: number; y: number } | null, gap: number = SUNLIGHT.apexGap): { from: number; to: number } {
+  return {
+    to: sun ? Math.hypot(sun.x - at.x, sun.y - at.y) - gap : Infinity,
+    from: opposite ? -(Math.hypot(opposite.x - at.x, opposite.y - at.y) - gap) : -Infinity,
+  };
 }
 
 /** The stretch of a line (as distances along its heading) that lies inside a box, or null. */
@@ -356,6 +384,8 @@ export interface SunlightView {
   sunHiddenBy: 'moon' | 'earth' | null;
   /** The Moon and (while it is drawn) Earth, as discs on screen. */
   bodies: Circle[];
+  /** The glass panels and the controls as the HUD last measured them (the HUD writes this; the scene keeps the Sun's tag off them). */
+  keepClear: Box[];
 }
 
 export const sunlightView: SunlightView = {
@@ -370,4 +400,5 @@ export const sunlightView: SunlightView = {
   sunRadius: 0,
   sunHiddenBy: null,
   bodies: [],
+  keepClear: [],
 };

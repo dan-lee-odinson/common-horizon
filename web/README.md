@@ -15,7 +15,8 @@ app on example data (`npm run screens`), at 1440 x 900.
 **Stage 1, Orbit.** The Moon with its ring system and the readouts running; Earth's limb, to
 scale beside the Moon, fills the top-left corner. Sunlight crosses the picture as faint lines along
 the Sun's true direction, and both bodies are lit from that one side: here the part of Earth on
-screen is its night side.
+screen is its night side. (The Sun itself is outside this frame; a soft glow at the frame's edge
+marks where its direction leaves the picture.)
 
 ![Stage 1, Orbit: the Moon inside a tilted ring system, half lit from the left, with faint lines of sunlight; the dark limb of Earth in the top-left corner; glass panels of Sun and Earth readouts](docs/screens/stage-1-orbit-1440x900.png)
 
@@ -23,6 +24,12 @@ Zoomed all the way out with **Show whole Earth**: Earth and the Moon at their tr
 each other (their distance apart is not to scale), each lit from the Sun's side.
 
 ![Orbit zoomed out: the whole Earth, showing NASA's Blue Marble map with its day side toward the Sun, much larger than the Moon and its rings](docs/screens/stage-1-orbit-whole-earth-1440x900.png)
+
+The view **turned by hand** (drag, or the arrow keys) until the Moon's night side faces the camera:
+the Sun, at its true direction and true apparent size (0.53 degrees across), rises over the Moon's
+edge. **Reset view** returns to the standard view.
+
+![Orbit with the view turned: the dark side of the Moon inside its rings, seen from just above the ring plane, with the small bright disc of the Sun and its glow standing just clear of the Moon's top edge, tagged "Sun"](docs/screens/stage-1-orbit-sunrise-1440x900.png)
 
 The landing card that opens over it on first load:
 
@@ -224,7 +231,9 @@ behind the Moon and out along its true direction, joined to its bracket by a lin
 view only part of it shows: a large limb, with a thin glow of atmosphere, filling the top-left
 corner of the screen behind the navigation. **Show whole Earth** (or the mouse wheel) zooms out
 until the whole disc is in view, and **Back to the Moon** returns. Earth can never come between the
-camera and the Moon or cover a site marker. (Really Earth is about 221 Moon radii away.) The
+camera and the Moon or cover a site marker: in the standard view it stands behind the Moon, and
+when the visitor turns the view round to Earth's own side it fades out before it could
+(`earthFade` in `src/scene/orbitTurn.ts`). (Really Earth is about 221 Moon radii away.) The
 navigation bar keeps a dark backing so its words stay readable over Earth's sunlit limb.
 
 *Earth's surface and light.* Earth shows **NASA's Blue Marble map** (the November picture, without
@@ -237,7 +246,16 @@ faces the Sun. Its night side is dim but still reads as Earth: faint land, a tra
 a thin line at the limb (`src/scene/orbitEarth.ts` holds the numbers; a browser test reads the
 real picture and checks that the night side is dark and the day side is the Sun's side).
 
-*The Sun's light.* The Sun is far outside this picture, so it is shown by its light:
+*The Sun.* The Sun is drawn as a **disc at its true direction, infinitely far away**: it rides with
+the camera, as the stars do, so it keeps its place against the stars however the view turns or
+zooms. It is a ball exactly as wide as the Sun looks, **0.53 degrees across** (about 14 pixels in a
+window 900 pixels tall), with a glow round it that is not the disc. The Moon and Earth hide it, and
+its glow, whenever they are in front of it. Its tag reads **Sun**, or **Sun (behind the Moon)** or
+**Sun (behind the Earth)** while it is hidden. In the standard view the Sun is always outside the
+frame (the camera looks down on the Moon from 30 degrees up, so the Sun, which keeps close to the
+ring plane, is at least 10 degrees beyond the frame's edge); turning the view brings it in.
+
+*Its light.* Wherever the Sun is, the picture shows where its light comes from:
 
 * **lines of light**: faint amber lines cross the scene along the Sun's direction. They are parallel
   in space and drawn in perspective like everything else, so they all head for the one point where
@@ -248,20 +266,30 @@ real picture and checks that the night side is dark and the day side is the Sun'
   only during an eclipse. Zoomed out, every second and then every fourth line is left out so they
   never crowd;
 * **a soft glow at the frame's edge**, where the Sun's direction leaves the picture, shown only
-  while the Sun itself is outside the frame.
+  while the Sun itself is outside the frame. When the Sun is inside the frame, its disc shows and
+  the edge glow does not.
 
 Both keep clear of the glass panels and the controls, which are measured from the page
 (`src/scene/sunlight.ts` is the arithmetic, `src/stages/SunlightField.tsx` draws it). A line on
-screen says what is drawn: *Earth and Moon sizes to scale; Earth is drawn much nearer than it is.
-The lines of light run along the Sun's true direction; the Sun itself is outside this picture.*
+screen says what is drawn: *The Sun is at its true direction and true apparent size. Earth is at
+true size but drawn much nearer than it is. Drag, or use the arrow keys, to turn the view.*
 
-The camera looks from the side of the Moon away from Earth, so Earth stands behind the Moon, always
+*Turning the view.* Click and drag the picture (one finger on a touch screen) to carry the camera
+round the Moon; the picture follows the pointer. The **arrow keys** do the same, 3 degrees a press
+and 15 with Shift (on the Preview scrubber they still move the scrubber). Letting go **keeps the
+view**. **Reset view**, which appears above the controls while the view is turned, returns to the
+standard view in one eased move. The slow sway pauses while the view is turned. The camera stays
+at least 10 degrees away from the Moon's poles. Leaving the stage also returns the view to
+standard (`src/scene/orbitTurn.ts`).
+
+In the standard view the camera looks from the side of the Moon away from Earth, so Earth stands behind the Moon, always
 at the left, where its limb holds the top-left corner; the camera keeps to the longitude Earth is
 over, so the limb stays put while time runs. The camera sways a few degrees and
 leans a little with the pointer. The panels are laid out so the Sun's tick on its ring, Earth, their
 tags, the lines of light and the edge glow never pass behind a glass panel
-(`src/scene/orbitView.test.ts` and `src/scene/sunlight.test.ts` check the arithmetic, and a browser
-test checks the real screen through a whole lunar day).
+(`src/scene/orbitView.test.ts` and `src/scene/sunlight.test.ts` check the arithmetic, and browser
+tests check the real screen through a whole lunar day and with the view turned all the way round
+the Moon; a tag that would land on a panel in a turned view is left out).
 
 The Sun lights the Moon from its own side, and the day-night line and both overhead points are
 marked on the surface. The Sun's tick and Earth each carry a small tag with their longitude. A tag
@@ -409,8 +437,8 @@ Margin of 25 % or more: green. From 0 % up to 25 %: yellow (exactly 0 % counts a
 red. The words next to the number repeat the meaning and name the limiting check.
 
 **Reduced motion.** Visitors whose system asks for reduced motion get no camera sway or lean, no
-flights (stages switch at once; down to the site and back is a cut with a short fade), a preview
-that starts paused, a site clock that never starts by itself, and a ranking that reorders at once
+flights (stages switch at once; down to the site and back is a cut with a short fade; a turn of the
+Orbit view and Reset view apply at once), a preview that starts paused, a site clock that never starts by itself, and a ranking that reorders at once
 instead of sliding.
 
 **Type and colour.** Three type families, served from this site: Oxanium (titles and labels), Geist
@@ -453,6 +481,7 @@ web/
                            orbitView.ts and missionView.ts (where things sit on screen, as arithmetic)
     orbitEarth.ts          Earth in Orbit: NASA's map, how it turns, how it is lit (and its shader)
     sunlight.ts            the Sun's light in Orbit as arithmetic: the lines of light and the edge glow
+    orbitTurn.ts           turning the Orbit view by hand; the Sun's disc; Earth's fade (arithmetic)
     SiteWorld.tsx          the site's world: lights, anchors, and the parts below
     SiteSky.tsx            the sky dome: stars, Earth, the Sun and its path, the terrain skyline
     SiteGround.tsx         the level ground with its range rings (siteShaders.ts)
@@ -472,7 +501,8 @@ web/
   src/assets/fonts/        the three font families and their licences
   e2e/path.spec.ts         the browser tests: landing card, Orbit, mission select
   e2e/orbit.spec.ts        the browser tests: the Orbit picture itself (Earth's day and night sides
-                           read from the screen, Earth's map, the Sun's tick)
+                           read from the screen, Earth's map, the Sun's tick, the Sun's disc, turning
+                           the view and Reset view, panels kept clear with the view turned)
   e2e/site.spec.ts         the browser tests: the site stage
   e2e/hud.spec.ts          the browser tests: glass panels keep a dark backing; a press after a rest
   e2e/moon.spec.ts         the browser tests: the right Moon maps for the device, from the app itself

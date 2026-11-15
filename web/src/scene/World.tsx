@@ -10,11 +10,10 @@ import { useStore } from '../state/store';
 import { useIsPhone, useReducedMotion } from '../state/useMedia';
 import { CameraDirector } from './CameraDirector';
 import { cssColor } from './colors';
-import { MoonWorld } from './MoonWorld';
+import { FarSky, MoonWorld } from './MoonWorld';
 import { MOON_CLIP, ORBIT_VIEW } from './orbitView';
 import type { SceneData } from './sceneData';
 import { SiteWorld } from './SiteWorld';
-import { Stars } from './Stars';
 
 const STAGE_LABEL = {
   orbit: 'The Moon inside its ring system, with Earth beside it at true size (drawn much nearer than it is). Both are lit from the Sun’s direction, which faint lines of light show; the Sun itself is outside the picture.',
@@ -54,8 +53,8 @@ export function World() {
     <div className="absolute inset-0" data-testid="world" data-stage={stage}>
       <Canvas flat dpr={[1, 2]} gl={{ antialias: true, powerPreference: 'high-performance' }} camera={{ position: [4.2, 3.2, 6.4], fov: ORBIT_VIEW.fov, near: MOON_CLIP.near, far: MOON_CLIP.far }} aria-label={STAGE_LABEL[stage]} role="img">
         <color attach="background" args={[cssColor('--ch-space')]} />
-        {/* The site has its own stars, on its sky dome. */}
-        <Stars visible={stage !== 'site'} />
+        {/* The stars and the Sun's disc, infinitely far away. The site has its own stars, on its sky dome. */}
+        <FarSky data={data} visible={stage !== 'site'} />
         <MoonWorld data={data} visible={stage !== 'site'} />
         {stage === 'site' || diving ? <SiteWorld data={data} active={stage === 'site'} /> : null}
         <OrbitControls makeDefault enablePan={false} enableDamping dampingFactor={0.08} rotateSpeed={0.45} zoomSpeed={0.7} />

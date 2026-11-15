@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { geometryAt, TRANSIT_DAYS } from '../api/mock/model';
 import { DAY_MS, HOUR_MS, SYNODIC_MONTH_DAYS } from '../util/time';
 import { ORBIT_COLUMN_PX, ORBIT_VIEW, orbitCameraFrame, orbitCameraLongitude, orbitDistance, orbitZoomDistance, projectOrbit, projectOrbitPoint, worldPoint } from './orbitView';
-import { clipLine, edgeGlow, glowBox, glowRadius, lineLevel, MIN_GLOW, sunExit, sunInFrame, SUNLIGHT, sunlightSheet, sunlightStrength, type Box, type Circle, type ScreenLine, type Segment } from './sunlight';
+import { clipLine, edgeGlow, glowBox, glowRadius, lineLevel, lineReach, MIN_GLOW, rowInFrame, sunExit, sunInFrame, SUNLIGHT, sunlightSheet, sunlightStrength, type Box, type Circle, type ScreenLine, type Segment } from './sunlight';
 
 const LANDING = Date.UTC(2027, 1, 10, 15, 0, 0) + TRANSIT_DAYS * DAY_MS;
 
@@ -40,8 +40,8 @@ function picture(tMs: number, width: number, height: number, zoom: number, swayD
     const a = project(row.point);
     const b = project({ x: row.point.x + sun.x * 0.5, y: row.point.y + sun.y * 0.5, z: row.point.z + sun.z * 0.5 });
     const len = Math.hypot(b.x - a.x, b.y - a.y);
-    if (a.depth <= 0 || len < 1e-6) continue;
-    lines.push({ k: row.k, x: a.x, y: a.y, ux: (b.x - a.x) / len, uy: (b.y - a.y) / len, to: sunPoint ? Math.hypot(sunPoint.x - a.x, sunPoint.y - a.y) : Infinity, from: opposite ? -Math.hypot(opposite.x - a.x, opposite.y - a.y) : -Infinity });
+    if (a.depth <= 0 || len < 1e-6 || !rowInFrame(a, { left: 0, top: 0, right: width, bottom: height })) continue;
+    lines.push({ k: row.k, x: a.x, y: a.y, ux: (b.x - a.x) / len, uy: (b.y - a.y) / len, ...lineReach(a, sunPoint, opposite) });
   }
   const moonAt = project({ x: 0, y: 0, z: 0 });
   const earthAt = projectOrbit(g.subearth_lat, g.subearth_lon_east, ORBIT_VIEW.earthDistance, cameraLon, ORBIT_VIEW.elevation, distance, width, height);
@@ -274,6 +274,25 @@ describe('the lines of light as a row', () => {
     expect(lineLevel(2, 20)).toBeGreaterThan(0);
     expect(lineLevel(2, 12)).toBe(0);
     expect(lineLevel(-3, 64)).toBe(1);
+  });
+
+  it('stops short of the point where the lines meet, and leaves out lines that only cross the frame near it', () => {
+    const frame: Box = { left: 0, top: 0, right: 1000, bottom: 800 };
+    // The Sun's point is in the frame: a line heading for it ends apexGap pixels before it.
+    const reach = lineReach({ x: 100, y: 400 }, { x: 700, y: 400 }, null);
+    expect(reach.to).toBeCloseTo(600 - SUNLIGHT.apexGap, 9);
+    expect(reach.from).toBe(-Infinity);
+    const piece = clipLine({ x: 100, y: 400, ux: 1, uy: 0, ...reach }, frame, [], [])[0];
+    expect(piece.x2).toBeCloseTo(700 - SUNLIGHT.apexGap, 9);
+    // With the Sun behind the camera the lines start short of the point straight opposite it.
+    const back = lineReach({ x: 100, y: 400 }, null, { x: 700, y: 400 });
+    expect(back.from).toBeCloseTo(-(600 - SUNLIGHT.apexGap), 9);
+    expect(back.to).toBe(Infinity);
+    // A line whose own point is far outside the frame is not drawn at all.
+    expect(rowInFrame({ x: 500, y: 400 }, frame)).toBe(true);
+    expect(rowInFrame({ x: -100, y: 400 }, frame)).toBe(true);
+    expect(rowInFrame({ x: -200, y: 400 }, frame)).toBe(false);
+    expect(rowInFrame({ x: 500, y: 1000 }, frame)).toBe(false);
   });
 
   it('cuts a line at a body drawn as an ellipse (Earth near the corner of the picture)', () => {
