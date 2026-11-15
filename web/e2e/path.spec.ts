@@ -168,3 +168,217 @@ test('orbit: through a whole lunar day, markers and their tags never touch a gla
   expect(earthSeen).toBe(13);
   expect(sunSeen).toBeGreaterThanOrEqual(6);
 });
+
+// ---------- Stage 2, mission select ----------
+
+async function enterMission(page: Page) {
+  await page.goto('/');
+  await page.getByTestId('begin').click();
+  await page.getByTestId('enter-mission').click();
+  await expect(page.getByTestId('mission-hud')).toBeVisible();
+  await expect(page.getByTestId('spotlight-name')).not.toHaveText('', { timeout: 30_000 });
+}
+
+async function stripNames(page: Page): Promise<string[]> {
+  return page.getByTestId('row-name').allTextContents();
+}
+
+test('mission select: one site in the spotlight, a short strip, and the delay reorders the ranking', async ({ page }) => {
+  test.skip(isPhone(page), 'the phone layout of mission select is covered by the phone test');
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await enterMission(page);
+
+  // The spotlight is the best-ranked site: rank 01, a name, a pass or fail word and the readouts.
+  await expect(page.getByTestId('spotlight-rank')).toHaveText('01');
+  const best = (await page.getByTestId('spotlight-name').textContent())!;
+  expect(best.length).toBeGreaterThan(2);
+  await expect(page.getByTestId('spotlight-verdict')).toHaveText(/^(pass|fail: .+)$/);
+  expect(await readout(page, 'sunlight_percent')).toMatch(/^\d{1,3}\.\d$/);
+  expect(await readout(page, 'score')).toMatch(/^\d{1,3}$/);
+
+  // The strip is short: a few rows, not every preset. The presets are in the drawer.
+  const rows = page.getByTestId('ranked-row');
+  expect(await rows.count()).toBeLessThanOrEqual(5);
+  await expect(page.getByTestId('strip-range')).toHaveText(/^1 to \d of 17$/);
+  await expect(page.getByTestId('site-drawer')).toHaveAttribute('data-open', 'false');
+  await expect(page.getByTestId('preset').first()).toBeHidden();
+  await expect(rows.first().getByTestId('row-name')).toHaveText(best);
+  await expect(rows.first().getByTestId('verdict')).toHaveText(/pass|fail/);
+
+  // Arrow keys move the spotlight down the ranking, and back.
+  const before = await stripNames(page);
+  await page.getByTestId('ranked-strip').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByTestId('spotlight-rank')).toHaveText('02');
+  await expect(page.getByTestId('spotlight-name')).toHaveText(before[1]);
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByTestId('spotlight-rank')).toHaveText('01');
+  // "Follow the best site" lets the spotlight follow the ranking again.
+  await page.getByTestId('follow-best').click();
+  await expect(page.getByTestId('follow-best')).toHaveCount(0);
+
+  // The delay: +7 days moves the landing a week along the lunar day, and the ranking reorders.
+  const slip = page.getByTestId('slip');
+  await slip.focus();
+  for (let i = 0; i < 7; i++) await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('slip-value')).toHaveText('+7days');
+  await expect.poll(async () => (await stripNames(page)).join(' | '), { timeout: 15_000 }).not.toBe(before.join(' | '));
+  await expect(page.getByTestId('moved').first()).toBeVisible();
+  await expect(page.getByTestId('spotlight-rank')).toHaveText('01');
+  await expect(page.getByTestId('spotlight-name')).not.toHaveText(best);
+  await expect(page.getByTestId('rank-announcement')).toContainText('is now first');
+  expect(errors).toEqual([]);
+});
+
+test('mission select: the drawer holds the presets and the coordinate entry', async ({ page }) => {
+  test.skip(isPhone(page), 'the phone layout of mission select is covered by the phone test');
+  await enterMission(page);
+  const drawer = page.getByTestId('site-drawer');
+  await expect(drawer).toHaveAttribute('data-open', 'false');
+
+  // It slides in; focus moves into it; the presets are a searchable list.
+  await page.getByTestId('drawer-toggle').click();
+  await expect(drawer).toHaveAttribute('data-open', 'true');
+  await expect(drawer).toBeFocused();
+  await expect(page.getByTestId('preset')).toHaveCount(17);
+  await page.getByTestId('preset-search').fill('apollo');
+  await expect(page.getByTestId('preset')).toHaveCount(6);
+  await page.getByTestId('preset-search').fill('zzz');
+  await expect(page.getByTestId('preset-none')).toBeVisible();
+  await page.getByTestId('preset-search').fill('athena');
+  await page.getByTestId('preset').click();
+  await expect(page.getByTestId('spotlight-name')).toHaveText('IM-2 Athena');
+
+  // Custom coordinates: a bad latitude is refused in words; a good point becomes the spotlight.
+  await page.getByTestId('mode-custom').click();
+  await page.getByTestId('lat-input').fill('120');
+  await page.getByTestId('lon-input').fill('10');
+  await page.getByTestId('go-coordinate').click();
+  await expect(page.getByTestId('coordinate-note')).toHaveText('Latitude must be a number between −90 and 90.');
+  await page.getByTestId('lat-input').fill('-88.5');
+  await page.getByTestId('lon-input').fill('45');
+  await page.getByTestId('hemi-input').selectOption('W');
+  await page.getByTestId('go-coordinate').click();
+  await expect(page.getByTestId('spotlight-name')).toContainText('Custom point');
+  await expect(page.getByTestId('custom-site')).toContainText('88.500° S, 315.000° E');
+  await expect(page.getByTestId('strip-range')).toHaveText(/of 18$/);
+
+  // Save it and compare: the comparison opens as a sheet and Escape closes it.
+  await page.getByTestId('save-site').click();
+  await page.getByTestId('compare-open').click();
+  await expect(page.getByTestId('compare-panel')).toHaveAttribute('data-open', 'true');
+  await expect(page.getByTestId('compare-column')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('compare-panel')).toHaveAttribute('data-open', 'false');
+
+  // The drawer slides out again.
+  await page.getByTestId('drawer-toggle').click({ force: true }).catch(() => undefined);
+  await page.getByTestId('site-drawer-close').click().catch(() => undefined);
+});
+
+test('mission select: edit the mission, and the battery box always agrees with the checks', async ({ page }) => {
+  test.skip(isPhone(page), 'the phone layout of mission select is covered by the phone test');
+  await enterMission(page);
+  await expect(page.getByTestId('mission-summary')).toContainText('Starship lander, Hab unit, Rover 1, Solar panels × 4, 2,000 kWh, 14 days.');
+
+  await page.getByTestId('edit-mission').click();
+  const planner = page.getByTestId('planner');
+  await expect(planner).toHaveAttribute('data-open', 'true');
+  await expect(planner).toBeFocused();
+  const power = page.getByTestId('power-number');
+  await expect(power).toHaveAttribute('data-level', /good|thin|short/);
+
+  // A bad entry counts as none, at once, and says so.
+  const box = page.getByTestId('storage-input');
+  await box.fill('-5');
+  await expect(page.getByTestId('storage-note')).toHaveAttribute('data-status', 'invalid');
+  await expect(page.getByTestId('storage-note')).toContainText('counts as 0 kWh');
+  await power.click();
+  await expect(page.getByTestId('storage-counted')).toHaveAttribute('data-kwh', '0');
+  // Leaving the box clears the bad text: the box then shows what the checks use.
+  await box.blur();
+  await expect(box).toHaveValue('');
+
+  // A figure above the cap becomes the cap, in the box too, and says so.
+  await box.fill('5000000');
+  await expect(box).toHaveValue('1000000');
+  await expect(page.getByTestId('storage-note')).toHaveText('Capped at 1,000,000 kWh, the most this planner accepts.');
+  await expect(page.getByTestId('storage-counted')).toHaveAttribute('data-kwh', '1000000');
+
+  // A stay long enough to include a lunar night, no storage and a solar-only plan: short at
+  // night, with the storage that would cover it.
+  await page.getByTestId('stay-input').fill('30');
+  await box.fill('');
+  await expect(power).toHaveAttribute('data-level', 'short', { timeout: 15_000 });
+  await expect(power).toHaveAttribute('data-limiting', 'night');
+  await expect(page.getByTestId('power-words')).toHaveText('power short at night');
+  const needed = Number(await page.getByTestId('storage-needed').getAttribute('data-kwh'));
+  expect(needed).toBeGreaterThan(0);
+  await box.fill(String(needed));
+  await expect(power).toHaveAttribute('data-level', /good|thin/);
+  await expect(page.getByTestId('night-advice')).toHaveCount(0);
+
+  // Hardware and stay change the one-line summary behind the sheet.
+  await page.getByLabel('Nuclear generator').check();
+  await page.keyboard.press('Escape');
+  await expect(planner).toHaveAttribute('data-open', 'false');
+  await expect(page.getByTestId('edit-mission')).toBeFocused();
+  await expect(page.getByTestId('mission-summary')).toContainText('Nuclear generator');
+  await expect(page.getByTestId('mission-summary')).toContainText('30 days.');
+});
+
+test('mission select: the assistant runs along the bottom and covers no control', async ({ page }) => {
+  test.skip(isPhone(page), 'the phone layout of mission select is covered by the phone test');
+  await enterMission(page);
+  const input = page.getByTestId('chat-input');
+  const questions = ['Why does the delay matter?', 'What about power at night and batteries?', 'How does Earth contact work?'];
+  for (const [i, q] of questions.entries()) {
+    await input.fill(q);
+    await input.press('Enter');
+    await expect(page.getByTestId('chat-log').locator('[data-state="answer"]')).toHaveCount(i + 1);
+  }
+  await expect(page.getByTestId('chat-announcer')).toContainText('Earth link depends');
+
+  // The history: at least six lines tall, at most 40 % of the window.
+  const panel = page.getByTestId('chat-panel');
+  const p = (await panel.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(p.height).toBeLessThanOrEqual(viewport.height * 0.4 + 1);
+  const log = await page.getByTestId('chat-log').evaluate((e) => ({ height: e.clientHeight, line: parseFloat(getComputedStyle(e).lineHeight) }));
+  expect(log.height).toBeGreaterThanOrEqual(6 * log.line);
+
+  // It covers no control outside itself: not the spotlight, the strip, the delay or the drawer handle.
+  const covered = await page.evaluate(() => {
+    const a = document.querySelector('[data-testid="assistant"]')!.getBoundingClientRect();
+    const out: string[] = [];
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-testid="mission-hud"] button, [data-testid="mission-hud"] input, [data-testid="mission-hud"] [role="option"]'))) {
+      if (el.closest('[data-testid="assistant"]') || el.closest('[inert]')) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || getComputedStyle(el).visibility === 'hidden') continue;
+      if (r.left < a.right && a.left < r.right && r.top < a.bottom && a.top < r.bottom) out.push(el.dataset.testid ?? el.textContent?.slice(0, 30) ?? el.tagName);
+    }
+    return out;
+  });
+  expect(covered).toEqual([]);
+
+  // Escape hides it, the button shows it again, Clear empties it.
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  await page.getByTestId('chat-expand').click();
+  await expect(panel).toBeVisible();
+  await page.getByTestId('chat-clear').click();
+  await expect(page.getByTestId('chat-panel')).toHaveCount(0);
+});
+
+test('zoom in to the site and come back', async ({ page }) => {
+  test.skip(isPhone(page), 'the phone layout is covered by the phone test');
+  await enterMission(page);
+  const name = (await page.getByTestId('spotlight-name').textContent())!;
+  await page.getByTestId('zoom-to-site').click();
+  await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'site', { timeout: 15_000 });
+  await expect(page.getByTestId('scene-title')).toHaveText(name);
+  await page.getByTestId('back-to-mission').click();
+  await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'mission');
+  await expect(page.getByTestId('spotlight-name')).toHaveText(name);
+});

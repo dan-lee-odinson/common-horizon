@@ -82,13 +82,18 @@ export function LineGraph({ label, points, xDomain, level, formatY, xLabels, get
       el.style.opacity = '0';
       return;
     }
-    const f = Math.max(0, Math.min(1, (x - shape.x0) / (shape.x1 - shape.x0 || 1)));
+    const f = (x - shape.x0) / (shape.x1 - shape.x0 || 1);
+    // Outside the plotted range there is nothing to point at: the cursor hides rather than park at an edge.
+    if (f < -0.002 || f > 1.002) {
+      el.style.opacity = '0';
+      return;
+    }
     el.style.opacity = '1';
-    el.style.transform = `translateX(${(PAD.left + f * shape.plotW).toFixed(1)}px)`;
+    el.style.transform = `translateX(${(PAD.left + Math.max(0, Math.min(1, f)) * shape.plotW).toFixed(1)}px)`;
   }, Boolean(getCursor));
 
   return (
-    <figure className={`m-0 flex min-w-0 flex-col gap-1 ${className}`} data-graph>
+    <figure className={`m-0 flex min-w-0 flex-col gap-1 ${className}`} aria-label={label} data-graph>
       <div ref={wrapRef} className="relative" style={{ height }}>
         {shape ? (
           <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 block" role="img" aria-label={`${label}. Lowest ${formatY(shape.yMin)}, highest ${formatY(shape.yMax)}.`}>
@@ -97,7 +102,9 @@ export function LineGraph({ label, points, xDomain, level, formatY, xLabels, get
             <path d={shape.d} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
           </svg>
         ) : (
-          <div className="skeleton absolute inset-0" aria-hidden />
+          <div className="skeleton absolute inset-0" role="status">
+            <span className="sr-only">No data yet</span>
+          </div>
         )}
         {getCursor ? (
           <div ref={cursorRef} className="pointer-events-none absolute left-0 top-0 h-full w-px" style={{ background: 'var(--ch-ink)', opacity: 0, willChange: 'transform' }} aria-hidden />

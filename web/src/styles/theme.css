@@ -24,7 +24,11 @@
   --ch-glass: rgb(7 18 30 / 0.58);
   --ch-glass-strong: rgb(6 15 26 / 0.8);
   /* How much the glass dims what is behind it (backdrop-filter brightness), 0..1. */
-  --ch-glass-dim: 0.55;
+  --ch-glass-dim: 0.42;
+  /* The sheen across the upper left of a glass panel: its colour at full strength. */
+  --ch-glass-sheen: rgb(150 240 255 / 0.07);
+  /* Dark layer under coloured tags and inside text boxes. */
+  --ch-tag-under: rgb(2 8 14 / 0.6);
   --ch-scrim: rgb(1 4 9 / 0.66);
   --ch-shadow: rgb(0 0 0 / 0.62);
 
@@ -87,7 +91,6 @@
   --color-surface: var(--ch-surface);
   --color-surface-2: var(--ch-surface-2);
   --color-surface-3: var(--ch-surface-3);
-  --color-glass: var(--ch-glass);
   --color-glass-strong: var(--ch-glass-strong);
   --color-scrim: var(--ch-scrim);
   --color-line-faint: var(--ch-line-faint);

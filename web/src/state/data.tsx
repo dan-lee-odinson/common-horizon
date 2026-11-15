@@ -78,9 +78,15 @@ export function useData(): DataValue {
   return value;
 }
 
-/** Horizon sample spacing: about 600 points across the window, never finer than 15 minutes. */
+/**
+ * Horizon sample spacing: about 2400 points across the window, in quarter hours, never finer than
+ * 15 minutes. That keeps the samples an hour apart or closer for windows up to about 112 days, so
+ * a sunrise or sunset there can be shown to a tenth of an hour; the longest window (a 365.25-day
+ * stay after a 30-day delay) gets samples 4 hours apart, and the readouts then show whole hours
+ * (util/quantities.ts). The point count stays under the 4000 the mock model answers with.
+ */
 export function horizonStepHours(startMs: number, endMs: number): number {
-  return Math.max(0.25, Math.round(((endMs - startMs) / 3_600_000 / 600) * 4) / 4);
+  return Math.max(0.25, Math.round(((endMs - startMs) / 3_600_000 / 2400) * 4) / 4);
 }
 
 export function horizonKey(site: SiteRef | null, startMs: number | null, endMs: number | null): string | null {

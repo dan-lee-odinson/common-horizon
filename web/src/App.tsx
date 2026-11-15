@@ -2,14 +2,17 @@ import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState, type R
 import { useParallax } from './hud/parallax';
 import { MoonFallback } from './scene/MoonFallback';
 import { hasWebGL } from './scene/webgl';
+import { AssistantSheet } from './stages/Assistant';
 import { LandingCard } from './stages/LandingCard';
 import { MissionHud } from './stages/MissionHud';
 import { OrbitHud } from './stages/OrbitHud';
 import { OrbitPreview } from './stages/Playback';
+import { SiteHud } from './stages/SiteHud';
 import { TopBar } from './stages/TopBar';
 import { actions, appStore } from './state/app';
 import { DataProvider, useData } from './state/data';
 import { useStore } from './state/store';
+import { useIsPhone } from './state/useMedia';
 
 // The 3D code is loaded on demand so the first paint (and the landing card) is quick.
 const World = lazy(() => import('./scene/World').then((m) => ({ default: m.World })));
@@ -37,6 +40,7 @@ function Shell() {
   const stage = useStore(appStore, (s) => s.stage);
   const cardOpen = useStore(appStore, (s) => s.cardOpen);
   const webgl = useMemo(() => hasWebGL(), []);
+  const isPhone = useIsPhone();
   const hudRef = useRef<HTMLDivElement>(null);
   // The HUD arrives once the landing card has been closed for the first time.
   const [revealed, setRevealed] = useState(!cardOpen);
@@ -62,6 +66,8 @@ function Shell() {
         <TopBar />
         {stage === 'orbit' ? <OrbitHud revealed={revealed} /> : null}
         {stage === 'mission' ? <MissionHud /> : null}
+        {stage === 'site' ? <SiteHud webgl={webgl} /> : null}
+        {stage !== 'mission' ? <AssistantSheet phone={isPhone} /> : null}
       </div>
       <LandingCard />
     </div>

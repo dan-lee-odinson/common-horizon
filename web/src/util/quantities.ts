@@ -3,17 +3,19 @@
 // DATA HONESTY. A readout on screen is a `Quantity`, and a Quantity is only ever made here, from
 // the app's data: answers of the API layer (in example mode, the mock model), the geometry track
 // built from those answers, and the visitor's own inputs (dates, delay). There are no random
-// numbers and no filler values anywhere in the interface. When the data has not arrived, the
-// value is null and the text is a dash. src/util/quantities.test.ts and
-// src/hud/readouts.test.tsx hold this in place.
+// numbers and no filler values anywhere in the interface. When the data has not arrived, or is not
+// a real number (a missing field, NaN, an unreadable time), the value is null and the text is a
+// dash. A figure is shown only as finely as its data supports: a sunrise read between horizon
+// samples hours apart is shown in whole hours and labelled "about". src/util/quantities.test.ts
+// and src/hud/readouts.test.tsx hold this in place.
 
 import type { CheckResponse, EarthLink, Geometry, HorizonResponse, SiteEvaluation, SiteRef } from '../api/types';
 import { azElFromSubpoint, normalizeLon360 } from './geo';
 import { nextSunChange, sunAt, type SunChange } from './horizon';
 import { formatMargin, levelFromStatus, type PowerLevel } from './power';
 import { southPoleSeason, type PoleSeason } from './season';
-import { discLitFromEarth, earthSwing, type GeometryTrack } from './track';
-import { formatLtcOffsetMicros, formatSinceLanding, formatUtcMinute, ltcClock, ltcOffsetMicros, utcClock, type ClockParts } from './time';
+import { discLitFromEarth, earthSwing, trackCovers, type GeometryTrack } from './track';
+import { DAY_MS, formatLtcOffsetMicros, formatSinceLanding, formatUtcMinute, ltcClock, ltcOffsetMicros, utcClock, type ClockParts } from './time';
 
 export type Tone = 'ink' | 'sun' | 'earth' | 'good' | 'warn' | 'bad' | 'muted';
 
@@ -40,6 +42,33 @@ function quantity(key: string, label: string, value: number | null, text: string
 function missing(key: string, label: string, tone?: Tone): Quantity {
   return { key, label, value: null, text: DASH, unit: '', tone };
 }
+
+/** The furthest instant a date can hold, either side of 1970 (milliseconds). */
+const MAX_DATE_MS = 8.64e15;
+
+/** True for a real instant: a finite number of milliseconds that a date can hold. */
+function isInstant(ms: number | null | undefined): ms is number {
+  return typeof ms === 'number' && Number.isFinite(ms) && Math.abs(ms) <= MAX_DATE_MS;
+}
+
+/** The geometry itself when all four of its values are real numbers, otherwise null. */
+function wholeGeometry(g: Geometry | null | undefined): Geometry | null {
+  if (!g) return null;
+  return [g.subsolar_lat, g.subsolar_lon_east, g.subearth_lat, g.subearth_lon_east].every((v) => Number.isFinite(v)) ? g : null;
+}
+
+/**
+ * Horizon samples at most this far apart carry the time of a sunrise or sunset to a tenth of an
+ * hour (checked against the mock model in src/util/horizon.test.ts). A minute of slack allows for
+ * sample times the backend rounded.
+ */
+const FINE_SAMPLE_HOURS = 1;
+function fineSamples(gapHours: number): boolean {
+  return Number.isFinite(gapHours) && gapHours <= FINE_SAMPLE_HOURS + 1 / 60;
+}
+
+/** Half of the last digit a direction is shown to (0.1°): a reading must be at least this sure. */
+const DIRECTION_TOLERANCE_DEG = 0.05;
 
 /** A number with fixed decimals and a true minus sign. */
 export function fixed(value: number, digits: number): string {
@@ -120,26 +149,49 @@ function horizonCovers(horizon: HorizonResponse | null, site: SiteRef | null, tM
   return tMs >= first && tMs <= last;
 }
 
+/** "Sunrise in 12.3 h", or "Sunrise in about 12 h" when the horizon samples are too far apart for the tenth. */
+function nextChangeQuantity(change: SunChange | null, horizon: HorizonResponse | null, lit: boolean | null): Quantity {
+  if (change && Number.isFinite(change.hours)) {
+    const word = change.kind === 'sunrise' ? 'Sunrise' : 'Sunset';
+    // One decimal (six minutes) only when the change was read off a crossing between two close
+    // samples. Otherwise whole hours, and the label says "about".
+    return change.interpolated && fineSamples(change.sampleGapHours)
+      ? quantity('next_change', `${word} in`, change.hours, change.hours.toFixed(1), 'h', 'sun')
+      : quantity('next_change', `${word} in about`, change.hours, String(Math.round(change.hours)), 'h', 'sun');
+  }
+  if (horizon && lit !== null) return quantity('next_change', lit ? 'Sunset' : 'Sunrise', null, 'none in view', '', 'muted');
+  return missing('next_change', 'Next sunrise or sunset');
+}
+
 /** Every sky readout for one instant. Pure: the same inputs always give the same quantities. */
 export function skyQuantities(input: SkyInput): SkyQuantities {
-  const { track, tMs, landingMs, site } = input;
-  const inTrack = track !== null && tMs >= track.startMs && tMs <= track.endMs;
-  const geometry = inTrack ? track.at(tMs) : null;
-  const horizon = horizonCovers(input.horizon, site, tMs) ? input.horizon : null;
+  const { track, tMs, site } = input;
+  const hasT = isInstant(tMs);
+  // A landing time that is missing or unreadable (NaN from a broken answer) is no landing time.
+  const landingMs = isInstant(input.landingMs) ? input.landingMs : null;
+  // Read from the track only inside the window it was loaded for, never from its spare ends.
+  const geometry = track !== null && hasT && trackCovers(track, tMs) ? wholeGeometry(track.at(tMs)) : null;
+  const horizon = hasT && horizonCovers(input.horizon, site, tMs) ? input.horizon : null;
+  const sunInHorizon = horizon ? sunAt(horizon, tMs) : null;
 
-  // The Sun's direction at the site: the horizon answer when it covers this instant (it is the
-  // backend's own figure and matches the horizon plot); otherwise from the Sun's overhead point.
-  const sunFromHorizon = horizon ? sunAt(horizon, tMs) : null;
+  // The Sun's direction at the site comes from the Sun's overhead point on the track: answers a day
+  // apart follow the model to a ten-thousandth of a degree. The horizon answer's samples can be
+  // hours apart, and a straight line between them is degrees off when the Sun passes high overhead.
+  // So the horizon answer gives the direction only when there is no track at all, and only where
+  // its own samples show the straight line to be good for the tenth of a degree shown.
   const sunFromTrack = site && geometry ? azElFromSubpoint(site.lat, site.lon_east, geometry.subsolar_lat, geometry.subsolar_lon_east) : null;
-  const sun = sunFromHorizon ?? sunFromTrack;
+  const sunFromHorizon = track === null && sunInHorizon && sunInHorizon.uncertaintyDeg <= DIRECTION_TOLERANCE_DEG ? sunInHorizon : null;
+  const sun = sunFromTrack ?? sunFromHorizon;
   // Earth's direction at the site, from Earth's overhead point (parallax ignored: good to about 1°).
   const earth = site && geometry ? azElFromSubpoint(site.lat, site.lon_east, geometry.subearth_lat, geometry.subearth_lon_east) : null;
 
+  // Lit or dark, and the next sunrise or sunset, need the terrain: they come from the horizon answer.
   const change = horizon ? nextSunChange(horizon, tMs) : null;
-  const lit = sunFromHorizon ? sunFromHorizon.above : null;
+  const lit = sunInHorizon ? sunInHorizon.above : null;
+  const discLit = geometry ? discLitFromEarth(geometry) * 100 : Number.NaN;
 
-  const utc = Number.isFinite(tMs) ? utcClock(tMs) : null;
-  const ltc = landingMs !== null && Number.isFinite(tMs) ? ltcClock(tMs, landingMs) : null;
+  const utc = hasT ? utcClock(tMs) : null;
+  const ltc = hasT && landingMs !== null ? ltcClock(tMs, landingMs) : null;
 
   return {
     geometry,
@@ -151,24 +203,24 @@ export function skyQuantities(input: SkyInput): SkyQuantities {
     sunEl: elevation('sun_el', 'Elevation', sun?.el ?? null, 'sun'),
     earthAz: azimuth('earth_az', 'Azimuth', earth?.az ?? null, 'earth'),
     earthEl: elevation('earth_el', 'Elevation', earth?.el ?? null, 'earth'),
-    discLit: geometry ? quantity('disc_lit', 'Moon lit, from Earth', discLitFromEarth(geometry) * 100, (discLitFromEarth(geometry) * 100).toFixed(1), '%') : missing('disc_lit', 'Moon lit, from Earth'),
+    discLit: Number.isFinite(discLit) ? quantity('disc_lit', 'Moon lit, from Earth', discLit, discLit.toFixed(1), '%') : missing('disc_lit', 'Moon lit, from Earth'),
     sunState: lit === null ? missing('sun_state', 'Site') : quantity('sun_state', 'Site', null, lit ? 'lit' : 'dark', '', lit ? 'sun' : 'muted'),
-    nextChange: change
-      ? quantity('next_change', change.kind === 'sunrise' ? 'Sunrise in' : 'Sunset in', change.hours, change.hours.toFixed(1), 'h', 'sun')
-      : horizon
-        ? quantity('next_change', lit ? 'Sunset' : 'Sunrise', null, 'none in view', '', 'muted')
-        : missing('next_change', 'Next sunrise or sunset'),
+    nextChange: nextChangeQuantity(change, horizon, lit),
     change,
     utc,
     ltc,
     utcClock: utc ? quantity('utc', 'UTC', tMs, `${utc.date} ${utc.time}`, 'UTC') : missing('utc', 'UTC'),
     // The time of day only: the date is the UTC date above (the two differ by microseconds).
     ltcClock: ltc ? quantity('ltc', 'LTC, model', tMs, `${ltc.time}.${ltc.fraction}`, 'LTC') : missing('ltc', 'LTC, model'),
+    // Both clocks that count from the landing need the instant and the landing time.
     ltcOffset:
-      landingMs !== null
+      hasT && landingMs !== null
         ? quantity('ltc_offset', 'LTC − UTC', ltcOffsetMicros(tMs, landingMs), formatLtcOffsetMicros(tMs, landingMs), 'µs')
         : missing('ltc_offset', 'LTC − UTC'),
-    sinceLanding: landingMs !== null ? quantity('since_landing', 'Since landing', (tMs - landingMs) / 3_600_000, formatSinceLanding(tMs, landingMs), '') : missing('since_landing', 'Since landing'),
+    sinceLanding:
+      hasT && landingMs !== null
+        ? quantity('since_landing', 'Since landing', (tMs - landingMs) / 3_600_000, formatSinceLanding(tMs, landingMs), '')
+        : missing('since_landing', 'Since landing'),
   };
 }
 
@@ -182,7 +234,9 @@ export interface SwingQuantities {
 /** How far Earth's overhead point moves over the stay (libration), from the track. */
 export function swingQuantities(track: GeometryTrack | null, landingMs: number | null, stayEndMs: number | null): SwingQuantities {
   const swing = earthSwing(track, landingMs, stayEndMs);
-  if (!swing) return { lon: missing('earth_swing_lon', 'Longitude swing, stay', 'earth'), lat: missing('earth_swing_lat', 'Latitude swing, stay', 'earth') };
+  if (!swing || !Number.isFinite(swing.lonSpan) || !Number.isFinite(swing.latSpan)) {
+    return { lon: missing('earth_swing_lon', 'Longitude swing, stay', 'earth'), lat: missing('earth_swing_lat', 'Latitude swing, stay', 'earth') };
+  }
   return {
     lon: quantity('earth_swing_lon', 'Longitude swing, stay', swing.lonSpan, swing.lonSpan.toFixed(2), '°', 'earth'),
     lat: quantity('earth_swing_lat', 'Latitude swing, stay', swing.latSpan, swing.latSpan.toFixed(2), '°', 'earth'),
@@ -204,15 +258,19 @@ export interface MissionDates {
 
 /**
  * Launch, delay and landing, and the lunar south pole's season on the landing date (from the Sun's
- * latitude in the evaluation answer).
+ * latitude in the evaluation answer). A date that is missing or not a real time is a dash, and
+ * there is no season without the Sun's latitude: it is never guessed.
  */
 export function missionDates(launchUtcMs: number, slipDays: number, landingMs: number | null, landingGeometry: Geometry | null): MissionDates {
-  const season = landingGeometry ? southPoleSeason(landingGeometry.subsolar_lat) : null;
+  const sunLat = landingGeometry ? landingGeometry.subsolar_lat : null;
+  const season = typeof sunLat === 'number' && Number.isFinite(sunLat) ? southPoleSeason(sunLat) : null;
+  const hasSlip = Number.isFinite(slipDays);
+  const delayedMs = launchUtcMs + slipDays * DAY_MS;
   return {
-    plannedLaunch: quantity('planned_launch', 'Planned', launchUtcMs, formatUtcMinute(launchUtcMs), 'UTC'),
-    launch: quantity('launch', 'Launch', launchUtcMs + slipDays * 86_400_000, formatUtcMinute(launchUtcMs + slipDays * 86_400_000), 'UTC'),
-    delay: quantity('delay', 'Launch delay', slipDays, `+${slipDays}`, slipDays === 1 ? 'day' : 'days'),
-    landing: landingMs === null ? missing('landing', 'Landing') : quantity('landing', 'Landing', landingMs, formatUtcMinute(landingMs), 'UTC'),
+    plannedLaunch: isInstant(launchUtcMs) ? quantity('planned_launch', 'Planned', launchUtcMs, formatUtcMinute(launchUtcMs), 'UTC') : missing('planned_launch', 'Planned'),
+    launch: isInstant(delayedMs) ? quantity('launch', 'Launch', delayedMs, formatUtcMinute(delayedMs), 'UTC') : missing('launch', 'Launch'),
+    delay: hasSlip ? quantity('delay', 'Launch delay', slipDays, `+${slipDays}`, slipDays === 1 ? 'day' : 'days') : missing('delay', 'Launch delay'),
+    landing: isInstant(landingMs) ? quantity('landing', 'Landing', landingMs, formatUtcMinute(landingMs), 'UTC') : missing('landing', 'Landing'),
     season,
     seasonLine: season === null ? missing('season', 'Lunar south pole') : quantity('season', 'Lunar south pole', null, season, '', season === 'summer' ? 'sun' : 'ink'),
   };

@@ -17,6 +17,7 @@ export function TopBar() {
   const stage = useStore(appStore, (s) => s.stage);
   const flight = useStore(appStore, (s) => s.flight);
   const cardOpen = useStore(appStore, (s) => s.cardOpen);
+  const assistantOpen = useStore(appStore, (s) => s.assistantOpen);
   const { focus } = useData();
 
   function go(to: Stage) {
@@ -67,6 +68,21 @@ export function TopBar() {
         <Icon name="info" size={16} />
         <span className="max-md:hidden">About</span>
       </button>
+      {/* In mission select the assistant is always along the bottom; elsewhere it opens from here. */}
+      {stage !== 'mission' ? (
+        <button
+          type="button"
+          className="btn btn-quiet pointer-events-auto shrink-0 max-md:w-11 max-md:px-0"
+          onClick={() => actions.setAssistantOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={assistantOpen}
+          aria-label="Mission Assistant"
+          data-testid="assistant-open"
+        >
+          <Icon name="chat" size={16} />
+          <span className="max-md:hidden">Assistant</span>
+        </button>
+      ) : null}
     </header>
   );
 }

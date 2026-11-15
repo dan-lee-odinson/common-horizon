@@ -3,6 +3,7 @@
 import type { CatalogItem, HardwareChoice, Site, SiteRef } from '../api/types';
 import type { TimeScale } from '../util/time';
 import { formatLatLon, normalizeLon360 } from '../util/geo';
+import { MAX_STORAGE_KWH } from '../util/storage';
 import { createStore } from './store';
 import { prefersReducedMotion } from './useMedia';
 
@@ -54,6 +55,8 @@ export interface AppState {
   missionOpen: boolean;
   /** Site stage on phones: the horizon sheet. */
   horizonOpen: boolean;
+  /** Orbit and site stages: the Mission Assistant, opened from the top bar. (In mission select it is always there.) */
+  assistantOpen: boolean;
   /** Orbit: the time preview is running. */
   previewPlaying: boolean;
   /** Site stage: time is playing, and how fast (simulated days per second). */
@@ -68,8 +71,7 @@ export const DEFAULT_STAY_DAYS = 14;
 export const MAX_SLIP_DAYS = 30;
 export const MIN_STAY_DAYS = 1;
 export const MAX_STAY_DAYS = 365.25;
-/** Upper limit for typed battery storage, kWh (far above anything a lander carries). */
-export const MAX_STORAGE_KWH = 1_000_000;
+export { MAX_STORAGE_KWH };
 /** Site stage speeds, in simulated days per second of play. */
 export const SPEEDS = [0.5, 2, 6] as const;
 export const DEFAULT_SPEED = 2;
@@ -143,6 +145,7 @@ export const appStore = createStore<AppState>({
   drawerMode: 'preset',
   missionOpen: false,
   horizonOpen: false,
+  assistantOpen: false,
   previewPlaying: !prefersReducedMotion(),
   playing: false,
   speed: DEFAULT_SPEED,
@@ -173,7 +176,7 @@ function startFlight(flight: 'in' | 'out', finish: () => void) {
   }, FLIGHT_TIMEOUT_MS);
 }
 
-const CLOSED_PANELS = { drawerOpen: false, missionOpen: false, horizonOpen: false, compareOpen: false } as const;
+const CLOSED_PANELS = { drawerOpen: false, missionOpen: false, horizonOpen: false, compareOpen: false, assistantOpen: false } as const;
 
 export const actions = {
   /** "Begin", Escape or a click outside: the landing card closes and does not return this visit. */
@@ -327,6 +330,9 @@ export const actions = {
   },
   setHorizonOpen(open: boolean) {
     appStore.set({ horizonOpen: open });
+  },
+  setAssistantOpen(open: boolean) {
+    appStore.set({ assistantOpen: open });
   },
   setPreviewPlaying(previewPlaying: boolean) {
     appStore.set({ previewPlaying });

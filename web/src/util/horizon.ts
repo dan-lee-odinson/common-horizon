@@ -4,8 +4,14 @@
 // The answer's own "above" / "hidden" words are the authority. Between two samples whose words
 // differ, the moment of change is placed where the Sun's height crosses the terrain skyline
 // (a straight line between the two samples), so a sunrise is not snapped to the sample grid.
+//
+// How finely anything here is known depends on the samples, so each reading says so. A sunrise or
+// sunset gives the spacing of the two samples it falls between (`sampleGapHours`), and the Sun's
+// position gives how far a straight line between its two samples can be from the truth
+// (`uncertaintyDeg`). The readouts use these to choose how many digits to show, or to show none:
+// a time read between samples four hours apart is not shown to a tenth of an hour.
 
-import type { HorizonResponse } from '../api/types';
+import type { HorizonResponse, SunPathPoint } from '../api/types';
 import { normalizeLon360, sampleProfile, wrap180 } from './geo';
 import { HOUR_MS } from './time';
 
@@ -14,6 +20,12 @@ export interface SunNow {
   el: number;
   /** True when the Sun is above the terrain skyline. */
   above: boolean;
+  /**
+   * How far az and el can be from the Sun's true direction because they were read off a straight
+   * line between two samples, in degrees (an upper estimate). 0 at either end of the path, where
+   * it is the end sample itself; Infinity when it cannot be judged.
+   */
+  uncertaintyDeg: number;
 }
 
 export interface SunChange {
@@ -21,6 +33,14 @@ export interface SunChange {
   atMs: number;
   /** Hours from the asked time to the change. */
   hours: number;
+  /** Hours between the two samples the change falls between: its time is not known more finely than this. */
+  sampleGapHours: number;
+  /**
+   * True when the Sun's height crosses the skyline between those two samples, so the time is read
+   * off that crossing. False when the two heights are on the same side (the words changed but the
+   * heights did not): the change is then placed mid-way and is only known to the sample spacing.
+   */
+  interpolated: boolean;
 }
 
 export interface Period {
@@ -33,6 +53,10 @@ interface Crossing {
   atMs: number;
   /** The state after the crossing. */
   toAbove: boolean;
+  /** Time between the two samples around the crossing. */
+  gapMs: number;
+  /** True when the heights above the skyline have opposite signs at those two samples. */
+  interpolated: boolean;
 }
 
 interface Prepared {
@@ -56,8 +80,10 @@ function prepare(data: HorizonResponse): Prepared {
     const ma = a.el - sampleProfile(data.skyline, a.az);
     const mb = b.el - sampleProfile(data.skyline, b.az);
     // Opposite signs: the height above the skyline passes zero between the samples.
-    const f = ma * mb < 0 ? ma / (ma - mb) : 0.5;
-    crossings.push({ atMs: times[i] + f * (times[i + 1] - times[i]), toAbove: b.state === 'above' });
+    const interpolated = ma * mb < 0;
+    const f = interpolated ? ma / (ma - mb) : 0.5;
+    const gapMs = times[i + 1] - times[i];
+    crossings.push({ atMs: times[i] + f * gapMs, toAbove: b.state === 'above', gapMs, interpolated });
   }
   const out: Prepared = { times, crossings, startsAbove: path.length > 0 && path[0].state === 'above' };
   prepared.set(data, out);
@@ -71,6 +97,26 @@ function aboveAt(p: Prepared, tMs: number): boolean {
     above = c.toAbove;
   }
   return above;
+}
+
+/**
+ * How far a reading off the straight line between samples i and i + 1 can be from the Sun's true
+ * direction, in degrees. It is judged by how much the path bends at those two samples (the change
+ * in step from one sample to the next, in height and in azimuth): half the largest bend. On a
+ * smooth stretch that is about four times the real error. It still holds where the Sun passes
+ * almost straight overhead and its height turns sharply between two samples, which is where a
+ * straight line is furthest out. Infinity when neither sample has a neighbour on both sides to
+ * judge the bend by. Assumes evenly spaced samples, as the answer gives them.
+ */
+function lineUncertaintyDeg(path: readonly SunPathPoint[], i: number): number {
+  let worst = -1;
+  for (const k of [i, i + 1]) {
+    if (k < 1 || k + 1 >= path.length) continue;
+    const bendEl = path[k - 1].el - 2 * path[k].el + path[k + 1].el;
+    const bendAz = wrap180(path[k + 1].az - path[k].az) - wrap180(path[k].az - path[k - 1].az);
+    worst = Math.max(worst, Math.abs(bendEl), Math.abs(bendAz));
+  }
+  return worst < 0 || !Number.isFinite(worst) ? Infinity : worst / 2;
 }
 
 /** Sample times of the Sun's path, in milliseconds (cached per answer). */
@@ -104,6 +150,7 @@ export function sunAt(data: HorizonResponse, tMs: number): SunNow | null {
     az: normalizeLon360(a.az + wrap180(b.az - a.az) * f),
     el: a.el + (b.el - a.el) * f,
     above: aboveAt(p, Math.min(times[n - 1], Math.max(times[0], tMs))),
+    uncertaintyDeg: hi === i ? 0 : lineUncertaintyDeg(data.sun_path, i),
   };
 }
 
@@ -111,7 +158,9 @@ export function sunAt(data: HorizonResponse, tMs: number): SunNow | null {
 export function nextSunChange(data: HorizonResponse, tMs: number): SunChange | null {
   const p = prepare(data);
   for (const c of p.crossings) {
-    if (c.atMs > tMs) return { kind: c.toAbove ? 'sunrise' : 'sunset', atMs: c.atMs, hours: (c.atMs - tMs) / HOUR_MS };
+    if (c.atMs > tMs) {
+      return { kind: c.toAbove ? 'sunrise' : 'sunset', atMs: c.atMs, hours: (c.atMs - tMs) / HOUR_MS, sampleGapHours: c.gapMs / HOUR_MS, interpolated: c.interpolated };
+    }
   }
   return null;
 }

@@ -382,7 +382,7 @@ export function HorizonPlot(props: HorizonPlotProps) {
           ) : null}
         </g>
         {box && boxRects.length ? (
-          <text x={boxRects[0].x + 2} y={Math.max(g.top + 9, g.y(box.el_max) - 4)} fontSize={fs} fill="var(--ch-earth)">
+          <text x={boxRects[0].x + 2} y={Math.max(g.top + 9, g.y(box.el_max) - 4)} fontSize={fs} fill="var(--ch-earth-text)">
             Earth
           </text>
         ) : null}

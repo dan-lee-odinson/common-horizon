@@ -13,7 +13,7 @@ import { useStore } from '../state/store';
 export function LandingCard() {
   const open = useStore(appStore, (s) => s.cardOpen);
   const ref = useRef<HTMLDivElement>(null);
-  useLayer(ref, open, actions.closeCard, { trap: true, closeOnOutside: true, initialFocus: '[data-begin]' });
+  useLayer(ref, open, actions.closeCard, { trap: true, initialFocus: '[data-begin]' });
 
   // The card rises into place once when it opens. No movement for visitors who prefer reduced motion.
   useLayoutEffect(() => {
@@ -29,7 +29,8 @@ export function LandingCard() {
   if (!open) return null;
   return (
     <div className="absolute inset-0 z-[60] grid place-items-center overflow-y-auto p-4" data-testid="landing-layer">
-      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, rgb(1 4 9 / 0.5), rgb(1 4 9 / 0.78))' }} aria-hidden />
+      {/* A press beside the card lands on this backdrop and closes the card. */}
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, rgb(1 4 9 / 0.5), rgb(1 4 9 / 0.78))' }} onClick={actions.closeCard} aria-hidden data-testid="landing-backdrop" />
       <div
         ref={ref}
         role="dialog"

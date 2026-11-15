@@ -123,7 +123,7 @@
   .glass {
     position: relative;
     background:
-      linear-gradient(142deg, rgb(150 240 255 / 0.075), rgb(150 240 255 / 0) 42%),
+      linear-gradient(142deg, var(--ch-glass-sheen), transparent 42%),
       var(--ch-glass);
     border: 1px solid var(--ch-line);
     border-radius: 6px;
@@ -136,7 +136,7 @@
   }
   .glass-strong {
     background:
-      linear-gradient(142deg, rgb(150 240 255 / 0.06), rgb(150 240 255 / 0) 42%),
+      linear-gradient(142deg, var(--ch-glass-sheen), transparent 42%),
       var(--ch-glass-strong);
   }
   /* Corner brackets: four short L-shaped strokes just outside the panel's corners. */
@@ -366,7 +366,7 @@
       box-shadow 160ms ease;
   }
   .field:focus-visible {
-    outline: none;
+    outline: 2px solid transparent;
     border-color: var(--ch-focus);
     box-shadow: 0 0 0 3px rgb(95 230 245 / 0.2);
   }
@@ -524,20 +524,27 @@
     color: var(--ch-ink-2);
     white-space: nowrap;
   }
+  /* Coloured tags carry a dark under-layer, so the word keeps its contrast whatever is behind. */
   .tag-good {
     border-color: rgb(79 227 180 / 0.55);
     color: var(--ch-good);
-    background: rgb(79 227 180 / 0.08);
+    background:
+      linear-gradient(rgb(79 227 180 / 0.08), rgb(79 227 180 / 0.08)),
+      var(--ch-tag-under);
   }
   .tag-bad {
     border-color: rgb(255 122 77 / 0.6);
     color: var(--ch-bad-text);
-    background: var(--ch-bad-soft);
+    background:
+      linear-gradient(var(--ch-bad-soft), var(--ch-bad-soft)),
+      var(--ch-tag-under);
   }
   .tag-warn {
     border-color: rgb(255 194 61 / 0.55);
     color: var(--ch-warn);
-    background: var(--ch-sun-soft);
+    background:
+      linear-gradient(var(--ch-sun-soft), var(--ch-sun-soft)),
+      var(--ch-tag-under);
   }
 
   /* ---------- drawer and sheet ---------- */
@@ -548,17 +555,20 @@
     transition: opacity 240ms ease;
   }
   /* Side drawer: slides in on the iOS-like curve, leaves faster than it arrives. */
+  /* Visibility switches at once on the way in (so focus can move inside straight away) and only
+     after the slide on the way out. */
   .drawer {
+    pointer-events: auto;
     transition:
       transform 220ms var(--ease-drawer),
       opacity 180ms ease,
-      visibility 220ms;
+      visibility 0s linear 220ms;
   }
   .drawer[data-open='true'] {
     transition:
       transform 340ms var(--ease-drawer),
       opacity 200ms ease,
-      visibility 340ms;
+      visibility 0s;
   }
   /* The assistant's history. At most about 40 % of the window height; with content, at least six
      lines tall (15 px text, 1.5 line height). */
@@ -594,25 +604,54 @@
   }
 }
 
-/* Touch screens and phone widths: every control is at least 44 px tall and wide. */
+/* Touch screens and phone widths: every control is at least 44 px tall and wide, and text boxes
+   are 16 px so a phone does not zoom the page when one takes focus. */
 @media (pointer: coarse), (max-width: 767px) {
   .btn,
   .field {
     min-height: 2.75rem;
   }
+  .btn-lg {
+    min-height: 3rem;
+  }
   .btn-icon {
     min-width: 2.75rem;
   }
-  .seg > button {
-    min-height: 2.5rem;
-    min-width: 2.75rem;
+  .field {
+    font-size: 16px;
   }
   .seg {
-    min-height: 2.75rem;
+    min-height: 3rem;
   }
+  .seg > button {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  /* The box stays small; its hit area is 44 px. */
   .check {
+    position: relative;
     width: 22px;
     height: 22px;
+  }
+  .check::before {
+    content: '';
+    position: absolute;
+    inset: -11px;
+  }
+  .scrub::-webkit-slider-thumb {
+    width: 22px;
+    height: 30px;
+    margin-top: -14px;
+    box-shadow:
+      0 0 0 11px rgb(95 230 245 / 0.14),
+      0 4px 18px -2px var(--ch-glow);
+  }
+  .scrub::-moz-range-thumb {
+    width: 22px;
+    height: 30px;
+    box-shadow:
+      0 0 0 11px rgb(95 230 245 / 0.14),
+      0 4px 18px -2px var(--ch-glow);
   }
 }
 
@@ -652,16 +691,42 @@
   .btn:active:not(:disabled) {
     transform: none;
   }
-  .drawer,
+  /* A drawer or sheet fades; its position changes while it is invisible. */
+  .drawer {
+    transition:
+      opacity 180ms ease,
+      visibility 0s linear 180ms,
+      transform 0s linear 180ms;
+  }
   .drawer[data-open='true'] {
-    transition-property: opacity, visibility;
+    transition:
+      opacity 200ms ease,
+      visibility 0s,
+      transform 0s;
   }
   .check::after {
     transition: none;
   }
+  .scrub:active::-webkit-slider-thumb {
+    transform: none;
+  }
   .reticle-pulse {
     animation: none;
     opacity: 0;
+  }
+}
+
+/* Forced colours (high contrast modes): states drawn with backgrounds get system colours. */
+@media (forced-colors: active) {
+  .check::after {
+    background: CanvasText;
+  }
+  .check:checked,
+  .seg > button[aria-checked='true'],
+  .seg > button[aria-pressed='true'] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
   }
 }
 

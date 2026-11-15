@@ -22,23 +22,23 @@ export function Drawer({
   title: string;
   /** Which edge it comes from. "bottom" is the phone form. */
   side?: 'right' | 'left' | 'bottom';
-  /** A modal drawer has a scrim, keeps Tab inside and closes on a press outside. */
+  /** A modal drawer has a scrim (a press on it closes the drawer) and keeps Tab inside. */
   modal?: boolean;
   children: ReactNode;
   testId?: string;
   className?: string;
 }) {
-  const ref = useRef<HTMLElement>(null);
-  useLayer(ref, open, onClose, { trap: modal, closeOnOutside: modal });
+  const ref = useRef<HTMLDivElement>(null);
+  useLayer(ref, open, onClose, { trap: modal });
   const closed = side === 'right' ? 'translateX(calc(100% + 24px))' : side === 'left' ? 'translateX(calc(-100% - 24px))' : 'translateY(calc(100% + 24px))';
   const placement =
     side === 'bottom'
       ? 'inset-x-0 bottom-0 max-h-[86%] rounded-b-none border-x-0 border-b-0'
-      : `${side === 'right' ? 'right-4' : 'left-4'} top-[4.75rem] bottom-[5.5rem] w-[min(23rem,calc(100vw-2rem))]`;
+      : `${side === 'right' ? 'right-5' : 'left-5'} top-[4.75rem] bottom-[5.25rem] w-[min(23rem,calc(100vw-2rem))]`;
   return (
     <>
-      {modal ? <div className="scrim z-30" style={{ opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none' }} aria-hidden /> : null}
-      <aside
+      {modal ? <div className="scrim z-30" style={{ opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none' }} onClick={onClose} aria-hidden /> : null}
+      <div
         ref={ref}
         role={modal ? 'dialog' : 'region'}
         aria-modal={modal ? open : undefined}
@@ -46,19 +46,21 @@ export function Drawer({
         aria-hidden={!open}
         inert={!open}
         tabIndex={-1}
+        id={testId}
         data-testid={testId}
         data-open={open}
+        data-panel={open ? '' : undefined}
         className={`drawer glass glass-strong absolute z-40 flex flex-col outline-none ${placement} ${className}`}
         style={{ transform: open ? 'none' : closed, opacity: open ? 1 : 0, visibility: open ? 'visible' : 'hidden' }}
       >
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-2">
           <h2 className="panel-title m-0">{title}</h2>
-          <button type="button" className="btn btn-quiet btn-icon" aria-label={`Close ${title.toLowerCase()}`} onClick={onClose}>
+          <button type="button" className="btn btn-quiet btn-icon -mr-2" aria-label={`Close ${title.toLowerCase()}`} onClick={onClose} data-testid={testId ? `${testId}-close` : undefined}>
             <Icon name="close" />
           </button>
         </header>
         {children}
-      </aside>
+      </div>
     </>
   );
 }
