@@ -1,0 +1,90 @@
+{
+  "id": "fission-surface-power",
+  "name": "Fission surface power unit, deployed (NASA concept)",
+  "file": "fission-surface-power.glb",
+  "kind": "generated",
+  "status": "our estimate, to be replaced by a published figure",
+  "note": "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 13.471,
+    "height_y": 6,
+    "depth_z": 13.503
+  },
+  "dimension_sources": [
+    {
+      "dimension": "width_x",
+      "value_m": 13.471,
+      "meaning": "overall width (X) of the finished shape: the diameter of the round radiator",
+      "source": "measured on the finished shape, after scaling it evenly to the published height",
+      "status": "our estimate"
+    },
+    {
+      "dimension": "height_y",
+      "value_m": 6,
+      "meaning": "overall height on the surface, from the base plate to the top of the radiator",
+      "source": "our estimate: no size is published for this rendering; we take the 6 m stowed length in NASA's goal for the 40 kWe unit (Kaldon et al., IAC 2024, NASA Technical Reports Server 20240011694) as the height of the deployed mast",
+      "link": "https://ntrs.nasa.gov/citations/20240011694",
+      "status": "our estimate, to be replaced by a published figure"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 13.503,
+      "meaning": "overall depth (Z) of the finished shape: the diameter of the round radiator",
+      "source": "measured on the finished shape, after scaling it evenly to the published height",
+      "status": "our estimate"
+    }
+  ],
+  "generation": {
+    "picture": {
+      "description": "NASA rendering of a Kilopower fission power unit on the surface of the Moon (https://www.nasa.gov/wp-content/uploads/2021/05/kilopower_moon_render_1_1.jpg, shown on NASA's Kilopower page with the text \"Rendering of Kilopower on surface of the moon\"); before sending, the picture was cropped to the unit and everything outside it painted white",
+      "credit": "NASA",
+      "in_repository": false
+    },
+    "model": "TRELLIS.2",
+    "model_maker": "Microsoft",
+    "model_license": "MIT",
+    "endpoint": "fal-ai/trellis-2",
+    "service": "fal.ai",
+    "request_id": "01a1e149-7883-75b2-af07-28e3da506add",
+    "date": "2026-11-15",
+    "settings": {
+      "seed": 42,
+      "resolution": 1024,
+      "texture_size": 1024,
+      "decimation_target": 18000,
+      "remesh": true
+    },
+    "cleanup": null
+  },
+  "triangles": 17801,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "The picture shows a Kilopower unit, the smaller NASA design that came before the 40 kWe fission surface power goal; it stands in for the 40 kWe unit (catalog item fsp_40kwe).",
+    "The picture shows the unit from one side, nearly edge-on to the radiator, so the generator guessed the radiator's round shape, the far side and the back.",
+    "The radiator is one thin sheet with some small holes, and the thin rods of the mast are rough.",
+    "No size is published for this rendering: the 6.0 m height is our estimate, and the radiator's width is measured from the shape scaled to it.",
+    "All colours, textures and markings removed; one plain grey material."
+  ],
+  "finishing": {
+    "rotate_deg": [
+      0,
+      0,
+      0
+    ],
+    "drop_loose_parts_below": 0,
+    "flatten_below": 0,
+    "flattened_vertices": 0,
+    "input_file": "trellis2_d8d2cd4965204797a9f88eb40734fd9b.glb",
+    "input_sha256": "07afbd250665fe9cd62945a48bdd3edb01462684e8a9333b82ee4c9cea85df4c",
+    "input_triangles": 17801,
+    "removed_loose_parts": {
+      "pieces": 0,
+      "triangles": 0
+    },
+    "scale_factor": 13.566983,
+    "material": "one neutral material; every texture, image, UV coordinate, per-vertex colour and original material removed"
+  },
+  "built_by": "tools/models/finish-model.mjs"
+}

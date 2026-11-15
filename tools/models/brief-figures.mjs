@@ -98,4 +98,10 @@ export const BRIEF = Object.freeze({
     dimensions_m: { height_y: 4 }, // our estimate: NASA publishes no size for this concept
     picture_credit: 'NASA', // NASA rendering, "Conceptual Lunar Habitation Module"
   },
+  'fission-surface-power': {
+    kind: 'generated',
+    status: STATUS_LABELS.ourEstimate,
+    dimensions_m: { height_y: 6 }, // our estimate: the 6 m stowed length of NASA's 40 kWe goal, taken as the deployed height
+    picture_credit: 'NASA', // NASA rendering of Kilopower on the Moon
+  },
 });
