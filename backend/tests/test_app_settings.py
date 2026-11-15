@@ -22,7 +22,11 @@ def clean_settings_cache():
 
 
 def _client(engine_name: str) -> TestClient:
-    return TestClient(create_app(Settings(physics_engine=engine_name, cors_origins=DEFAULT_CORS_ORIGINS)))
+    # The real engine gets a kernel folder that does not exist, whatever is installed on this machine.
+    settings = Settings(
+        physics_engine=engine_name, cors_origins=DEFAULT_CORS_ORIGINS, spice_kernel_dir="/nonexistent/ch-kernels"
+    )
+    return TestClient(create_app(settings))
 
 
 def test_supplied_physics_setting_is_used_even_when_environment_says_synthetic(monkeypatch, clean_settings_cache):

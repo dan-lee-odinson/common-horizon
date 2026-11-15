@@ -49,9 +49,9 @@ Within each group the order is by score, highest first, with ties broken by the 
 
 | Quantity | Today | Effect |
 |---|---|---|
-| `slope_deg` | Null for every site from the real engine adapter (PR #14, not merged; the synthetic engine reports 0) | `score` is null. `score_min` (slope term 0) and `score_max` (slope term 100) bound it, and ranking uses `score_min`. The `landing slope` requirement is unknown, so the verdict is `unknown` unless something else fails. |
+| `slope_deg` | Null for every site from the real engine adapter (the synthetic engine reports 0) | `score` is null. `score_min` (slope term 0) and `score_max` (slope term 100) bound it, and ranking uses `score_min`. The `landing slope` requirement is unknown, so the verdict is `unknown` unless something else fails. |
 | Lander slope limit | Published only for Griffin (10°, `griffin_slope`) | Every other lander leaves `landing slope` unknown. |
-| `clear_sky_percent` | Null without a stored terrain skyline (with the PR #14 adapter, 6 of the 17 presets have one) | Shown as unknown. It is not part of the score. |
+| `clear_sky_percent` | Null without a stored terrain skyline (6 of the 17 presets have one) | Shown as unknown. It is not part of the score. |
 | `geometry` | From the engine's positions at landing | Never invented; null only if an engine returned no positions. |
 | `energy_added_kwh` | Always null | The planner has no net generation-minus-load figure. The planner's `site_energy` (night penalty plus heating penalty) is in `site_energy`. |
 | `fits` / `hardware_fits` | Null when the planner answers "depends on capacity figure" or "mass needed" | `hardware fit` is unknown, not passed. |
@@ -123,12 +123,11 @@ These are differences from `web/src/api/types.ts`. All other fields match it by 
 - `time_step_s` and a warning say so.
 - A coarser step coarsens the darkness and crossing times by up to one step. At 26,880 s (about 7.5 h), a 354 h night reads as 358 h.
 
-**Measured with real kernels** (laptop, not Lambda; this branch merged locally with PR #14, nothing committed):
-- 17 presets × 14 days: 1.6–1.75 s;
+**Measured with real kernels** (laptop, not Lambda; this branch with `main` at `86ee0b1`):
+- 17 presets × 14 days: 1.5–1.75 s;
 - 17 presets × 365 days: 5.2 s;
 - responses about 32 kB.
 
-When both branches are merged, regenerate `contract/openapi.json`; `AI_USE_LOG.md` will conflict (both append a section).
 
 ## Decisions for Dan and Isabella
 

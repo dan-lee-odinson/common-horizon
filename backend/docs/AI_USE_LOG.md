@@ -87,6 +87,85 @@ the source files' modification times.
 |---|---|---|---|
 | 15:28:19 | 17:28:19 | Drafted with Claude Code: open coordination questions in `API_CONTRACT.md` restated as neutral provisional technical assumptions and engine integration requirements; private working notes moved to a git-ignored `.local-notes/` directory | No change to the API, code behaviour or OpenAPI contract |
 
+## Physics adapter: real engine behind the API (2026-11-15)
+
+Drafted with Claude Code (Claude Opus 5.5) on branch `feat/physics-adapter` from `main` at `2d4bbd9`
+(after PRs #10, #12 and #13). Tests ran in a local Python 3.12.10 virtual environment with the pinned
+`requirements-dev.txt` (numpy 2.5.4 needs Python 3.12, the Docker image's version) and ruff 0.17.5.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 10:18:46 | 12:18:46 | `main` fast-forwarded to `2d4bbd9`; `feat/physics-adapter` created (git reflog) | Clean tree; PR #6 branch untouched |
+| by 10:24:15 | by 12:24:15 | Read the interface, evaluation service, engine (`ephemeris`, `positions`, `frames`, `kernel_loader`), horizon package and their tests; baseline run | 338 passed, 14 skipped; 60 pre-existing ruff findings, none in files changed here |
+| ~10:27:07 onward | ~12:27:07 onward | Adapter, metrics module, `provenance.sources`, kernel/profile settings | Implemented |
+| ~10:34:07 onward | ~12:34:07 onward | Adapter and metrics regression tests (injected positions, fixture profile) | 380 passed, 15 skipped (real-kernel check skipped: no kernels on this machine) |
+
+What the AI did and did not decide:
+
+- The adapter calls the physics engine's own SPICE position and frame functions; it computes no
+  ephemeris itself. `compute_sun_earth_angles` is not called: it returns angles only and puts the
+  observer on the 1737.4 km sphere, while the contract also needs position vectors and disc radii.
+- Terrain comes from the stored horizon profiles; sites without one get a smooth sphere with an
+  explicit warning. Slope stays null; elevation without a profile or input is a labelled placeholder.
+- Matching tolerances (50 m, 0.5 m site height, 0.01 m observer height), the sky-visibility definition
+  and the transport rounding are proposals in code and docs for the physics owner to confirm.
+- All numbers in the new unit tests come from injected positions and a fixture profile (mocked, not
+  physics). Only the opt-in real-kernel test (`CH_SPICE_KERNEL_DIR`) produces physical output; it has
+  not been run yet.
+- Not done: Docker image changes for kernels and profiles (kept apart from the open PR #6), production
+  switch to the real engine, deployment.
+
+### Real-kernel validation (2026-11-15)
+
+Kernels downloaded with the backend owner's authorisation from `naif.jpl.nasa.gov` into the git-ignored
+`backend/app/physics/data/datasets/spice/` (checksums in `backend/README.md`; not committed).
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| ~10:48 | ~12:48 | Downloaded the four kernels; sizes checked against `Content-Length`, SHA-256 computed | `de440s.bsp` MD5 matches NAIF's `aa_checksums.txt`; no published checksum for the other three |
+| ~10:49 | ~12:49 | Ran the previously skipped real-kernel test | Passed; no skip |
+| by 10:53:21 | by 12:53:21 | Real-kernel tests for `shackleton-ridge` and `nobile` (2027, hourly), API run, runtime measurements; full suite | 9 real-kernel tests passed; suite 394 passed, 9 skipped (LOLA DEM tests only) |
+
+Physical results (adapter vs the stored independent 2027 check, `results_2027.json`): Sun visible
+82.669% vs 82.671% (Shackleton ridge) and 49.058% vs 49.053% (Nobile); Earth visible 50.234% vs
+50.240% and 63.363% vs 63.368%; longest dark period 155 h and 532 h in both. Against the engine's
+`compute_sun_earth_angles`: largest elevation difference 1.2e-6 degree (Sun) and 2.8e-4 / 1.0e-3 degree
+(Earth, the parallax of the 1.7 km / 6.4 km site height that function leaves out); azimuth differences
+5e-7 degree (transport rounding). Bug found and fixed: the provenance text printed Earth's radius as
+6378.14 km (`:g` format) instead of the 6378.1366 km used.
+
+### Fixes for the independent Codex review of `fd7c5de` (2026-11-15)
+
+Review by Codex by OpenAI, posted on PR #14 at 11:19:02 UTC (GitHub timestamp). Fixes drafted by
+Claude Code (Claude Opus 5.5). Correction to the earlier entry: the real-kernel run counted 9 tests, of
+which 8 use the kernels; the ninth (the radius-text regression) does not.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 11:19:02 | 13:19:02 | Codex review posted (GitHub timestamp) | 1 blocker (unbounded launch-delay work), 3 nonblocking defects |
+| by 11:30:10 | by 13:30:10 | Work budget (exact distinct-sample count, 422), elevation kept for incompatible skylines, sanitised profile errors, strict position validation; regression tests | 434 passed, 9 skipped with kernels (LOLA DEM tests only); 424 passed, 19 skipped without |
+
+- Review counts reproduced exactly by the new estimate: 310 000 samples (61 s step) and 53 200 (60 s).
+- During the work an over-broad `ruff format app/` reformatted 12 files, including the physics engine
+  modules; they were restored from Git before any commit and are not part of this change.
+- Local timings are not Lambda measurements (see `backend/README.md`, "Work budget").
+
+### Fixes for the Codex re-review of `51c4cf0` (2026-11-15)
+
+Re-review by Codex by OpenAI posted on PR #14 at 11:44:56 UTC (GitHub timestamp): one remaining blocker
+(the adapter-wide sample cache, filled by earlier requests, was cleared mid-sweep, so an evaluation
+validated at 20 000 samples computed 27 120) and one minor defect (an integer too large for a float gave
+500). Fixes drafted by Claude Code (Claude Opus 5.5): one `EvaluationCache` per evaluation, passed
+explicitly with each `SimulationRequest`; no engine-wide cache; overflow mapped to the 502 contract error.
+While writing the fix, a new test caught that an empty cache is falsy (`cache or new_cache` silently
+discarded it); fixed with an explicit `is None` check before any commit. The warm-process regression
+reproduces 27 120 extra samples against `51c4cf0` and passes on the fix.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 11:44:56 | 13:44:56 | Codex re-review posted (GitHub timestamp) | 1 blocker, 1 minor defect |
+| by 11:59:20 | by 13:59:20 | Per-evaluation cache, overflow handling, regressions, real-kernel HTTP probe | 447 passed, 9 skipped with kernels (LOLA DEM tests only); warm exact-20 000 evaluation computes 20 000 samples (6.9 s locally, not Lambda) |
+
 ## Website API and multi-site ranking (2026-11-15)
 
 Drafted with Claude Code (Claude Opus 5.5) on `feat/website-api` (from `main` at `2d4bbd9`). Times are
@@ -100,6 +179,7 @@ from the branch reflog, file modification times and the clock at each step.
 | 13:37:56 | 15:37:56 | OpenAPI regenerated | Additive only: new paths and schemas, one new `/health` field |
 | by 13:40:38 | by 15:40:39 | Ruff on the changed files, full backend and planner suites, `docs/WEBSITE_API.md` | 439 passed, 11 skipped (backend); 166 passed (planner); repo-wide Ruff count unchanged at 60 |
 | ~13:41–13:43 | ~15:41–15:43 | Controlled real-kernel check in a throwaway worktree (this branch merged with PR #14's adapter, never committed): merged-tree pytest with kernels, then all 17 presets through `/evaluate` and `/check` with `CH_PHYSICS_ENGINE=physics` | Found and fixed one bug: per-site `provenance.sources` (one terrain profile per site) made the one-engine check refuse the request; now only the engine identity is compared and sources are merged. Then 540 passed, 14 skipped (merged tree); 17 sites x 14 d in 1.6-1.75 s, 17 x 365 d in 5.2 s (laptop); 445 passed on this branch |
+| by 13:57:03 | by 15:57:03 | Merged `origin/main` at `86ee0b1` (PRs #14 and #15) into `feat/website-api`; the only conflict was this log (both sides appended a section; both kept, in time order); OpenAPI regenerated (identical to the auto-merged file) | Backend 546 passed, 19 skipped without kernels; 556 passed, 9 skipped with `CH_SPICE_KERNEL_DIR` and `CH_NAIF_DIR` (only LOLA DEM tests skip); planner 166 passed; all website endpoints checked on the real engine (17 x 14 d in 1.5 s, 17 x 365 d in 5.2 s, laptop) |
 
 **Not decided here (listed in `WEBSITE_API.md`):** transit time, Earth-link thresholds, ranking of
 unknown verdicts, slope source and lander slope limits, empty-payload and no-lander fit, observer

@@ -105,13 +105,17 @@ def test_launch_delay_cases_include_baseline_and_shifted_starts(client, mission_
     assert cases[0]["metrics"] == body["metrics"]
 
 
-def test_unavailable_engine_returns_503_not_synthetic_data(app, client, mission_payload):
-    app.dependency_overrides[get_physics_engine] = PhysicsEngineAdapter
+def test_unavailable_engine_returns_503_not_synthetic_data(app, client, mission_payload, tmp_path):
+    # An explicit missing folder, so the test does not depend on kernels installed on this machine.
+    missing = tmp_path / "no-kernels"
+    app.dependency_overrides[get_physics_engine] = lambda: PhysicsEngineAdapter(spice_kernel_dir=missing)
 
     response = client.post(URL, json=mission_payload)
 
     assert response.status_code == 503
-    assert "not integrated" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert "SPICE kernel directory not found" in detail
+    assert str(tmp_path) not in detail  # server paths stay in the log
     health = client.get("/health").json()["physics_engine"]
     assert health["available"] is False
     assert health["is_synthetic"] is False
@@ -172,6 +176,7 @@ def test_real_engine_results_are_labelled_as_physics(app, client, mission_payloa
         "engine_name": "fake-physics",
         "engine_version": "9.9",
         "notice": "Values computed by the Common Horizon physics engine.",
+        "sources": [],
     }
     assert body["site"]["slope_deg"] == 4.5
     assert body["requirements_passed"] is False

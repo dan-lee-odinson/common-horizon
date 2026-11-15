@@ -5,7 +5,8 @@
     "is_synthetic": true,
     "engine_name": "synthetic-fixture",
     "engine_version": "0.1.0",
-    "notice": "SYNTHETIC FIXTURE: values come from a simplified toy model for interface development only. They are not physics-engine results and must not be used for mission decisions."
+    "notice": "SYNTHETIC FIXTURE: values come from a simplified toy model for interface development only. They are not physics-engine results and must not be used for mission decisions.",
+    "sources": []
   },
   "mission": {
     "landing_site": {
