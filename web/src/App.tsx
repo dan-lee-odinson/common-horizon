@@ -1,5 +1,4 @@
-import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useParallax } from './hud/parallax';
+import { Component, lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { MoonFallback } from './scene/MoonFallback';
 import { hasWebGL } from './scene/webgl';
 import { AssistantSheet } from './stages/Assistant';
@@ -44,13 +43,11 @@ function Shell() {
   const cardOpen = useStore(appStore, (s) => s.cardOpen);
   const webgl = useMemo(() => hasWebGL(), []);
   const isPhone = useIsPhone();
-  const hudRef = useRef<HTMLDivElement>(null);
   // The HUD arrives once the landing card has been closed for the first time.
   const [revealed, setRevealed] = useState(!cardOpen);
   useEffect(() => {
     if (!cardOpen) setRevealed(true);
   }, [cardOpen]);
-  useParallax(hudRef, [stage, revealed]);
 
   const noScene = <FlatWorld />;
 
@@ -68,7 +65,7 @@ function Shell() {
         noScene
       )}
       {webgl ? <SiteVeil /> : null}
-      <div ref={hudRef} className="hud" inert={cardOpen}>
+      <div className="hud" inert={cardOpen}>
         {/* Under every panel: the reticle that rides the landing point from the Moon down to the site. */}
         {webgl ? <LanderReticle /> : null}
         <TopBar />

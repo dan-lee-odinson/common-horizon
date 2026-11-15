@@ -364,7 +364,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       <div {...rootProps}>
         <h2 className="sr-only">Site: {name}</h2>
 
-        <div className="hud-layer" data-depth="0.5">
+        <div className="hud-layer">
           <div className="absolute left-3 right-3 top-[4.25rem] flex flex-col gap-2" data-enter="lead" data-site-zone="top">
             <div className="flex items-center gap-2">
               <button type="button" className="btn btn-glass btn-icon shrink-0" onClick={actions.backToMission} aria-label="Back to mission select" data-testid="back-to-mission">
@@ -441,7 +441,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       ) : null}
 
       {/* Across the top: the way back, and which site this is. */}
-      <div className="hud-layer" data-depth="0.6">
+      <div className="hud-layer">
         <div className="absolute left-5 right-[22.5rem] top-[4.75rem] flex items-center gap-2 max-lg:right-[18.5rem]" data-enter="lead" data-site-zone="top">
           <button type="button" className="btn btn-glass shrink-0" onClick={actions.backToMission} aria-label="Back to mission select" data-testid="back-to-mission">
             <Icon name="back" size={14} />
@@ -497,21 +497,21 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
       {/* Inside the launch delay, the stage says so where the scene begins: no hardware stands there yet. */}
       {webgl ? (
-        <div className="hud-layer" data-depth="0.6">
+        <div className="hud-layer">
           {/* On its own over the scene, so it carries its own dark backing. */}
           <div className="site-before absolute left-[22.5rem] top-[8rem] rounded-[3px] bg-glass-strong max-lg:left-[18.5rem]">{beforeLanding}</div>
         </div>
       ) : null}
 
       {/* Left wing: the Sun now, the shadows it casts and its light over the stay. */}
-      <div className="hud-layer" data-depth="0.9">
+      <div className="hud-layer">
         <div className="site-wing wing-l absolute left-5 top-[8rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="left" data-site-zone="left">
           {sunPanel()}
         </div>
       </div>
 
       {/* Right wing: Earth in this sky; the mission's hardware. */}
-      <div className="hud-layer" data-depth="0.9">
+      <div className="hud-layer">
         <div className="site-wing site-wing-r wing-r absolute right-5 top-[4.75rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="right" data-site-zone="right">
           {earthPanel()}
           {hardwarePanel({ className: 'max-lg:hidden [@media(max-height:759px)]:hidden' })}
@@ -520,7 +520,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
       {/* Without 3D the plot takes the scene's place, in the middle. */}
       {webgl ? null : (
-        <div className="hud-layer" data-depth="0.5">
+        <div className="hud-layer">
           <Glass as="section" className="absolute left-[22.5rem] right-[22.5rem] top-[11.5rem] flex flex-col gap-3 p-4 max-lg:left-[18.5rem] max-lg:right-[18.5rem]" aria-label="Horizon" data-enter="fade" data-panel data-testid="site-flat">
             <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
               <h3 className="panel-title m-0">Horizon</h3>
@@ -548,8 +548,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
         </div>
       ) : null}
 
-      {/* The console: sky and time. The plot sits directly above the timeline that scrubs it.
-          This layer does not drift with the pointer: the needle stays under the hand that drags it. */}
+      {/* The console: sky and time. The plot sits directly above the timeline that scrubs it. */}
       <div className="hud-layer">
         <Glass as="section" strong className="absolute bottom-5 left-5 right-5 grid grid-cols-[24rem_minmax(0,1fr)] gap-x-5 px-4 py-3.5 short:py-3 max-[1439px]:grid-cols-[22.5rem_minmax(0,1fr)] max-lg:grid-cols-[17rem_minmax(0,1fr)]" aria-label="Sky and time" data-enter="rise" data-site-zone="console" data-panel data-testid="site-console">
           <div className="flex min-w-0 flex-col gap-2.5 short:gap-2">
