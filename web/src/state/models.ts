@@ -23,22 +23,45 @@ import { createStore } from './store';
  * Blue Moon Mark 1 is a lander. The crew rover stands for Astrolab's FLEX-class `astrolab_clv1`, the
  * pressurized rover for JAXA's, and VIPER stands in for the science rover (`science_rover_recharge`).
  *
+ * The Surface Habitat is the habitation module and the 40 kWe fission unit the deployed fission
+ * surface power unit (its round radiator 13.5 m across), both generated from NASA renderings. The
+ * earlier code-built habitat-unit and fission-power-unit files stay in public/models/ and on the
+ * models page; they are no longer placed in the scene.
+ *
  * How each shape was made differs, and each description says so in its own `note`: code-built
- * (Starship, Griffin, the habitat, the fission unit, the mast: "built with SI/AI-written code"),
- * imported (Blue Moon Mark 1: "from a community CAD model") or generated (the three rovers:
- * "SI/AI-generated from a photo"). Every one is drawn at its published size.
+ * (Starship, Griffin, the mast: "built with SI/AI-written code"), imported (Blue Moon Mark 1:
+ * "from a community CAD model") or generated (the habitation module, the fission unit and the
+ * three rovers: "SI/AI-generated from a photo"). Every one is drawn at its published size.
  */
 export const MODEL_FOR: Readonly<Record<string, string>> = {
   starship_hls: 'starship-lander',
   griffin: 'griffin-lander',
   blue_moon_mk1: 'blue-moon-mk1',
-  surface_habitat: 'habitat-unit',
-  fsp_40kwe: 'fission-power-unit',
+  surface_habitat: 'hab-module',
+  fsp_40kwe: 'fission-surface-power',
   vsat: 'solar-array-mast',
   astrolab_clv1: 'crew-rover',
   jaxa_pressurized_rover: 'pressurized-rover',
   science_rover_recharge: 'viper-rover',
 };
+
+/**
+ * Power rows that are another chosen item's own, not a second object: the crewed and uncrewed
+ * habitat loads are the Surface Habitat's draw, and the 40 kWe fission power row is the fission
+ * unit's output (the planner ticks the two together, state/app.ts LINKED_HARDWARE). While that
+ * item is chosen they get no marker in the scene and no row in the Hardware panel.
+ */
+export const DRAWN_AS_PART_OF: Readonly<Record<string, string>> = {
+  hab_crewed: 'surface_habitat',
+  hab_uncrewed: 'surface_habitat',
+  fission_40kwe: 'fsp_40kwe',
+};
+
+/** True when a chosen item is part of another chosen item (see DRAWN_AS_PART_OF). */
+export function drawnAsPartOf(catalogId: string, chosenIds: readonly string[]): boolean {
+  const owner = Object.hasOwn(DRAWN_AS_PART_OF, catalogId) ? DRAWN_AS_PART_OF[catalogId] : null;
+  return owner !== null && chosenIds.includes(owner);
+}
 
 /** The model that stands for a catalog item, or null when it has none. */
 export function modelFor(catalogId: string): string | null {
