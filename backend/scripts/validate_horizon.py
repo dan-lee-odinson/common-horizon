@@ -33,6 +33,7 @@ import argparse
 import json
 import math
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -129,6 +130,58 @@ def body_track(spice, target: str, radius_km: float, profile: HorizonProfile, ep
     return track
 
 
+def find_engine():
+    """The physics engine's own position, frame and kernel modules, if this checkout has them.
+
+    They live in ``app/physics/engine`` on the physics owner's branch. When they can be imported this
+    script uses them for the Sun's and the Earth's positions and for azimuth and elevation, so the
+    check runs on the same numbers the engine will produce.
+    """
+    try:
+        from app.physics.engine import frames, kernel_loader, positions
+    except ImportError:
+        return None
+    return frames, kernel_loader, positions
+
+
+def utc_moments(year: int, step_hours: float, count: int) -> list[datetime]:
+    start = datetime(year, 1, 1, tzinfo=UTC)
+    return [start + timedelta(hours=index * step_hours) for index in range(count)]
+
+
+def body_track_with_engine(engine, target: str, radius_km: float, profile: HorizonProfile, moments: list[datetime]):
+    """Like ``body_track`` but with the physics engine's functions.
+
+    ``positions.get_body_position`` gives the body's position from the Moon's centre in MOON_ME with
+    the engine's own aberration setting; the observer's position (``frames.get_site_position`` at the
+    observer's radius) is subtracted, and ``frames.get_azimuth_elevation`` gives the angles.
+    """
+    frames, _, positions = engine
+    latitude, longitude = profile.latitude_deg, profile.longitude_deg
+    observer_radius_km = (MOON_RADIUS_M + profile.site_height_m + profile.observer_height_m) / 1000.0
+    site = frames.get_site_position(latitude, longitude, observer_radius_km)
+    track = []
+    for moment in moments:
+        direction = [body - own for body, own in zip(positions.get_body_position(target, moment), site, strict=True)]
+        distance = math.sqrt(sum(float(component) ** 2 for component in direction))
+        azimuth, elevation = frames.get_azimuth_elevation(direction, latitude, longitude)
+        azimuth = float(azimuth) % 360.0
+        track.append(
+            (0.0 if azimuth >= 360.0 else azimuth, float(elevation), math.degrees(math.asin(radius_km / distance)))
+        )
+    return track
+
+
+def track_difference(first, second) -> dict[str, float]:
+    """Largest differences between two tracks of the same body: elevation, and azimuth as an angle on the sky."""
+    elevation = max(abs(a[1] - b[1]) for a, b in zip(first, second, strict=True))
+    azimuth = max(
+        abs((a[0] - b[0] + 180.0) % 360.0 - 180.0) * math.cos(math.radians(a[1]))
+        for a, b in zip(first, second, strict=True)
+    )
+    return {"max_elevation_difference_deg": elevation, "max_azimuth_difference_on_sky_deg": azimuth}
+
+
 def sky_sanity(spice, epochs: list[float]) -> dict[str, float]:
     """Facts about the real sky that any correct kernel and frame setup must reproduce.
 
@@ -184,19 +237,52 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--compare-suffix", default=".240m", help="file name suffix of the profiles in --compare-dir")
     parser.add_argument("--year", type=int, default=2027)
     parser.add_argument("--step-hours", type=float, default=1.0)
+    parser.add_argument(
+        "--positions",
+        choices=("auto", "engine", "spice"),
+        default="auto",
+        help="where Sun and Earth positions come from: the physics engine's functions (app.physics.engine), "
+        "this script's own SPICE calls (LT+S from the surface point), or auto: the engine's when present",
+    )
+    parser.add_argument("--positions-note", default="", help="free text stored with the results, e.g. a commit id")
     parser.add_argument("--json-out", type=Path, help="also write the results to this JSON file")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = parse_arguments(argv)
-    spice = load_kernels(arguments.kernel_dir)
+    engine = None if arguments.positions == "spice" else find_engine()
+    if arguments.positions == "engine" and engine is None:
+        print("--positions engine: app.physics.engine is not in this checkout", file=sys.stderr)
+        return 2
+    if engine is not None:
+        _, kernel_loader, positions = engine
+        if list(kernel_loader.SPICE_KERNELS) != list(KERNELS):
+            print(f"the engine loads other kernels than this check: {kernel_loader.SPICE_KERNELS}", file=sys.stderr)
+            return 2
+        kernel_loader.clear_kernels()
+        kernel_loader.load_kernels(arguments.kernel_dir)
+        import spiceypy as spice
+
+        positions_source = (
+            "physics engine functions: app.physics.engine.positions.get_body_position (from the Moon's centre, "
+            f"frame {positions.REFERENCE_FRAME}, aberration correction {positions.ABERRATION_CORRECTION}), minus "
+            "app.physics.engine.frames.get_site_position at the observer's radius, then frames.get_azimuth_elevation"
+        )
+        aberration_correction = positions.ABERRATION_CORRECTION
+    else:
+        spice = load_kernels(arguments.kernel_dir)
+        positions_source = (
+            f"this script's own SPICE calls: spkcpo from the surface point, frame {FRAME}, "
+            f"aberration correction {ABERRATION_CORRECTION}"
+        )
+        aberration_correction = ABERRATION_CORRECTION
     epochs = hourly_epochs(spice, arguments.year, arguments.step_hours)
+    moments = utc_moments(arguments.year, arguments.step_hours, len(epochs))
     sanity = sky_sanity(spice, epochs)
-    print(
-        f"{arguments.year}: {len(epochs)} samples, one every {arguments.step_hours:g} h; frame {FRAME}, "
-        f"correction {ABERRATION_CORRECTION}; kernels {', '.join(KERNELS)}"
-    )
+    print(f"{arguments.year}: {len(epochs)} samples, one every {arguments.step_hours:g} h")
+    print(f"kernels: {', '.join(KERNELS)}")
+    print(f"positions: {positions_source}")
     print(
         "sky check from the Moon's centre: sub-solar latitude "
         f"{sanity['subsolar_latitude_min_deg']:+.3f} to {sanity['subsolar_latitude_max_deg']:+.3f} deg; sub-Earth "
@@ -221,7 +307,9 @@ def main(argv: list[str] | None = None) -> int:
         "step_hours": arguments.step_hours,
         "samples": len(epochs),
         "frame": FRAME,
-        "aberration_correction": ABERRATION_CORRECTION,
+        "positions_source": positions_source,
+        "positions_note": arguments.positions_note,
+        "aberration_correction": aberration_correction,
         "kernels": list(KERNELS),
         "sun_radius_km": SUN_RADIUS_KM,
         "earth_radius_km": EARTH_RADIUS_KM,
@@ -231,8 +319,13 @@ def main(argv: list[str] | None = None) -> int:
     }
     for site_id in arguments.sites:
         profile = load_profile(arguments.profiles_dir / f"{site_id}.json")
-        sun_track = body_track(spice, "SUN", SUN_RADIUS_KM, profile, epochs)
-        earth_track = body_track(spice, "EARTH", EARTH_RADIUS_KM, profile, epochs)
+        own_sun_track = body_track(spice, "SUN", SUN_RADIUS_KM, profile, epochs)
+        own_earth_track = body_track(spice, "EARTH", EARTH_RADIUS_KM, profile, epochs)
+        if engine is not None:
+            sun_track = body_track_with_engine(engine, "SUN", SUN_RADIUS_KM, profile, moments)
+            earth_track = body_track_with_engine(engine, "EARTH", EARTH_RADIUS_KM, profile, moments)
+        else:
+            sun_track, earth_track = own_sun_track, own_earth_track
         smooth = HorizonProfile.smooth_sphere(
             site_id=site_id,
             latitude_deg=profile.latitude_deg,
@@ -278,6 +371,17 @@ def main(argv: list[str] | None = None) -> int:
             }
         rows["no_terrain"] = evaluate(smooth, sun_track, earth_track, arguments.step_hours)
         labels["no_terrain"] = "no terrain (smooth sphere)"
+        if engine is not None:
+            # The same stored profile under this script's own LT+S positions: how much the engine's
+            # aberration setting matters.
+            rows["terrain_own_lts"] = evaluate(profile, own_sun_track, own_earth_track, arguments.step_hours)
+            labels["terrain_own_lts"] = f"with terrain, {ABERRATION_CORRECTION} from the site"
+            site_result["engine_minus_own_lts_positions"] = {
+                "sun": {key: round(value, 6) for key, value in track_difference(sun_track, own_sun_track).items()},
+                "earth": {
+                    key: round(value, 6) for key, value in track_difference(earth_track, own_earth_track).items()
+                },
+            }
         site_result["results"] = {
             name: {key: round(value, 4) for key, value in row.items()} for name, row in rows.items()
         }
@@ -309,6 +413,16 @@ def main(argv: list[str] | None = None) -> int:
                 f"Earth any {difference['earth_any_part_visible_percent']:+.2f} points; skyline rms "
                 f"{skyline['rms_deg']:.3f}, median |d| {skyline['median_abs_deg']:.3f}, "
                 f"max |d| {skyline['max_abs_deg']:.3f} deg"
+            )
+
+        if engine is not None:
+            gap = site_result["engine_minus_own_lts_positions"]
+            print(
+                f"  engine positions vs {ABERRATION_CORRECTION} from the site, largest difference over the year: Sun "
+                f"elevation {gap['sun']['max_elevation_difference_deg']:.4f}, azimuth "
+                f"{gap['sun']['max_azimuth_difference_on_sky_deg']:.4f} deg; Earth elevation "
+                f"{gap['earth']['max_elevation_difference_deg']:.4f}, azimuth "
+                f"{gap['earth']['max_azimuth_difference_on_sky_deg']:.4f} deg"
             )
 
     if arguments.json_out:

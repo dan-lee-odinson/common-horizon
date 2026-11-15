@@ -18,6 +18,8 @@ from scripts.validate_horizon import (
     longest_run_hours,
     skyline_difference,
     summarise,
+    track_difference,
+    utc_moments,
 )
 
 VALIDATION_DIR = DEFAULT_PROFILE_DIR.parent / "horizon_validation"
@@ -83,10 +85,32 @@ def test_skyline_difference():
     assert difference["max_abs_deg"] == pytest.approx(1.0)
 
 
+def test_utc_moments_cover_the_year_in_even_steps():
+    moments = utc_moments(2027, 1.0, 8760)
+    assert moments[0].isoformat() == "2027-01-01T00:00:00+00:00"
+    assert moments[-1].isoformat() == "2027-12-31T23:00:00+00:00"
+    gaps = {(later - earlier).total_seconds() for earlier, later in zip(moments, moments[1:], strict=False)}
+    assert gaps == {3600.0}
+    assert utc_moments(2027, 0.5, 3)[2].isoformat() == "2027-01-01T01:00:00+00:00"
+
+
+def test_track_difference_measures_azimuth_on_the_sky_and_wraps():
+    first = [(359.9, 0.0, 0.27), (10.0, 60.0, 0.27)]
+    second = [(0.1, 0.5, 0.27), (11.0, 60.0, 0.27)]
+    difference = track_difference(first, second)
+    assert difference["max_elevation_difference_deg"] == pytest.approx(0.5)
+    # 1 degree of azimuth at 60 degrees elevation is 0.5 degrees on the sky; 359.9 to 0.1 is 0.2, not 359.8.
+    assert difference["max_azimuth_difference_on_sky_deg"] == pytest.approx(0.5)
+
+
 @pytest.mark.skipif(not RESULTS_FILE.is_file(), reason="no stored validation results")
 def test_stored_validation_results_belong_to_the_stored_profiles():
     results = json.loads(RESULTS_FILE.read_text(encoding="utf-8"))
-    assert results["frame"] == "MOON_ME" and results["aberration_correction"] == "LT+S"
+    assert results["frame"] == "MOON_ME"
+    # Positions come either from the physics engine's functions (its own aberration setting) or from
+    # this script's SPICE calls (LT+S); the file says which.
+    assert results["aberration_correction"] in ("NONE", "LT+S")
+    assert results["positions_source"]
     assert results["kernels"] == list(KERNELS)
     assert results["samples"] == 8760 and results["year"] == 2027
     assert results["sites"], "no sites in the results"
