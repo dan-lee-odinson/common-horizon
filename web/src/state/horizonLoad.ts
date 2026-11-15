@@ -20,8 +20,9 @@ export const MIN_SAMPLE_HOURS = 0.25;
 /** About this many points are asked for across a window, while the spacing stays inside its two limits. */
 export const TARGET_POINTS = 2400;
 /**
- * Most steps asked for in one request. The example model answers with at most 4000 points; staying
- * under it keeps the spacing that was asked for.
+ * Most steps asked for in one request. The backend answers with at most 4,000 Sun path samples per
+ * request (WEBSITE_API.md, POST /horizon), as does the example model; staying under it keeps the
+ * spacing that was asked for. The answer's own `time_step_s` is read all the same (util/horizon.ts).
  */
 export const STEPS_PER_REQUEST = 3600;
 
@@ -87,9 +88,24 @@ function joinBoxes(boxes: readonly SkyBox[]): SkyBox | null {
 }
 
 /**
+ * The provenance of answers joined into one. They should all say the same; if they do not, the
+ * joined answer is labelled synthetic as soon as any part is (its notice and sources are that
+ * part's), so a mix is never shown as real physics.
+ */
+export function joinProvenance(parts: readonly Pick<HorizonResponse, 'provenance'>[]): HorizonResponse['provenance'] {
+  const all = parts.map((p) => p.provenance).filter((p): p is HorizonResponse['provenance'] => Boolean(p));
+  if (all.length === 0) return parts[0]?.provenance;
+  const synthetic = all.find((p) => p.is_synthetic);
+  return synthetic ?? all[0];
+}
+
+/**
  * Join the answers for sub-windows that meet end to end, in order, into one answer for the whole
  * window. The skyline is the site's and is the same in each. Where two sub-windows meet, both carry
  * a sample for the meeting instant: it is kept once. Earth's box becomes the box around all of them.
+ * The added fields are kept: provenance (see joinProvenance), the warnings of every part (each
+ * once), the skyline's source ("smooth_sphere", which says less, if any part says it) and the
+ * largest time_step_s of the parts.
  */
 export function mergeHorizon(parts: readonly HorizonResponse[]): HorizonResponse | null {
   if (parts.length === 0) return null;
@@ -106,8 +122,19 @@ export function mergeHorizon(parts: readonly HorizonResponse[]): HorizonResponse
       if (Number.isFinite(t)) lastMs = t;
     }
   }
-  const skyline = parts.find((p) => p.skyline && p.skyline.length > 0)?.skyline ?? first.skyline;
-  return { site_id: first.site_id, skyline, sun_path, earth_box: joinBoxes(parts.map((p) => p.earth_box).filter((b): b is SkyBox => b !== null && b !== undefined)) };
+  const withSkyline = parts.find((p) => p.skyline && p.skyline.length > 0) ?? first;
+  return {
+    site_id: first.site_id,
+    skyline: withSkyline.skyline,
+    sun_path,
+    earth_box: joinBoxes(parts.map((p) => p.earth_box).filter((b): b is SkyBox => b !== null && b !== undefined)),
+    skyline_source: parts.some((p) => p.skyline_source === 'smooth_sphere') ? 'smooth_sphere' : withSkyline.skyline_source,
+    // The coarsest spacing of any part: the joined answer is known no more finely than that.
+    time_step_s: Math.max(...parts.map((p) => (Number.isFinite(p.time_step_s) ? p.time_step_s : 0))),
+    provenance: joinProvenance(parts),
+    // Each warning once, in the order the parts give them.
+    warnings: [...new Set(parts.flatMap((p) => p.warnings ?? []))],
+  };
 }
 
 /**

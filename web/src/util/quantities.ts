@@ -72,13 +72,14 @@ function wholeGeometry(g: Geometry | null | undefined): Geometry | null {
 }
 
 /**
- * Horizon samples at most this far apart carry the time of a sunrise or sunset to a tenth of an
- * hour (checked against the mock model in src/util/horizon.test.ts). A minute of slack allows for
- * sample times the backend rounded.
+ * A sunrise or sunset is placed midway between the two samples whose words differ (the nearest
+ * sample's word holds between samples: util/horizon.ts), so it is known to half their spacing. A
+ * tenth of an hour is shown only when that half is within half a tenth: samples at most six minutes
+ * apart (the spacing is the larger of the samples' own and the answer's time_step_s).
  */
-const FINE_SAMPLE_HOURS = 1;
+const FINE_SAMPLE_HOURS = 0.1;
 function fineSamples(gapHours: number): boolean {
-  return Number.isFinite(gapHours) && gapHours <= FINE_SAMPLE_HOURS + 1 / 60;
+  return Number.isFinite(gapHours) && gapHours <= FINE_SAMPLE_HOURS + 1e-9;
 }
 
 /** Half of the last digit a direction is shown to (0.1°): a reading must be at least this sure. */
@@ -168,9 +169,9 @@ function nextChangeQuantity(change: SunChange | null, horizon: HorizonResponse |
   if (change) {
     if (!Number.isFinite(change.hours)) return missing('next_change', 'Next sunrise or sunset');
     const word = change.kind === 'sunrise' ? 'Sunrise' : 'Sunset';
-    // One decimal (six minutes) only when the change was read off a crossing between two close
-    // samples. Otherwise whole hours, and the label says "about".
-    return change.interpolated && fineSamples(change.sampleGapHours)
+    // One decimal (six minutes) only when the two samples around the change are that close.
+    // Otherwise whole hours, and the label says "about".
+    return fineSamples(change.sampleGapHours)
       ? quantity('next_change', `${word} in`, change.hours, change.hours.toFixed(1), 'h', 'sun')
       : quantity('next_change', `${word} in about`, change.hours, String(Math.round(change.hours)), 'h', 'sun');
   }
@@ -297,6 +298,16 @@ export function swingQuantities(track: GeometryTrack | null, landingMs: number |
 
 // ---------- the mission's dates ----------
 
+/**
+ * Transit from launch to landing, as the evaluation answer states it: "5 days (our estimate)". The
+ * website sends its estimate (util/transit.ts); an answer that does not state one counts it as 0.
+ */
+export function transitQuantity(transitDays: number | null | undefined, answered: boolean): Quantity {
+  if (!answered) return missing('transit', 'Transit');
+  if (typeof transitDays !== 'number' || !Number.isFinite(transitDays)) return quantity('transit', 'Transit', null, 'not stated, counted as 0', '', 'warn');
+  return quantity('transit', 'Transit', transitDays, formatDays(transitDays), `${transitDays === 1 ? 'day' : 'days'} (our estimate)`);
+}
+
 export interface MissionDates {
   /** The launch as planned, before any delay. */
   plannedLaunch: Quantity;
@@ -352,10 +363,39 @@ export interface SiteQuantities {
   clearSky: Quantity;
   earthLink: Quantity;
   powerMargin: Quantity;
+  /** The energy the site's darkness adds (the planner's site_energy), or the net energy when an answer gives one. */
   energy: Quantity;
-  /** "pass", or "fail: night power". */
+  /** "pass", "fail: night power" or "UNKNOWN: landing slope". */
   verdict: Quantity;
+  /** The verdict's one word: "pass", "fail" or "unknown". */
+  verdictWord: string;
+  /** The verdict as the answer gives it; null with no result. */
+  result: 'pass' | 'fail' | 'unknown' | null;
+  /** True only for a pass, false for a fail, null for unknown or no result: unknown is never a pass. */
   passes: boolean | null;
+}
+
+/** "unknown" as shown: in capitals, with the requirement that could not be checked. */
+export function verdictText(v: SiteEvaluation['verdict']): string {
+  if (v.result === 'fail') return `fail: ${v.requirement ?? 'requirement not met'}`;
+  if (v.result === 'unknown') return `UNKNOWN: ${v.requirement ?? v.unknown_requirements?.[0] ?? 'requirement not checked'}`;
+  return 'pass';
+}
+
+const VERDICT_TONE: Record<SiteEvaluation['verdict']['result'], Tone> = { pass: 'good', fail: 'bad', unknown: 'warn' };
+
+/**
+ * The score, or, when it is not known (null: a term such as slope is unknown), the range it lies in:
+ * score_min to score_max. Never a single invented figure.
+ */
+export function scoreQuantity(e: Pick<SiteEvaluation, 'score' | 'score_min' | 'score_max'>): Quantity {
+  if (typeof e.score === 'number' && Number.isFinite(e.score)) return quantity('score', 'Score', e.score, String(Math.round(e.score)), '/ 100');
+  const lo = e.score_min;
+  const hi = e.score_max;
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return missing('score', 'Score');
+  const a = Math.round(lo);
+  const b = Math.round(hi);
+  return quantity('score', 'Score, range', null, a === b ? String(a) : `${a}–${b}`, '/ 100');
 }
 
 /** The spotlight readouts for one ranked site. `check` (the planner's own check) wins for power when present. */
@@ -371,6 +411,8 @@ export function siteQuantities(rank: number | null, e: SiteEvaluation | null, ch
       powerMargin: missing('power_margin', 'Power margin'),
       energy: missing('energy', 'Energy over the stay'),
       verdict: missing('verdict', 'Result'),
+      verdictWord: '',
+      result: null,
       passes: null,
     };
   }
@@ -378,22 +420,38 @@ export function siteQuantities(rank: number | null, e: SiteEvaluation | null, ch
   const level = levelFromStatus(check ? check.balance.status : e.power_status);
   const marginText = formatMargin(margin, level);
   const hasNumber = margin !== null && Number.isFinite(margin);
-  const fail = e.verdict.result === 'fail';
-  const energySign = e.energy_added_kwh > 0 ? '+' : e.energy_added_kwh < 0 ? MINUS : '';
+  const result = e.verdict.result;
   return {
     rank: rank === null ? missing('rank', 'Rank') : quantity('rank', 'Rank', rank, String(rank).padStart(2, '0'), ''),
-    score: quantity('score', 'Score', e.score, String(Math.round(e.score)), '/ 100'),
+    score: scoreQuantity(e),
     sunlightPercent: quantity('sunlight_percent', 'Sunlight', e.sunlight_percent, e.sunlight_percent.toFixed(1), '%', 'sun'),
     sunlightHours: quantity('sunlight_hours', 'Sunlit hours', e.sunlight_hours, Math.round(e.sunlight_hours).toLocaleString('en-US'), 'h', 'sun'),
-    clearSky: quantity('clear_sky', 'Clear sky', e.clear_sky_percent, e.clear_sky_percent.toFixed(1), '%'),
+    clearSky:
+      typeof e.clear_sky_percent === 'number' && Number.isFinite(e.clear_sky_percent)
+        ? quantity('clear_sky', 'Clear sky', e.clear_sky_percent, e.clear_sky_percent.toFixed(1), '%')
+        : quantity('clear_sky', 'Clear sky', null, 'not known', '', 'muted'),
     earthLink: quantity('earth_link', 'Earth link', null, EARTH_LINK_WORD[e.earth_link], '', EARTH_LINK_TONE[e.earth_link]),
     powerMargin: hasNumber
       ? quantity('power_margin', 'Power margin', margin, marginText.replace('%', ''), '%', LEVEL_TONE[level])
       : quantity('power_margin', 'Power margin', null, marginText === DASH ? 'no load' : marginText, '', LEVEL_TONE[level]),
-    energy: quantity('energy', 'Energy over the stay', e.energy_added_kwh, `${energySign}${Math.round(Math.abs(e.energy_added_kwh)).toLocaleString('en-US')}`, 'kWh', LEVEL_TONE[level]),
-    verdict: quantity('verdict', 'Result', null, fail ? `fail: ${e.verdict.requirement ?? 'requirement not met'}` : 'pass', '', fail ? 'bad' : 'good'),
-    passes: !fail,
+    energy: energyQuantity(e, LEVEL_TONE[level]),
+    verdict: quantity('verdict', 'Result', null, verdictText(e.verdict), '', VERDICT_TONE[result] ?? 'muted'),
+    verdictWord: result,
+    result,
+    passes: result === 'pass' ? true : result === 'fail' ? false : null,
   };
+}
+
+/** The net energy when the answer has one; else the energy the darkness adds (site_energy); else a dash. */
+function energyQuantity(e: SiteEvaluation, tone: Tone): Quantity {
+  const net = e.energy_added_kwh;
+  if (typeof net === 'number' && Number.isFinite(net)) {
+    const sign = net > 0 ? '+' : net < 0 ? MINUS : '';
+    return quantity('energy', 'Energy over the stay', net, `${sign}${Math.round(Math.abs(net)).toLocaleString('en-US')}`, 'kWh', tone);
+  }
+  const dark = e.site_energy?.total_kwh;
+  if (typeof dark === 'number' && Number.isFinite(dark)) return quantity('energy', 'Darkness adds', dark, Math.round(dark).toLocaleString('en-US'), 'kWh');
+  return missing('energy', 'Energy over the stay');
 }
 
 // ---------- the site stage ----------

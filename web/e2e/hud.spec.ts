@@ -47,6 +47,12 @@ for (const motion of ['reduce', 'no-preference'] as const) {
     await page.getByTestId('begin').click();
     await page.getByTestId('enter-mission').click();
     await expect(page.getByTestId('spotlight-name')).not.toHaveText('', { timeout: 30_000 });
+    // A site with the Sun high at the landing, so the ground under the panel is brightly lit.
+    await page.getByTestId('drawer-toggle').click();
+    await page.getByTestId('preset-search').fill('Blue Ghost Mission 1');
+    await page.getByTestId('preset').first().click();
+    await expect(page.getByTestId('spotlight-name')).toHaveText('Blue Ghost Mission 1');
+    await page.keyboard.press('Escape');
     await page.getByTestId('zoom-to-site').click();
     await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'site', { timeout: 30_000 });
     const panel = page.getByTestId('sun-panel');

@@ -25,6 +25,7 @@ import { cssColor } from './colors';
 import type { SceneData } from './sceneData';
 import { SiteGround } from './SiteGround';
 import { SiteHardware } from './SiteHardware';
+import { SiteMarkers } from './SiteMarkers';
 import { hiddenByHardware, siteLayout, type PlacedItem, type SiteLayout } from './siteLayout';
 import { createGroundUniforms, createSiteClock, createSiteNow, type GroundUniforms, type SiteNow } from './siteNow';
 import { SiteRig } from './SiteRig';
@@ -62,6 +63,7 @@ export function SiteWorld({ data, active }: { data: SceneData; active: boolean }
       <SiteClock active={active} dataRef={dataRef} horizonRef={horizonRef} now={now} uniforms={uniforms} />
       <SiteGround uniforms={uniforms} />
       <SiteHardware layout={layout} now={now} uniforms={uniforms} />
+      <SiteMarkers layout={layout} names={data.hardwareNames ?? {}} now={now} active={active} />
       <SiteSky now={now} profile={profile} sunPath={sunPath} />
       <SiteAnchors active={active} now={now} profile={profile} landerMid={landerMid} layout={layout} />
       <SiteRig active={active} data={data} heightM={layout.heightM} layoutRadius={layout.radius} />

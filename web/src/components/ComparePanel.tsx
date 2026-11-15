@@ -65,7 +65,7 @@ function CompareColumn({ site, elRange, onRange }: { site: SiteRef; elRange: { m
   }, [horizon.data, onRange, site.id]);
   const q = siteQuantities(row?.rank ?? null, row?.evaluation ?? null);
   // Where the site stood with no delay, as the same kind of readout.
-  const planned = row?.planned ? siteQuantities(row.planned.rank, { ...row.evaluation, score: row.planned.score }) : null;
+  const planned = row?.planned ? siteQuantities(row.planned.rank, row.planned.evaluation) : null;
   return (
     <li className="flex w-[300px] shrink-0 flex-col gap-3 rounded-[4px] border border-line p-3" data-testid="compare-column">
       <div className="flex items-start gap-2">
@@ -102,10 +102,10 @@ function CompareColumn({ site, elRange, onRange }: { site: SiteRef; elRange: { m
             {q.earthLink.text}
           </dd>
           <dt className="text-ink-2">Hardware</dt>
-          <dd className="m-0 text-right" data-tone={row.evaluation.hardware_fits ? undefined : 'bad'}>
-            {row.evaluation.hardware_fits ? 'fits' : 'does not fit'}
+          <dd className="m-0 text-right" data-tone={row.evaluation.hardware_fits === null ? 'warn' : row.evaluation.hardware_fits ? undefined : 'bad'}>
+            {row.evaluation.hardware_fits === null ? 'not known' : row.evaluation.hardware_fits ? 'fits' : 'does not fit'}
           </dd>
-          <dt className="text-ink-2">Energy, stay</dt>
+          <dt className="text-ink-2">{q.energy.label}</dt>
           <dd className="m-0 text-right" data-tone={q.energy.tone}>
             {q.energy.text} {q.energy.unit}
           </dd>

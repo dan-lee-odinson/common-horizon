@@ -163,21 +163,30 @@ export function skylineMinDeg(skyline: readonly { el: number }[]): number | null
 }
 
 /**
- * The top of the skyline band at each whole degree of azimuth, 0 to 360 inclusive (the last equals
- * the first): the data's skyline, resampled, with nothing clamped. The band is built from these
- * values and the scene asks them whether a body stands clear of the terrain, so the two agree.
+ * The top of the skyline band at evenly spaced azimuths from 0 to 360 inclusive (the last equals
+ * the first): the data's skyline at the spacing it arrives with (720 points for the backend's stored
+ * profiles, every 0.5 degrees), and never coarser than a degree, with nothing clamped. The band is
+ * built from these values and the scene asks them whether a body stands clear of the terrain, so
+ * the two agree.
  */
 export function bandProfile(skyline: readonly { az: number; el: number }[]): number[] {
+  const steps = Math.max(360, skyline.length);
   const out: number[] = [];
-  for (let az = 0; az <= 360; az++) out.push(sampleProfile(skyline, az % 360));
+  for (let i = 0; i <= steps; i++) out.push(sampleProfile(skyline, ((i * 360) / steps) % 360));
   return out;
 }
 
-/** The band's top at any azimuth, degrees: a straight line between the two whole degrees either side. */
+/** The azimuth of a band profile's point `i`, degrees. */
+export function bandAz(profile: readonly number[], i: number): number {
+  return (i * 360) / (profile.length - 1);
+}
+
+/** The band's top at any azimuth, degrees: a straight line between the two profile points either side. */
 export function bandTopAt(profile: readonly number[], azDeg: number): number {
   if (profile.length < 361) return 0;
-  const a = ((azDeg % 360) + 360) % 360;
-  const i = Math.floor(a);
+  const steps = profile.length - 1;
+  const a = ((((azDeg % 360) + 360) % 360) * steps) / 360;
+  const i = Math.min(steps - 1, Math.floor(a));
   const f = a - i;
   return profile[i] * (1 - f) + profile[i + 1] * f;
 }

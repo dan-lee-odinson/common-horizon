@@ -149,159 +149,170 @@
   "sun_path": [
     {
       "t": "2027-02-15T15:00:00Z",
-      "az": 232.104,
-      "el": 0.435,
+      "az": 231.393,
+      "el": -0.36,
       "state": "above"
     },
     {
       "t": "2027-02-15T17:00:00Z",
-      "az": 231.088,
-      "el": 0.432,
+      "az": 230.377,
+      "el": -0.367,
       "state": "above"
     },
     {
       "t": "2027-02-15T19:00:00Z",
-      "az": 230.072,
-      "el": 0.43,
+      "az": 229.362,
+      "el": -0.373,
       "state": "above"
     },
     {
       "t": "2027-02-15T21:00:00Z",
-      "az": 229.056,
-      "el": 0.428,
-      "state": "above"
+      "az": 228.346,
+      "el": -0.38,
+      "state": "hidden"
     },
     {
       "t": "2027-02-15T23:00:00Z",
-      "az": 228.04,
-      "el": 0.426,
-      "state": "above"
+      "az": 227.33,
+      "el": -0.386,
+      "state": "hidden"
     },
     {
       "t": "2027-02-16T01:00:00Z",
-      "az": 227.025,
-      "el": 0.424,
-      "state": "above"
+      "az": 226.314,
+      "el": -0.393,
+      "state": "hidden"
     },
     {
       "t": "2027-02-16T03:00:00Z",
-      "az": 226.009,
-      "el": 0.422,
-      "state": "above"
+      "az": 225.298,
+      "el": -0.399,
+      "state": "hidden"
     },
     {
       "t": "2027-02-16T05:00:00Z",
-      "az": 224.993,
-      "el": 0.42,
-      "state": "above"
+      "az": 224.282,
+      "el": -0.405,
+      "state": "hidden"
     },
     {
       "t": "2027-02-16T07:00:00Z",
-      "az": 223.977,
-      "el": 0.418,
-      "state": "above"
+      "az": 223.266,
+      "el": -0.411,
+      "state": "hidden"
     },
     {
       "t": "2027-02-16T09:00:00Z",
-      "az": 222.961,
-      "el": 0.416,
-      "state": "above"
+      "az": 222.25,
+      "el": -0.418,
+      "state": "hidden"
     },
     {
       "t": "2027-02-16T11:00:00Z",
-      "az": 221.945,
-      "el": 0.415,
-      "state": "above"
+      "az": 221.234,
+      "el": -0.424,
+      "state": "hidden"
     },
     {
       "t": "2027-02-16T13:00:00Z",
-      "az": 220.929,
-      "el": 0.413,
-      "state": "above"
+      "az": 220.218,
+      "el": -0.43,
+      "state": "hidden"
     },
     {
       "t": "2027-02-16T15:00:00Z",
-      "az": 219.914,
-      "el": 0.412,
-      "state": "above"
+      "az": 219.203,
+      "el": -0.435,
+      "state": "hidden"
     },
     {
       "t": "2027-02-16T17:00:00Z",
-      "az": 218.898,
-      "el": 0.41,
+      "az": 218.187,
+      "el": -0.441,
       "state": "hidden"
     },
     {
       "t": "2027-02-16T19:00:00Z",
-      "az": 217.882,
-      "el": 0.409,
+      "az": 217.171,
+      "el": -0.447,
       "state": "hidden"
     },
     {
       "t": "2027-02-16T21:00:00Z",
-      "az": 216.866,
-      "el": 0.407,
+      "az": 216.155,
+      "el": -0.453,
       "state": "hidden"
     },
     {
       "t": "2027-02-16T23:00:00Z",
-      "az": 215.85,
-      "el": 0.406,
+      "az": 215.139,
+      "el": -0.458,
       "state": "hidden"
     },
     {
       "t": "2027-02-17T01:00:00Z",
-      "az": 214.834,
-      "el": 0.405,
+      "az": 214.123,
+      "el": -0.464,
       "state": "hidden"
     },
     {
       "t": "2027-02-17T03:00:00Z",
-      "az": 213.818,
-      "el": 0.404,
+      "az": 213.107,
+      "el": -0.469,
       "state": "hidden"
     },
     {
       "t": "2027-02-17T05:00:00Z",
-      "az": 212.803,
-      "el": 0.403,
+      "az": 212.091,
+      "el": -0.474,
       "state": "hidden"
     },
     {
       "t": "2027-02-17T07:00:00Z",
-      "az": 211.787,
-      "el": 0.402,
+      "az": 211.075,
+      "el": -0.48,
       "state": "hidden"
     },
     {
       "t": "2027-02-17T09:00:00Z",
-      "az": 210.771,
-      "el": 0.401,
+      "az": 210.059,
+      "el": -0.485,
       "state": "hidden"
     },
     {
       "t": "2027-02-17T11:00:00Z",
-      "az": 209.755,
-      "el": 0.401,
+      "az": 209.043,
+      "el": -0.49,
       "state": "hidden"
     },
     {
       "t": "2027-02-17T13:00:00Z",
-      "az": 208.739,
-      "el": 0.4,
-      "state": "above"
+      "az": 208.028,
+      "el": -0.495,
+      "state": "hidden"
     },
     {
       "t": "2027-02-17T15:00:00Z",
-      "az": 207.723,
-      "el": 0.399,
-      "state": "above"
+      "az": 207.012,
+      "el": -0.5,
+      "state": "hidden"
     }
   ],
   "earth_box": {
-    "az_min": 155.1,
-    "az_max": 159.3,
-    "el_min": 0.8,
-    "el_max": 5.42
-  }
+    "az_min": 156.67,
+    "az_max": 161.69,
+    "el_min": 2.69,
+    "el_max": 6.67
+  },
+  "skyline_source": "stored_profile",
+  "time_step_s": 7200,
+  "provenance": {
+    "source": "synthetic",
+    "is_synthetic": true,
+    "engine_name": "website-example-model",
+    "engine_version": "1",
+    "notice": "EXAMPLE DATA: the website's own simplified model (src/api/mock/). The geometry is simplified and the terrain is invented. Do not use these numbers for planning.",
+    "sources": []
+  },
+  "warnings": []
 }

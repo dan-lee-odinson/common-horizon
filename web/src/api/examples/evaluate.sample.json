@@ -1,62 +1,229 @@
 {
   "launch_utc": "2027-02-10T15:00:00Z",
   "landing_utc": "2027-02-22T15:00:00Z",
+  "transit_days": 5,
   "slip_days": 7,
   "stay_days": 14,
+  "time_step_s": 3600,
   "geometry": {
-    "subsolar_lat": -0.8015,
-    "subsolar_lon_east": 343.51,
-    "subearth_lat": 4.9751,
-    "subearth_lon_east": 353.9905
+    "subsolar_lat": 0.3554,
+    "subsolar_lon_east": 342.796,
+    "subearth_lat": 3.3162,
+    "subearth_lon_east": 5.712
   },
+  "provenance": {
+    "source": "synthetic",
+    "is_synthetic": true,
+    "engine_name": "website-example-model",
+    "engine_version": "1",
+    "notice": "EXAMPLE DATA: the website's own simplified model (src/api/mock/). The geometry is simplified and the terrain is invented. Do not use these numbers for planning.",
+    "sources": []
+  },
+  "warnings": [],
   "results": [
     {
-      "site_id": "shackleton-ridge",
-      "score": 81,
-      "sunlight_hours": 335,
-      "sunlight_percent": 99.7,
-      "clear_sky_percent": 98.5,
-      "earth_link": "intermittent",
-      "hardware_fits": true,
-      "energy_added_kwh": 7367,
-      "power_margin_percent": 84.6,
-      "power_status": "green",
-      "verdict": {
-        "result": "pass",
-        "requirement": null
-      }
-    },
-    {
       "site_id": "apollo-11",
-      "score": 43,
+      "rank": 1,
+      "score": 51.564,
+      "score_min": 51.564,
+      "score_max": 51.564,
+      "score_components": {
+        "sunlight": 28.783,
+        "darkness": 32.20338983050848,
+        "earth": 100,
+        "slope": 80
+      },
       "sunlight_hours": 96.7,
       "sunlight_percent": 28.8,
+      "longest_darkness_hours": 240,
+      "earth_visible_percent": 100,
       "clear_sky_percent": 97.7,
+      "slope_deg": 2,
       "earth_link": "clear",
       "hardware_fits": true,
-      "energy_added_kwh": 1410,
-      "power_margin_percent": -44,
-      "power_status": "red",
+      "energy_added_kwh": null,
+      "site_energy": {
+        "dark_hours": 239.3,
+        "nights": 1,
+        "night_penalty_kwh": 478.6,
+        "heating_penalty_kwh": 0,
+        "total_kwh": 478.6
+      },
+      "power_margin_percent": 4,
+      "power_status": "yellow",
       "verdict": {
-        "result": "fail",
-        "requirement": "night power"
-      }
+        "result": "unknown",
+        "requirement": "landing slope",
+        "unknown_requirements": [
+          "landing slope"
+        ]
+      },
+      "requirements": [
+        {
+          "requirement": "hardware fit",
+          "passed": true,
+          "detail": "nothing to fit"
+        },
+        {
+          "requirement": "night power",
+          "passed": true,
+          "detail": "night status yellow"
+        },
+        {
+          "requirement": "day power",
+          "passed": true,
+          "detail": "day status green"
+        },
+        {
+          "requirement": "landing slope",
+          "passed": null,
+          "detail": "No published slope limit for Starship HLS."
+        },
+        {
+          "requirement": "Earth contact",
+          "passed": true,
+          "detail": "Earth link clear"
+        }
+      ],
+      "elevation_m": 0,
+      "elevation_source": "example_model",
+      "warnings": []
+    },
+    {
+      "site_id": "shackleton-ridge",
+      "rank": 2,
+      "score": 43.8425,
+      "score_min": 43.8425,
+      "score_max": 43.8425,
+      "score_components": {
+        "sunlight": 51.632,
+        "darkness": 53.954802259887,
+        "earth": 22.255,
+        "slope": 35
+      },
+      "sunlight_hours": 173.5,
+      "sunlight_percent": 51.6,
+      "longest_darkness_hours": 163,
+      "earth_visible_percent": 22.3,
+      "clear_sky_percent": 98.5,
+      "slope_deg": 6.5,
+      "earth_link": "intermittent",
+      "hardware_fits": true,
+      "energy_added_kwh": null,
+      "site_energy": {
+        "dark_hours": 162.5,
+        "nights": 1,
+        "night_penalty_kwh": 325,
+        "heating_penalty_kwh": 0,
+        "total_kwh": 325
+      },
+      "power_margin_percent": 34.8,
+      "power_status": "green",
+      "verdict": {
+        "result": "unknown",
+        "requirement": "landing slope",
+        "unknown_requirements": [
+          "landing slope"
+        ]
+      },
+      "requirements": [
+        {
+          "requirement": "hardware fit",
+          "passed": true,
+          "detail": "nothing to fit"
+        },
+        {
+          "requirement": "night power",
+          "passed": true,
+          "detail": "night status green"
+        },
+        {
+          "requirement": "day power",
+          "passed": true,
+          "detail": "day status green"
+        },
+        {
+          "requirement": "landing slope",
+          "passed": null,
+          "detail": "No published slope limit for Starship HLS."
+        },
+        {
+          "requirement": "Earth contact",
+          "passed": true,
+          "detail": "Earth link intermittent"
+        }
+      ],
+      "elevation_m": 0,
+      "elevation_source": "example_model",
+      "warnings": []
     },
     {
       "site_id": "nobile",
-      "score": 17,
-      "sunlight_hours": 65.8,
-      "sunlight_percent": 19.6,
+      "rank": 3,
+      "score": 15.7995,
+      "score_min": 15.7995,
+      "score_max": 15.7995,
+      "score_components": {
+        "sunlight": 13.056,
+        "darkness": 17.231638418079097,
+        "earth": 27.596,
+        "slope": 5.000000000000004
+      },
+      "sunlight_hours": 43.9,
+      "sunlight_percent": 13.1,
+      "longest_darkness_hours": 293,
+      "earth_visible_percent": 27.6,
       "clear_sky_percent": 90.9,
+      "slope_deg": 9.5,
       "earth_link": "intermittent",
-      "hardware_fits": false,
-      "energy_added_kwh": 637,
-      "power_margin_percent": -62.6,
+      "hardware_fits": true,
+      "energy_added_kwh": null,
+      "site_energy": {
+        "dark_hours": 292.1,
+        "nights": 1,
+        "night_penalty_kwh": 584.3,
+        "heating_penalty_kwh": 0,
+        "total_kwh": 584.3
+      },
+      "power_margin_percent": -17.2,
       "power_status": "red",
       "verdict": {
         "result": "fail",
-        "requirement": "hardware fit"
-      }
+        "requirement": "night power",
+        "unknown_requirements": [
+          "landing slope"
+        ]
+      },
+      "requirements": [
+        {
+          "requirement": "hardware fit",
+          "passed": true,
+          "detail": "nothing to fit"
+        },
+        {
+          "requirement": "night power",
+          "passed": false,
+          "detail": "night status red"
+        },
+        {
+          "requirement": "day power",
+          "passed": true,
+          "detail": "day status green"
+        },
+        {
+          "requirement": "landing slope",
+          "passed": null,
+          "detail": "No published slope limit for Starship HLS."
+        },
+        {
+          "requirement": "Earth contact",
+          "passed": true,
+          "detail": "Earth link intermittent"
+        }
+      ],
+      "elevation_m": 0,
+      "elevation_source": "example_model",
+      "warnings": []
     }
   ]
 }

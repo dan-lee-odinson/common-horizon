@@ -25,7 +25,7 @@ import type {
   SiteListResponse,
 } from '../types';
 import { ApiError, abortError } from '../errors';
-import { MOCK_CATALOG, TRANSIT_DAYS, evaluateSite, genericCheck, geometryAt, horizonFor } from './model';
+import { MOCK_CATALOG, MOCK_PROVENANCE, MOCK_STATUS_LABELS, evaluateSite, genericCheck, geometryAt, horizonFor, rankResults } from './model';
 import { DAY_MS, toIsoUtc } from '../../util/time';
 
 export interface MockScenario {
@@ -93,7 +93,7 @@ export function listSites(signal?: AbortSignal): Promise<SiteListResponse> {
 }
 
 export function catalog(signal?: AbortSignal): Promise<CatalogResponse> {
-  return respond(signal, () => ({ items: MOCK_CATALOG }), () => ({ items: [] }));
+  return respond(signal, () => ({ items: MOCK_CATALOG, status_labels: MOCK_STATUS_LABELS }), () => ({ items: [], status_labels: MOCK_STATUS_LABELS }));
 }
 
 /** Typed storage from a request; a missing, negative or non-number value counts as none. */
@@ -102,26 +102,30 @@ function storageOf(req: { storage_kwh?: number }): number {
   return typeof kwh === 'number' && Number.isFinite(kwh) && kwh > 0 ? kwh : 0;
 }
 
-export function landingMsFor(launchUtc: string, slipDays: number): number {
-  return Date.parse(launchUtc) + (TRANSIT_DAYS + slipDays) * DAY_MS;
+/** As the backend: launch + transit + slip, with a transit left out counted as 0. */
+export function landingMsFor(launchUtc: string, slipDays: number, transitDays: number | null | undefined): number {
+  return Date.parse(launchUtc) + ((transitDays ?? 0) + slipDays) * DAY_MS;
 }
 
+const NO_TRANSIT_WARNING = 'transit_days was not sent: the transit is counted as 0 days, so the stay starts at launch_utc + slip_days.';
+
 export function evaluate(req: EvaluateRequest, signal?: AbortSignal): Promise<EvaluateResponse> {
-  const landingMs = landingMsFor(req.launch_utc, req.slip_days);
+  const transit = typeof req.transit_days === 'number' && Number.isFinite(req.transit_days) ? req.transit_days : null;
+  const landingMs = landingMsFor(req.launch_utc, req.slip_days, transit);
   const base = {
     launch_utc: req.launch_utc,
     landing_utc: toIsoUtc(landingMs),
+    transit_days: transit,
     slip_days: req.slip_days,
     stay_days: req.stay_days,
+    time_step_s: Math.round((req.stay_days * DAY_MS) / Math.min(1500, Math.max(200, Math.round(req.stay_days * 24))) / 1000),
     geometry: geometryAt(landingMs),
+    provenance: MOCK_PROVENANCE,
+    warnings: transit === null ? [NO_TRANSIT_WARNING] : [],
   };
   return respond(
     signal,
-    () => {
-      const results = req.sites.map((site) => evaluateSite(site, landingMs, req.stay_days, req.hardware, storageOf(req)).evaluation);
-      results.sort((a, b) => b.score - a.score || a.site_id.localeCompare(b.site_id));
-      return { ...base, results };
-    },
+    () => ({ ...base, results: rankResults(req.sites.map((site) => evaluateSite(site, landingMs, req.stay_days, req.hardware, storageOf(req)).evaluation)) }),
     () => ({ ...base, results: [] }),
   );
 }
@@ -130,7 +134,7 @@ export function horizon(req: HorizonRequest, signal?: AbortSignal): Promise<Hori
   return respond(
     signal,
     () => horizonFor(req.site, Date.parse(req.start_utc), Date.parse(req.end_utc), req.step_hours),
-    () => ({ site_id: req.site.id, skyline: [], sun_path: [], earth_box: null }),
+    () => ({ site_id: req.site.id, skyline: [], sun_path: [], earth_box: null, skyline_source: 'stored_profile', time_step_s: 0, provenance: MOCK_PROVENANCE, warnings: [] }),
   );
 }
 

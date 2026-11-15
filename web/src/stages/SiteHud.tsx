@@ -53,6 +53,8 @@ import { clipPeriods, dayTicks } from '../util/stay';
 import { AnchorTag } from './AnchorTag';
 import { ClockPanel, EarthPanel, HardwarePanel, Inline, SunPanel } from './SitePanels';
 import { useEntrance } from './useEntrance';
+import { SiteChecks } from './SiteChecks';
+import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
 const LEADERS: LeaderSpec[] = [
   { anchor: 'sun', to: '[data-leader-target="sun"]', color: 'var(--ch-sun)' },
@@ -65,7 +67,7 @@ const nextChangeAhead = createStore<{ kind: 'sunrise' | 'sunset' | null }>({ kin
 const JUMP_PAST_MS = 60_000;
 
 /** What of the hardware in the picture is true and what is an illustration. (Without 3D there is no picture: only what the heights are.) */
-const HARDWARE_NOTE = 'Drawn at true scale from its models. Where each piece stands is an illustration. An item with no model is listed, not drawn.';
+const HARDWARE_NOTE = 'Drawn at true scale from its models. Where each piece stands is an illustration. An item with no model stands as a plain labelled marker.';
 const HARDWARE_NOTE_FLAT = 'Heights are those of the hardware models, in their descriptions’ own words.';
 
 export function SiteHud({ webgl }: { webgl: boolean }) {
@@ -196,7 +198,16 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   }, [readLive]);
 
   const name = focus?.name ?? 'No site';
-  const passTag = result.passes === null ? 'tag' : result.passes ? 'tag tag-good' : 'tag tag-bad';
+  const passTag = result.result === 'pass' ? 'tag tag-good' : result.result === 'fail' ? 'tag tag-bad' : result.result === 'unknown' ? 'tag tag-warn' : 'tag';
+  const smooth = terrainNotIncluded(focusRow?.evaluation, horizonData);
+  const terrainTag = smooth ? (
+    <span className="tag min-h-9 shrink-0 bg-glass-strong px-2.5 normal-case tracking-[0.02em]" data-tone="warn" data-testid="site-terrain">
+      {TERRAIN_NOT_INCLUDED}
+    </span>
+  ) : null;
+  const checks = (bare: boolean) => (
+    <SiteChecks site={site} evaluation={focusRow?.evaluation ?? null} horizon={horizonData} check={d.horizonsCheck.data ?? null} landingMs={landingMs} bare={bare} />
+  );
   const plotLabel = `Horizon plot for ${name}: compass direction across, height above level upward. It shows the terrain skyline, the Sun’s path from ${slipDays > 0 ? 'the planned landing' : 'the landing'} to the end of the stay (solid where the Sun is above the skyline, dashed where the terrain hides it) and the part of the sky Earth moves through. The running figures are in the Sun and Earth panels.`;
   // The legend names the height where the plot's scale changes, when this site's plot has two bands.
   const scaleBreak = useMemo(() => {
@@ -311,7 +322,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
   const trueSize = (
     <p className="m-0 text-[13px] leading-snug text-ink-2" data-testid="true-size">
-      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. Lit and dark are for the Sun's centre, so part of its disc can show over a ridge while it is dark. <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
+      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. Lit means some part of the Sun's disc is above the skyline, so the disc can sit mostly behind a ridge while the site is lit. <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
       <span data-testid="site-rings">
         Range rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
       </span>
@@ -345,10 +356,11 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
               </span>
               {result.verdict.text === DASH ? null : (
                 <span className={`${passTag} min-h-11 shrink-0 px-2.5`} data-q={result.verdict.key} title={result.verdict.text}>
-                  {result.passes ? 'pass' : 'fail'}
+                  {result.verdictWord}
                 </span>
               )}
             </div>
+            {smooth ? <div className="flex">{terrainTag}</div> : null}
             <Glass as="section" tone="sun" className="grid grid-cols-2 gap-x-3 gap-y-2 p-3" aria-label="Sun, now" data-panel data-testid="site-status">
               <Readout q={q.sunState} />
               <Readout q={q.nextChange} size="sm" />
@@ -367,6 +379,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             {sunPanel({ bare: true })}
             {earthPanel({ bare: true })}
             {hardwarePanel({ bare: true })}
+            {checks(true)}
           </div>
         </Drawer>
 
@@ -433,6 +446,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
               <span data-q-text>{result.verdict.text}</span>
             </span>
           )}
+          {terrainTag}
           <span className="num flex shrink-0 items-center gap-3 rounded-[3px] bg-glass-strong px-2.5 py-2 text-[13px] leading-none text-ink-2 max-xl:hidden" data-testid="site-coordinates">
             <Inline q={fixed.siteLat} />
             <Inline q={fixed.siteLon} />
@@ -460,6 +474,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       <div className="hud-layer" data-depth="0.9">
         <div className="site-wing wing-l absolute left-5 top-[8rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="left" data-site-zone="left">
           {sunPanel()}
+          {checks(false)}
         </div>
       </div>
 

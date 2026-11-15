@@ -140,7 +140,7 @@ export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
               aria-selected={active}
               data-site-id={row.siteId}
               data-testid="ranked-row"
-              className={`settling grid min-h-11 cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)_auto_3.25rem] items-center gap-x-2.5 rounded-[3px] border px-2 py-1 short:min-h-10 ${active ? 'border-line-strong bg-accent-soft' : 'border-transparent hover:bg-accent-soft'}`}
+              className={`settling grid min-h-11 cursor-pointer grid-cols-[1.75rem_minmax(0,1fr)_auto_4.25rem] items-center gap-x-2.5 rounded-[3px] border px-2 py-1 short:min-h-10 ${active ? 'border-line-strong bg-accent-soft' : 'border-transparent hover:bg-accent-soft'}`}
               onClick={() => select(row)}
             >
               <span className="num text-[14px] text-ink-2" data-testid="row-rank">
@@ -176,8 +176,10 @@ export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
                 <span className="sr-only">score </span>
                 {q.score.text}
               </span>
-              <span className="text-right font-display text-[12px] font-semibold uppercase tracking-[0.1em]" data-tone={q.verdict.tone} data-testid="verdict" title={q.verdict.text}>
-                {q.passes ? 'pass' : 'fail'}
+              <span className="text-right font-display text-[12px] font-semibold uppercase tracking-[0.1em]" data-tone={q.verdict.tone} data-testid="verdict" data-result={q.result ?? ''} title={q.verdict.text}>
+                {q.verdictWord}
+                {/* The requirement behind a fail or an unknown, for screen readers (the title carries it on hover). */}
+                {q.result === 'pass' ? null : <span className="sr-only">: {q.verdict.text}</span>}
               </span>
             </div>
           );

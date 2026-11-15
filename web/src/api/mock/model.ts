@@ -1,24 +1,33 @@
-// The website's mock model. It stands in for the Python backend so every screen has
-// believable, slip-dependent numbers. It is deliberately simple:
+// The website's example model. It stands in for the Python backend so every screen has
+// believable, slip-dependent numbers, in exactly the backend's shapes (src/api/types.ts). It is
+// deliberately simple:
 //   * the Sun's overhead point moves once around the Moon every synodic month (29.53 days),
-//     with a small north-south swing; Earth's overhead point wobbles around 0° N 0° E (libration);
+//     with a small north-south swing; Earth's overhead point wobbles around 0° N 0° E (libration).
+//     The phases are set so that both points sit close to the physics engine's in February 2027
+//     (see mock-model.json and src/api/mock/model.test.ts);
 //   * each site gets an invented terrain skyline (seeded, so it is the same on every load);
-//   * the stay is sampled in time steps: is the Sun above the skyline? is Earth?
+//   * the stay is sampled in time steps: is any part of the Sun's disc above the skyline? is Earth?
 // None of this is ephemeris-grade. The backend replaces it.
-// The power checks follow the planner module's rules (see ./power.ts and planner/README.md).
+// Fit, power, score, requirements and ranking follow the backend's rules (backend/docs/WEBSITE_API.md):
+// the planner module's fit and power checks (./power.ts, planner/README.md) and the ranking rules
+// (score = 0.40 sunlight + 0.25 darkness + 0.20 Earth + 0.15 slope; requirements in a fixed order).
 
 import modelJson from '../examples/mock-model.json';
 import catalogJson from '../examples/catalog.json';
 import type {
   CatalogItem,
   CheckResponse,
+  DataProvenance,
   DayCheck,
   EarthLink,
+  FitVerdict,
   Geometry,
   HardwareChoice,
   HorizonResponse,
   NightBasis,
   NightCheck,
+  RequirementCheck,
+  SiteEnergy,
   SiteEvaluation,
   SiteRef,
   SkyBox,
@@ -26,9 +35,14 @@ import type {
   SunPathPoint,
   Verdict,
 } from '../types';
+import { sunWidthDeg } from '../../util/bodies';
 import { azElFromSubpoint, normalizeLon360, sampleProfile, wrap180 } from '../../util/geo';
 import { DAY_MS, HOUR_MS, toIsoUtc } from '../../util/time';
+import { TRANSIT_DAYS } from '../../util/transit';
 import { powerCheck, type PowerResult } from './power';
+
+/** Re-exported for the tests that build a landing time the way the website asks for one. */
+export { TRANSIT_DAYS };
 
 interface Terrain {
   slope_deg: number;
@@ -39,10 +53,22 @@ interface Terrain {
 const M = modelJson;
 const REF_MS = Date.parse(M.reference_new_moon_utc);
 const TERRAIN = M.terrain as Record<string, Terrain>;
-export const MOCK_CATALOG = catalogJson.items as CatalogItem[];
-export const TRANSIT_DAYS = M.transit_days;
+export const MOCK_CATALOG = catalogJson.items as unknown as CatalogItem[];
+export const MOCK_STATUS_LABELS = catalogJson.status_labels as string[];
+
+/** Where the example model's numbers come from, in the backend's provenance shape. */
+export const MOCK_PROVENANCE: DataProvenance = {
+  source: 'synthetic',
+  is_synthetic: true,
+  engine_name: 'website-example-model',
+  engine_version: '1',
+  notice: "EXAMPLE DATA: the website's own simplified model (src/api/mock/). The geometry is simplified and the terrain is invented. Do not use these numbers for planning.",
+  sources: [],
+};
 
 const TAU = Math.PI * 2;
+/** Half the Sun's apparent width: "above" means any part of the disc shows over the skyline. */
+const SUN_RADIUS_DEG = sunWidthDeg() / 2;
 
 function frac(x: number): number {
   return x - Math.floor(x);
@@ -50,14 +76,14 @@ function frac(x: number): number {
 
 // ---------- geometry ----------
 
-/** Where the Sun is straight overhead on the Moon at a UTC instant (mock geometry). */
+/** Where the Sun is straight overhead on the Moon at a UTC instant (example geometry). */
 export function subsolarPoint(tMs: number): { lat: number; lonEast: number } {
   const days = (tMs - REF_MS) / DAY_MS;
   const phase = frac(days / M.synodic_month_days); // 0 = new moon, 0.5 = full moon
   return {
-    lat: M.subsolar_lat_amplitude_deg * Math.sin((TAU * days) / M.subsolar_lat_period_days),
+    lat: M.subsolar_lat_amplitude_deg * Math.sin((TAU * (days + M.subsolar_lat_phase_days)) / M.subsolar_lat_period_days),
     // New moon: Sun over the far side (180° E). Full moon: over the near side (0° E).
-    lonEast: normalizeLon360(180 - 360 * phase),
+    lonEast: normalizeLon360(180 - 360 * phase + M.subsolar_lon_offset_deg),
   };
 }
 
@@ -65,8 +91,8 @@ export function subsolarPoint(tMs: number): { lat: number; lonEast: number } {
 export function subearthPoint(tMs: number): { lat: number; lonEast: number } {
   const days = (tMs - REF_MS) / DAY_MS;
   return {
-    lat: M.subearth_lat_amplitude_deg * Math.sin((TAU * days) / M.subearth_lat_period_days),
-    lonEast: normalizeLon360(M.subearth_lon_amplitude_deg * Math.sin((TAU * (days + 7)) / M.subearth_lon_period_days)),
+    lat: M.subearth_lat_amplitude_deg * Math.sin((TAU * (days + M.subearth_lat_phase_days)) / M.subearth_lat_period_days),
+    lonEast: normalizeLon360(M.subearth_lon_amplitude_deg * Math.sin((TAU * (days + M.subearth_lon_phase_days)) / M.subearth_lon_period_days)),
   };
 }
 
@@ -163,6 +189,7 @@ export interface Sample {
   t: number;
   sunAz: number;
   sunEl: number;
+  /** Any part of the Sun's disc is above the skyline (the backend's rule for "above" and for sunlight). */
   sunAbove: boolean;
   earthAz: number;
   earthEl: number;
@@ -183,7 +210,7 @@ export function sampleWindow(site: SiteRef, startMs: number, endMs: number, step
       t,
       sunAz: sun.az,
       sunEl: sun.el,
-      sunAbove: sun.el > sampleProfile(skyline, sun.az),
+      sunAbove: sun.el + SUN_RADIUS_DEG > sampleProfile(skyline, sun.az),
       earthAz: earth.az,
       earthEl: earth.el,
       earthVisible: earth.el > sampleProfile(skyline, earth.az) + M.earth_link_margin_deg,
@@ -199,8 +226,8 @@ function stepsForStay(stayDays: number): number {
 // ---------- hardware and power ----------
 
 /**
- * The selected hardware in the planner module's terms. Each mock catalog row has a day load and a
- * night load; a source either needs the Sun (works in sunlight only) or works day and night.
+ * The selected hardware in the planner module's terms. A missing figure (null: not published, or
+ * not of this kind) counts as nothing.
  */
 interface PowerTotals {
   genSunKw: number;
@@ -219,12 +246,12 @@ function selectedItems(hardware: HardwareChoice[], catalog: CatalogItem[]) {
 function powerTotals(hardware: HardwareChoice[], catalog: CatalogItem[]): PowerTotals {
   const totals: PowerTotals = { genSunKw: 0, genAlwaysKw: 0, loadDayKw: 0, loadNightKw: 0, perNightKwh: 0 };
   for (const { item, count } of selectedItems(hardware, catalog)) {
-    if (item.gen_needs_sun) totals.genSunKw += item.gen_kw * count;
-    else totals.genAlwaysKw += item.gen_kw * count;
-    totals.loadDayKw += item.load_day_kw * count;
-    totals.loadNightKw += item.load_night_kw * count;
-    // Per-night items belong to loads that draw in darkness.
-    if (item.load_night_kw > 0) totals.perNightKwh += (item.energy_per_night_kwh ?? 0) * count;
+    const gen = item.gen_kw ?? 0;
+    if (item.gen_needs_sun === true) totals.genSunKw += gen * count;
+    else totals.genAlwaysKw += gen * count;
+    totals.loadDayKw += (item.load_day_kw ?? 0) * count;
+    totals.loadNightKw += (item.load_night_kw ?? 0) * count;
+    totals.perNightKwh += (item.energy_per_night_kwh ?? 0) * count;
   }
   return totals;
 }
@@ -255,6 +282,17 @@ export function longestDarknessHours(samples: readonly Pick<Sample, 'sunAbove'>[
     longest = Math.max(longest, run);
   }
   return Math.min(stayHours, longest * stepHours);
+}
+
+/** How many separate dark spells the samples hold (at least 1, as the planner's site_energy requires). */
+function darkSpells(samples: readonly Pick<Sample, 'sunAbove'>[]): number {
+  let spells = 0;
+  let dark = false;
+  for (const s of samples) {
+    if (!s.sunAbove && !dark) spells++;
+    dark = !s.sunAbove;
+  }
+  return Math.max(1, spells);
 }
 
 const BASIS: Record<PowerResult['night']['basis'], NightBasis> = {
@@ -299,26 +337,87 @@ function nightCheckOf(r: PowerResult): NightCheck {
   };
 }
 
-function fitCheck(hardware: HardwareChoice[], catalog: CatalogItem[], site: SiteRef | null): { fits: boolean; notes: string[] } {
+function kg(n: number): string {
+  return `${Math.round(n).toLocaleString('en-US')} kg`;
+}
+
+export interface FitResult {
+  fits: boolean | null;
+  verdict: FitVerdict;
+  notes: string[];
+}
+
+/**
+ * The fit check, by the planner's rules as the backend answers them: the payload mass against each
+ * of the lander's published capacity figures, one line each. Every figure fits: fits. None: does not
+ * fit. Some but not all: it depends on the capacity figure (fits is null). A payload whose mass is
+ * not published: mass needed (null). No lander: fails. A lander with no payload: nothing to fit.
+ */
+export function fitCheck(hardware: HardwareChoice[], catalog: CatalogItem[] = MOCK_CATALOG): FitResult {
   const items = selectedItems(hardware, catalog);
   const landers = items.filter((x) => x.item.kind === 'lander');
-  const cargoKg = items.filter((x) => x.item.kind !== 'lander').reduce((s, x) => s + x.item.mass_kg * x.count, 0);
-  const capacityKg = landers.reduce((s, x) => s + (x.item.capacity_kg ?? 0) * x.count, 0);
-  const notes: string[] = [];
-  if (cargoKg > 0 && landers.length === 0) {
-    notes.push('The cargo needs a lander: add the Starship lander.');
-  } else if (cargoKg > capacityKg) {
-    notes.push(`Cargo of ${(cargoKg / 1000).toFixed(1)} t is more than the landers carry (${(capacityKg / 1000).toFixed(1)} t).`);
+  const payload = items.filter((x) => x.item.kind === 'cargo');
+  const lander = landers[0]?.item;
+  if (!lander) return { fits: false, verdict: 'no lander', notes: ['No lander chosen: pick one to carry the payload.'] };
+  if (payload.length === 0) return { fits: true, verdict: 'nothing to fit', notes: [`${lander.name}: no payload chosen, nothing to fit.`] };
+  const missing = payload.filter((x) => x.item.mass_kg === null);
+  if (missing.length > 0) {
+    return { fits: null, verdict: 'mass needed', notes: missing.map((x) => `${x.item.name}: mass not published, so the fit cannot be checked.`) };
   }
-  if (site) {
-    const slope = terrainFor(site).slope_deg;
-    for (const { item } of landers) {
-      if (item.max_slope_deg !== undefined && slope > item.max_slope_deg) {
-        notes.push(`${item.name}: ground slope ${slope}° is steeper than its ${item.max_slope_deg}° limit.`);
-      }
-    }
-  }
-  return { fits: notes.length === 0, notes };
+  const massKg = payload.reduce((s, x) => s + (x.item.mass_kg ?? 0) * x.count, 0);
+  const options = lander.capacity_options;
+  if (options.length === 0) return { fits: null, verdict: 'depends on capacity figure', notes: [`${lander.name}: no capacity figure published.`] };
+  const results = options.map((o) => {
+    const spare = o.capacity_kg - massKg;
+    return {
+      fits: spare >= 0,
+      note: `${lander.name}, ${o.label} (${kg(o.capacity_kg)}): ${spare >= 0 ? `fits with ${kg(spare)} spare` : `does not fit, ${kg(-spare)} over`}.`,
+    };
+  });
+  const notes = [...results.map((r) => r.note), 'Mass only: dimensions are not checked.'];
+  if (results.every((r) => r.fits)) return { fits: true, verdict: 'fits', notes };
+  if (results.every((r) => !r.fits)) return { fits: false, verdict: 'does not fit', notes };
+  return { fits: null, verdict: 'depends on capacity figure', notes };
+}
+
+// ---------- score, requirements and ranking (the backend's rules) ----------
+
+/** One lunar night, hours: the darkness term is 0 from here on. */
+const DARKNESS_SCALE_H = 354;
+/** Slope at which the slope term reaches 0, degrees. */
+const SLOPE_SCALE_DEG = 10;
+
+export function scoreComponents(sunlightPercent: number, longestDarkH: number, earthPercent: number, slopeDeg: number | null) {
+  return {
+    sunlight: round(sunlightPercent, 3),
+    darkness: Math.max(0, 100 * (1 - longestDarkH / DARKNESS_SCALE_H)),
+    earth: round(earthPercent, 3),
+    slope: slopeDeg === null ? null : Math.max(0, 100 * (1 - slopeDeg / SLOPE_SCALE_DEG)),
+  };
+}
+
+function scoreOf(c: ReturnType<typeof scoreComponents>, slope: number): number {
+  return 0.4 * c.sunlight + 0.25 * c.darkness + 0.2 * c.earth + 0.15 * slope;
+}
+
+const VERDICT_GROUP: Record<Verdict['result'], number> = { pass: 0, unknown: 1, fail: 2 };
+
+/**
+ * The backend's order: passing sites, then unknown, then failing; within each by score (the worst
+ * case, score_min, when the score is not known), then the higher score_max, then site id, then the
+ * order asked. Sets `rank` (1 = best).
+ */
+export function rankResults(results: SiteEvaluation[]): SiteEvaluation[] {
+  const order = new Map(results.map((r, i) => [r.site_id, i]));
+  const sorted = [...results].sort(
+    (a, b) =>
+      VERDICT_GROUP[a.verdict.result] - VERDICT_GROUP[b.verdict.result] ||
+      (b.score ?? b.score_min) - (a.score ?? a.score_min) ||
+      b.score_max - a.score_max ||
+      (a.site_id < b.site_id ? -1 : a.site_id > b.site_id ? 1 : 0) ||
+      (order.get(a.site_id) ?? 0) - (order.get(b.site_id) ?? 0),
+  );
+  return sorted.map((r, i) => ({ ...r, rank: i + 1 }));
 }
 
 // ---------- one site, one stay ----------
@@ -345,73 +444,114 @@ export function evaluateSite(
   const darkH = longestDarknessHours(samples, stayHours);
 
   const p = powerTotals(hardware, catalog);
-  const genKwh = (p.genSunKw * lit + p.genAlwaysKw) * stayHours;
-  const loadKwh = (p.loadDayKw * lit + p.loadNightKw * (1 - lit)) * stayHours;
   const power = runPowerCheck(p, storageKwh, darkH);
   const balance = power.balance;
+  const fit = fitCheck(hardware, catalog);
+  // The backend's classes: none at 0 %, clear at 100 %, intermittent in between.
+  const earthLink: EarthLink = earthShare >= 1 ? 'clear' : earthShare <= 0 ? 'none' : 'intermittent';
+  const slope = terrainFor(site).slope_deg;
+  const lander = selectedItems(hardware, catalog).find((x) => x.item.kind === 'lander')?.item ?? null;
+  const slopeLimit = lander?.max_slope_deg ?? null;
 
-  const fit = fitCheck(hardware, catalog, site);
-  const earthLink: EarthLink = earthShare >= 0.98 ? 'clear' : earthShare <= 0.02 ? 'none' : 'intermittent';
-  const clearSky = clearSkyPercent(skyline);
+  const requirements: RequirementCheck[] = [
+    { requirement: 'hardware fit', passed: fit.fits, detail: fit.verdict },
+    { requirement: 'night power', passed: power.night.passes, detail: `night status ${power.night.status}` },
+    { requirement: 'day power', passed: power.day.passes, detail: `day status ${power.day.status}` },
+    {
+      requirement: 'landing slope',
+      passed: lander === null || slopeLimit === null ? null : slope <= slopeLimit,
+      detail:
+        lander === null
+          ? 'No lander chosen.'
+          : slopeLimit === null
+            ? `No published slope limit for ${lander.name}.`
+            : `Ground slope ${slope}° against the ${slopeLimit}° limit of ${lander.name}.`,
+    },
+    { requirement: 'Earth contact', passed: earthLink !== 'none', detail: `Earth link ${earthLink}` },
+  ];
+  const failed = requirements.find((r) => r.passed === false);
+  const unknown = requirements.filter((r) => r.passed === null).map((r) => r.requirement);
+  const verdict: Verdict = failed
+    ? { result: 'fail', requirement: failed.requirement, unknown_requirements: unknown }
+    : unknown.length > 0
+      ? { result: 'unknown', requirement: unknown[0], unknown_requirements: unknown }
+      : { result: 'pass', requirement: null, unknown_requirements: [] };
 
-  let verdict: Verdict = { result: 'pass', requirement: null };
-  if (!fit.fits) verdict = { result: 'fail', requirement: 'hardware fit' };
-  else if (!power.night.passes) verdict = { result: 'fail', requirement: 'night power' };
-  else if (!power.day.passes) verdict = { result: 'fail', requirement: 'day power' };
-  else if (earthLink === 'none') verdict = { result: 'fail', requirement: 'Earth contact' };
-
-  // Power counts for 15 % of the score: the balance margin, mapped from -100..+100 % onto 0..100.
-  const powerScore =
-    balance.status === 'none' ? 50 : balance.margin_percent === null ? 0 : 50 + Math.min(100, Math.max(-100, balance.margin_percent)) / 2;
-  let score = 0.45 * lit * 100 + 0.25 * earthShare * 100 + 0.15 * clearSky + 0.15 * powerScore;
-  if (!fit.fits) score *= 0.5;
-  else if (verdict.result === 'fail') score *= 0.75;
+  const components = scoreComponents(lit * 100, darkH, earthShare * 100, slope);
+  const score = scoreOf(components, components.slope ?? 0);
+  const sunlitH = lit * stayHours;
+  const siteEnergy = siteEnergyOf(p, Math.max(0, stayHours - sunlitH), darkSpells(samples));
+  const warnings: string[] = [];
 
   const evaluation: SiteEvaluation = {
     site_id: site.id,
-    score: Math.round(score),
-    sunlight_hours: round(lit * stayHours, 1),
+    rank: 1,
+    score: round(score, 4),
+    score_min: round(score, 4),
+    score_max: round(score, 4),
+    score_components: components,
+    sunlight_hours: round(sunlitH, 1),
     sunlight_percent: round(lit * 100, 1),
-    clear_sky_percent: round(clearSky, 1),
+    longest_darkness_hours: round(darkH, 1),
+    earth_visible_percent: round(earthShare * 100, 1),
+    clear_sky_percent: round(clearSkyPercent(skyline), 1),
+    slope_deg: slope,
     earth_link: earthLink,
     hardware_fits: fit.fits,
-    energy_added_kwh: Math.round(genKwh - loadKwh),
+    energy_added_kwh: null,
+    site_energy: siteEnergy,
     power_margin_percent: nullableRound(balance.margin_percent, 2),
     power_status: balance.status,
     verdict,
+    requirements,
+    elevation_m: 0,
+    elevation_source: 'example_model',
+    warnings,
   };
   const check: CheckResponse = {
     fits: fit.fits,
+    fit_verdict: fit.verdict,
     fit_notes: fit.notes,
     day: dayCheckOf(power),
     night: nightCheckOf(power),
     balance: { margin_percent: nullableRound(balance.margin_percent, 2), status: balance.status, limiting: balance.limiting },
     power_notes: power.notes,
-    energy_added_kwh: Math.round(genKwh - loadKwh),
+    energy_added_kwh: null,
+    site_energy: siteEnergy,
+    provenance: MOCK_PROVENANCE,
+    warnings: [],
   };
   return { evaluation, check };
+}
+
+/** The planner's site_energy without its heating model: night load x dark hours + per-night items x nights. */
+function siteEnergyOf(p: PowerTotals, darkHours: number, nights: number): SiteEnergy {
+  const night = p.loadNightKw * darkHours + (darkHours > 0 ? p.perNightKwh * nights : 0);
+  return { dark_hours: round(darkHours, 1), nights, night_penalty_kwh: round(night, 1), heating_penalty_kwh: 0, total_kwh: round(night, 1) };
 }
 
 /**
  * Day / night check when no site is picked yet. Without a site there is no darkness length, so,
  * as in the planner module, the night check compares power only and storage is not counted.
- * The energy figure assumes half the stay is sunlit.
  */
 export function genericCheck(stayDays: number, hardware: HardwareChoice[], storageKwh = 0, catalog: CatalogItem[] = MOCK_CATALOG): CheckResponse {
+  void stayDays;
   const p = powerTotals(hardware, catalog);
   const power = runPowerCheck(p, storageKwh, null);
-  const hours = stayDays * 24;
-  const energy = (p.genSunKw * 0.5 + p.genAlwaysKw - (p.loadDayKw + p.loadNightKw) * 0.5) * hours;
-  const fit = fitCheck(hardware, catalog, null);
+  const fit = fitCheck(hardware, catalog);
   const notes = storageKwh > 0 || p.perNightKwh > 0 ? ['No site picked yet: storage counts once a site gives the length of its darkness.'] : [];
   return {
     fits: fit.fits,
+    fit_verdict: fit.verdict,
     fit_notes: fit.notes,
     day: dayCheckOf(power),
     night: nightCheckOf(power),
     balance: { margin_percent: nullableRound(power.balance.margin_percent, 2), status: power.balance.status, limiting: power.balance.limiting },
     power_notes: notes,
-    energy_added_kwh: Math.round(energy),
+    energy_added_kwh: null,
+    site_energy: null,
+    provenance: null,
+    warnings: [],
   };
 }
 
@@ -427,7 +567,17 @@ export function horizonFor(site: SiteRef, startMs: number, endMs: number, stepHo
     el: round(s.sunEl, 3),
     state: s.sunAbove ? 'above' : 'hidden',
   }));
-  return { site_id: site.id, skyline, sun_path, earth_box: earthBox(samples) };
+  return {
+    site_id: site.id,
+    skyline,
+    sun_path,
+    earth_box: earthBox(samples),
+    // The example model's own invented profile, stored in mock-model.json: terrain is shown, not smoothed away.
+    skyline_source: 'stored_profile',
+    time_step_s: Math.round((endMs - startMs) / steps / 1000),
+    provenance: MOCK_PROVENANCE,
+    warnings: [],
+  };
 }
 
 function earthBox(samples: Sample[]): SkyBox | null {

@@ -9,39 +9,39 @@ function served(modelId: string): ModelMeta {
   const raw = JSON.parse(readFileSync(fileURLToPath(new URL(`../../public/${modelUrl(modelId, 'json')}`, import.meta.url)), 'utf8')) as unknown;
   return parseModelMeta(raw, modelId)!;
 }
-const METAS: Record<string, ModelMeta | null> = { ...Object.fromEntries(Object.entries(MODEL_FOR).map(([id, modelId]) => [id, served(modelId)])), rover: null };
+const METAS: Record<string, ModelMeta | null> = { ...Object.fromEntries(Object.entries(MODEL_FOR).map(([id, modelId]) => [id, served(modelId)])), astrolab_clv1: null };
 
 const EXAMPLE = [
-  { id: 'hab', count: 1 },
-  { id: 'rover', count: 1 },
-  { id: 'solar', count: 4 },
-  { id: 'starship', count: 1 },
+  { id: 'surface_habitat', count: 1 },
+  { id: 'astrolab_clv1', count: 1 },
+  { id: 'vsat', count: 4 },
+  { id: 'starship_hls', count: 1 },
 ];
 /** The largest mission the catalog allows, with both landers. */
 const LARGEST = [
   { id: 'griffin', count: 1 },
-  { id: 'hab', count: 1 },
-  { id: 'nuclear', count: 1 },
-  { id: 'rover', count: 4 },
-  { id: 'solar', count: 10 },
-  { id: 'starship', count: 1 },
+  { id: 'surface_habitat', count: 1 },
+  { id: 'fsp_40kwe', count: 1 },
+  { id: 'astrolab_clv1', count: 4 },
+  { id: 'vsat', count: 10 },
+  { id: 'starship_hls', count: 1 },
 ];
 
 describe('where the hardware stands', () => {
   it('puts the lander on the landing point, the habitat to the east and the masts in a row to the north', () => {
     const layout = siteLayout(EXAMPLE, METAS);
-    expect(layout.primaryLanderId).toBe('starship');
+    expect(layout.primaryLanderId).toBe('starship_hls');
     expect(layout.heightM).toBe(52);
-    expect(layout.noModel).toEqual(['rover']);
+    expect(layout.noModel).toEqual(['astrolab_clv1']);
     const of = (id: string) => layout.items.filter((i) => i.id === id);
-    expect(of('starship')).toHaveLength(1);
-    expect(of('starship')[0]).toMatchObject({ x: 0, z: 0, rotY: 0, height: 52, halfX: 4.5, halfZ: 4.5, modelId: 'starship-lander' });
+    expect(of('starship_hls')).toHaveLength(1);
+    expect(of('starship_hls')[0]).toMatchObject({ x: 0, z: 0, rotY: 0, height: 52, halfX: 4.5, halfZ: 4.5, modelId: 'starship-lander' });
     // 40 m east; turned a quarter, so its footprint's sides swap (it is round, so they are equal).
-    expect(of('hab')[0].x).toBeCloseTo(40, 9);
-    expect(of('hab')[0].z).toBeCloseTo(0, 9);
-    expect(Math.abs(of('hab')[0].rotY)).toBeCloseTo(Math.PI / 2, 12);
+    expect(of('surface_habitat')[0].x).toBeCloseTo(40, 9);
+    expect(of('surface_habitat')[0].z).toBeCloseTo(0, 9);
+    expect(Math.abs(of('surface_habitat')[0].rotY)).toBeCloseTo(Math.PI / 2, 12);
     // Four masts 45 m north (z is south), nine metres apart, centred on the line north.
-    const masts = of('solar');
+    const masts = of('vsat');
     expect(masts.map((m) => m.z)).toEqual([-45, -45, -45, -45]);
     expect(masts.map((m) => Math.round(m.x * 1000) / 1000)).toEqual([-13.5, -4.5, 4.5, 13.5]);
     expect(masts.every((m) => m.rotY === 0 && m.height === 10)).toBe(true);
@@ -50,16 +50,16 @@ describe('where the hardware stands', () => {
   it('draws each item as many times as the mission has it, and nothing for an item with no model', () => {
     const layout = siteLayout(LARGEST, METAS);
     const count = (id: string) => layout.items.filter((i) => i.id === id).length;
-    expect(count('solar')).toBe(10);
-    expect(count('starship')).toBe(1);
+    expect(count('vsat')).toBe(10);
+    expect(count('starship_hls')).toBe(1);
     expect(count('griffin')).toBe(1);
-    expect(count('hab')).toBe(1);
-    expect(count('nuclear')).toBe(1);
-    expect(count('rover')).toBe(0);
-    expect(layout.noModel).toEqual(['rover']);
+    expect(count('surface_habitat')).toBe(1);
+    expect(count('fsp_40kwe')).toBe(1);
+    expect(count('astrolab_clv1')).toBe(0);
+    expect(layout.noModel).toEqual(['astrolab_clv1']);
     expect(new Set(layout.items.map((i) => i.key)).size).toBe(layout.items.length);
     // With both landers the Starship lander takes the landing point and the Griffin lander stands off.
-    expect(layout.primaryLanderId).toBe('starship');
+    expect(layout.primaryLanderId).toBe('starship_hls');
     const griffin = layout.items.find((i) => i.id === 'griffin')!;
     expect(Math.hypot(griffin.x, griffin.z)).toBeCloseTo(60, 9);
   });
@@ -104,23 +104,42 @@ describe('where the hardware stands', () => {
 
   it('with no hardware there is only the landing point', () => {
     const layout = siteLayout([], {});
-    expect(layout).toEqual({ items: [], noModel: [], primaryLanderId: null, heightM: null, radius: 12 });
+    expect(layout).toEqual({ items: [], noModel: [], markers: [], primaryLanderId: null, heightM: null, radius: 12 });
+  });
+
+  it('gives every item with no model a plain labelled marker, clear of the drawn hardware, inside the radius', () => {
+    const choices = [...EXAMPLE, { id: 'hab_crewed', count: 1 }, { id: 'comms_relay', count: 2 }, { id: 'blue_moon_mk1', count: 1 }];
+    const layout = siteLayout(choices, { ...METAS, hab_crewed: null, comms_relay: null, blue_moon_mk1: null });
+    expect(layout.markers.map((m) => [m.id, m.count])).toEqual([
+      ['astrolab_clv1', 1],
+      ['blue_moon_mk1', 1],
+      ['comms_relay', 2],
+      ['hab_crewed', 1],
+    ]);
+    for (const m of layout.markers) {
+      expect(Math.hypot(m.x, m.z)).toBeLessThan(layout.radius);
+      for (const item of layout.items) {
+        const dx = Math.max(0, Math.abs(m.x - item.x) - item.halfX);
+        const dz = Math.max(0, Math.abs(m.z - item.z) - item.halfZ);
+        expect(Math.hypot(dx, dz), `${m.id} by ${item.key}`).toBeGreaterThan(3);
+      }
+    }
   });
 
   it('with no lander the tallest item gives the height, and nothing stands on the landing point', () => {
-    const layout = siteLayout([{ id: 'hab', count: 1 }, { id: 'solar', count: 2 }], METAS);
+    const layout = siteLayout([{ id: 'surface_habitat', count: 1 }, { id: 'vsat', count: 2 }], METAS);
     expect(layout.primaryLanderId).toBeNull();
     expect(layout.heightM).toBe(10);
     expect(layout.items.some((i) => i.x === 0 && i.z === 0)).toBe(false);
   });
 
   it('leaves out an item whose description is still being read, and lists one that has none or an unknown one', () => {
-    const loading = siteLayout(EXAMPLE, { ...METAS, starship: undefined });
-    expect(loading.items.some((i) => i.id === 'starship')).toBe(false);
-    expect(loading.noModel).toEqual(['rover']);
-    const failed = siteLayout(EXAMPLE, { ...METAS, starship: null });
-    expect(failed.items.some((i) => i.id === 'starship')).toBe(false);
-    expect(failed.noModel).toEqual(['rover', 'starship']);
+    const loading = siteLayout(EXAMPLE, { ...METAS, starship_hls: undefined });
+    expect(loading.items.some((i) => i.id === 'starship_hls')).toBe(false);
+    expect(loading.noModel).toEqual(['astrolab_clv1']);
+    const failed = siteLayout(EXAMPLE, { ...METAS, starship_hls: null });
+    expect(failed.items.some((i) => i.id === 'starship_hls')).toBe(false);
+    expect(failed.noModel).toEqual(['astrolab_clv1', 'starship_hls']);
     const unknown = siteLayout([{ id: 'drill', count: 2 }], {});
     expect(unknown.items).toEqual([]);
     expect(unknown.noModel).toEqual(['drill']);

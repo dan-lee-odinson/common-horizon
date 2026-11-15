@@ -3,7 +3,7 @@
 // TRUE SCALE: each model is drawn exactly as its file gives it, one unit to the metre, never scaled
 // (siteModels.ts refuses a shape that does not match its published height). The count of each item
 // is the mission's. WHERE each piece stands is an illustration (siteLayout.ts); the data has no
-// positions. An item with no model (the rover) is not drawn at all.
+// positions. An item with no model stands as a plain labelled marker instead (SiteMarkers.tsx).
 //
 // Shadows are flat projections on the level ground: every vertex of a model is dropped onto the
 // ground along the sunlight (in the ground's own shader), so a shadow has exactly the length and

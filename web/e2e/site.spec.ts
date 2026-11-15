@@ -202,7 +202,7 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
 
   // The hardware of the example mission, with each model's height (the rover has no model).
   await expect(page.getByTestId('hardware-row')).toHaveCount(4);
-  await expect.poll(() => readout(page, 'hw_height:starship')).toBe('52');
+  await expect.poll(() => readout(page, 'hw_height:starship_hls')).toBe('52');
   expect(await readout(page, 'hw_height:rover')).toBe('no model');
   expect(await readout(page, 'hw_count:solar')).toBe('× 4');
   // It is drawn at true scale, and its place is said to be an illustration. Every shape has loaded:
@@ -215,7 +215,7 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
   const reticle = page.getByTestId('lander-reticle');
   await expect(reticle).toHaveAttribute('data-visible', 'true');
   await expect(reticle).toHaveAttribute('data-follows', 'lander');
-  await expect(reticle.locator('[data-marker-tag]')).toHaveText('Starship lander');
+  await expect(reticle.locator('[data-marker-tag]')).toHaveText('Starship HLS');
   // The Sun is up at this landing: its tag is in the picture too, with the readout's own elevation.
   const sunTag = page.getByTestId('body-label-sun');
   await expect(sunTag).toHaveAttribute('data-visible', 'true');
@@ -484,7 +484,7 @@ test('site: with a launch delay the timeline shows the planned landing, the dela
   const world = page.getByTestId('world');
   const reticleName = page.getByTestId('lander-reticle').locator('[data-marker-tag]');
   await expect(world).toHaveAttribute('data-site-hardware', 'shown');
-  await expect(reticleName).toHaveText('Starship lander');
+  await expect(reticleName).toHaveText('Starship HLS');
 
   // Scrubbing into the delay: the stage says it is before the landing, and how long until it.
   await scrub.focus();
@@ -532,7 +532,7 @@ test('site: with a launch delay the timeline shows the planned landing, the dela
   await expect.poll(() => hours(page)).toBe(0);
   await expect(hud).toHaveAttribute('data-phase', 'stay');
   await expect(world).toHaveAttribute('data-site-hardware', 'shown');
-  await expect(reticleName).toHaveText('Starship lander');
+  await expect(reticleName).toHaveText('Starship HLS');
 });
 
 test('site: down and back twice, to two different sites: one canvas throughout, and the camera returns to where it was', async ({ page }) => {
@@ -711,7 +711,7 @@ test('site: "Back" pressed during the descent, and "Zoom in" again straight afte
   await zoomIn(page);
   await expect(page.getByTestId('scene-title')).toHaveText(name);
   await expect(page.locator('canvas')).toHaveCount(1);
-  await expect(page.getByTestId('lander-reticle').locator('[data-marker-tag]')).toHaveText('Starship lander');
+  await expect(page.getByTestId('lander-reticle').locator('[data-marker-tag]')).toHaveText('Starship HLS');
   await expect.poll(async () => (await sceneSays(page)).sun).toMatch(/above|below/);
   expect(errors).toEqual([]);
 });
@@ -835,7 +835,7 @@ test('site: without WebGL the instrument still works over the flat fallback', as
   await expect(page.getByTestId('true-size')).toHaveCount(0);
   expect(await readout(page, 'sun_width')).toBe('0.53');
   expect(await readout(page, 'earth_width')).toMatch(/^1\.9[01]$/);
-  await expect.poll(() => readout(page, 'hw_height:starship')).toBe('52');
+  await expect.poll(() => readout(page, 'hw_height:starship_hls')).toBe('52');
   // No panel covers another, the fallback sentence included.
   const sentence = (await page.getByTestId('site-scene-fallback').boundingBox())!;
   const boxes = await panels(page);

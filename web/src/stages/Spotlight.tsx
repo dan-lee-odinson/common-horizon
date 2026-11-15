@@ -16,10 +16,13 @@ import { formatLatLon } from '../util/geo';
 import { balanceWords, levelFromStatus } from '../util/power';
 import { siteQuantities } from '../util/quantities';
 import { movedText } from '../util/ranking';
+import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
 export function Spotlight() {
   const data = useData();
-  const { focus, focusRow, focusCheck, highlighted, updating } = data;
+  const { focus, focusRow, focusCheck, highlighted, updating, evaluation } = data;
+  // A newer ranking failed while the previous one is still on screen: say so, in the backend's words.
+  const failedRefresh = evaluation.status === 'error' && focusRow !== null;
   const flight = useStore(appStore, (s) => s.flight);
   const saved = useStore(appStore, (s) => s.saved);
 
@@ -33,7 +36,8 @@ export function Spotlight() {
   const q = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck);
   const words = focusCheck ? balanceWords(levelFromStatus(focusCheck.balance.status), focusCheck.balance.limiting) : null;
   const isSaved = saved.some((s) => s.id === focus.id);
-  const fail = q.passes === false;
+  const fail = q.result === 'fail';
+  const smooth = terrainNotIncluded(focusRow?.evaluation);
   // Where the site stood with no delay, as a rank readout of its own ("10", "03").
   const moved = focusRow?.planned && focusRow.moved !== 0 ? { places: focusRow.moved, from: siteQuantities(focusRow.planned.rank, focusRow.evaluation).rank.text } : null;
 
@@ -103,12 +107,21 @@ export function Spotlight() {
         </div>
 
         <div className="flex min-h-9 items-center gap-2 max-md:flex-wrap">
-          {q.passes === null ? null : (
-            <span className={`tag ${fail ? 'tag-bad' : 'tag-good'} min-h-8 shrink-0 px-3 text-[13px]`} data-testid="spotlight-verdict">
+          {q.result === null ? null : (
+            <span
+              className={`tag ${fail ? 'tag-bad' : q.result === 'unknown' ? 'tag-warn' : 'tag-good'} min-h-8 shrink-0 px-3 text-[13px]`}
+              data-testid="spotlight-verdict"
+              data-result={q.result}
+            >
               {q.verdict.text}
             </span>
           )}
-          {focus.note ? (
+          {smooth ? (
+            <span className="tag min-h-8 shrink-0 px-2 normal-case tracking-[0.02em]" data-tone="warn" data-testid="terrain-note">
+              {TERRAIN_NOT_INCLUDED}
+            </span>
+          ) : null}
+          {focus.note && !smooth ? (
             <span className="line-clamp-2 min-w-0 flex-1 text-[13px] leading-snug text-ink-2 max-md:basis-40" title={focus.note}>
               {focus.note}
             </span>
@@ -135,6 +148,17 @@ export function Spotlight() {
           </div>
         </div>
       </div>
+
+      {failedRefresh ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-[3px] border border-line-strong px-3 py-2 text-[13px] leading-snug" role="alert" data-testid="evaluation-error">
+          <p className="m-0 min-w-0 flex-1 break-words text-ink-2">
+            <span data-tone="bad">The ranking did not update.</span> {evaluation.error} <span>The figures shown are for the previous settings.</span>
+          </p>
+          <button type="button" className="btn shrink-0" onClick={evaluation.retry}>
+            Try again
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3.5 short:pt-3 max-md:pt-3">
         <button type="button" className="btn btn-primary btn-lg flex-1 whitespace-nowrap short:min-h-11" onClick={() => actions.zoomToSite(focus)} disabled={flight !== null} data-testid="zoom-to-site">

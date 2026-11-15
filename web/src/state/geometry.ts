@@ -62,9 +62,9 @@ export function geometryForLaunch(launchMs: number): Promise<TrackSample> {
     Promise.resolve()
       .then(() => api.evaluate({ sites: [GEOMETRY_PROBE], launch_utc: toIsoUtc(launchMs), slip_days: 0, stay_days: 1, hardware: [], storage_kwh: 0 }, controller.signal))
       .then((r) => {
-        const sample: TrackSample = { tMs: Date.parse(r.landing_utc), geometry: r.geometry };
-        // A missing landing time or a missing value is no answer: it is not joined into the track.
-        if (!isWholeSample(sample)) throw new ApiError('parse', 'The backend sent a geometry answer the website could not read.');
+        // A missing landing time, geometry or value is no answer: it is not joined into the track.
+        const sample = r.geometry ? ({ tMs: Date.parse(r.landing_utc), geometry: r.geometry } satisfies TrackSample) : null;
+        if (!sample || !isWholeSample(sample)) throw new ApiError('parse', 'The backend sent a geometry answer the website could not read.');
         return sample;
       })
       .then(resolve, reject)

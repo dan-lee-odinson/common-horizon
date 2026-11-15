@@ -15,7 +15,7 @@ beforeAll(() => configureMock({ latencyMs: 0 }));
 const json = (x: unknown) => JSON.stringify(x, null, 2) + '\n';
 
 it('evaluate sample', async () => {
-  const r = await api.evaluate({ sites: SITES, launch_utc: '2027-02-10T15:00:00Z', slip_days: 7, stay_days: 14, hardware: [{ id: 'starship', count: 1 }, { id: 'solar', count: 2 }], storage_kwh: 500 });
+  const r = await api.evaluate({ sites: SITES, launch_utc: '2027-02-10T15:00:00Z', slip_days: 7, stay_days: 14, hardware: [{ id: 'starship_hls', count: 1 }, { id: 'hab_uncrewed', count: 1 }, { id: 'vsat', count: 2 }], storage_kwh: 500 });
   await expect(json(r)).toMatchFileSnapshot('./examples/evaluate.sample.json');
 });
 
@@ -25,6 +25,6 @@ it('horizon sample', async () => {
 });
 
 it('check sample', async () => {
-  const r = await api.check({ site: SITES[1], landing_utc: '2027-02-22T15:00:00Z', stay_days: 14, hardware: [{ id: 'griffin', count: 1 }, { id: 'starship', count: 1 }], storage_kwh: 0 });
+  const r = await api.check({ site: SITES[1], landing_utc: '2027-02-22T15:00:00Z', stay_days: 14, hardware: [{ id: 'griffin', count: 1 }, { id: 'astrolab_clv1', count: 1 }, { id: 'worksite_lighting', count: 1 }], storage_kwh: 0 });
   await expect(json(r)).toMatchFileSnapshot('./examples/check.sample.json');
 });

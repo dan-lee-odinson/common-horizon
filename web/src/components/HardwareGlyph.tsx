@@ -3,10 +3,29 @@
 
 import type { HardwareKind } from '../api/types';
 
+/** The planner's catalog ids, by the drawing they share. Anything else gets its kind's drawing. */
+const GLYPH: Readonly<Record<string, string>> = {
+  starship_hls: 'starship',
+  blue_moon_mk1: 'starship',
+  blue_moon_mk2_cargo: 'starship',
+  griffin: 'griffin',
+  surface_habitat: 'hab',
+  hab_crewed: 'hab',
+  hab_uncrewed: 'hab',
+  astrolab_clv1: 'rover',
+  jaxa_pressurized_rover: 'rover',
+  fsp_40kwe: 'nuclear',
+  fission_40kwe: 'nuclear',
+  fission_100kwe: 'nuclear',
+  vsat: 'solar',
+  vsat_xl: 'solar',
+  hab_array: 'solar',
+};
+
 export function HardwareGlyph({ id, kind }: { id: string; kind: HardwareKind }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   let body;
-  switch (id) {
+  switch (Object.hasOwn(GLYPH, id) ? GLYPH[id] : id) {
     case 'starship':
       body = (
         <>

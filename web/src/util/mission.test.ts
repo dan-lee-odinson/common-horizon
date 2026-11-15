@@ -3,28 +3,28 @@ import catalogJson from '../api/examples/catalog.json';
 import type { CatalogItem } from '../api/types';
 import { missionSummary } from './mission';
 
-const catalog = catalogJson.items as CatalogItem[];
+const catalog = catalogJson.items as unknown as CatalogItem[];
 
 describe('mission summary line', () => {
   it('names the hardware in catalog order, then storage, then the stay', () => {
     const s = missionSummary(
       catalog,
       [
-        { id: 'solar', count: 4 },
-        { id: 'starship', count: 1 },
-        { id: 'rover', count: 1 },
-        { id: 'hab', count: 1 },
+        { id: 'vsat', count: 4 },
+        { id: 'starship_hls', count: 1 },
+        { id: 'hab_crewed', count: 1 },
+        { id: 'surface_habitat', count: 1 },
       ],
       2000,
       14,
     );
-    expect(s.text).toBe('Starship lander, Hab unit, Rover 1, Solar panels × 4, 2,000 kWh, 14 days.');
+    expect(s.text).toBe('Starship HLS, Surface Habitat, Solar array mast (VSAT) × 4, Habitat, crewed, 2,000 kWh, 14 days.');
     expect(s.empty).toBe(false);
   });
 
   it('leaves storage out when there is none and says "day" for one day', () => {
-    expect(missionSummary(catalog, [{ id: 'griffin', count: 1 }], 0, 1).text).toBe('Griffin lander, 1 day.');
-    expect(missionSummary(catalog, [{ id: 'griffin', count: 1 }], 0, 7.25).text).toBe('Griffin lander, 7.25 days.');
+    expect(missionSummary(catalog, [{ id: 'griffin', count: 1 }], 0, 1).text).toBe('Griffin, 1 day.');
+    expect(missionSummary(catalog, [{ id: 'griffin', count: 1 }], 0, 7.25).text).toBe('Griffin, 7.25 days.');
   });
 
   it('says so when no hardware is chosen', () => {

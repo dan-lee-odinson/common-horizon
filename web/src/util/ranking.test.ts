@@ -2,10 +2,22 @@ import { describe, expect, it } from 'vitest';
 import type { SiteEvaluation } from '../api/types';
 import { movedText, rankRows, rankWindow } from './ranking';
 
-function ev(site_id: string, score: number): SiteEvaluation {
+function ev(site_id: string, score: number, rank = 0): SiteEvaluation {
   return {
     site_id,
+    rank,
     score,
+    score_min: score,
+    score_max: score,
+    score_components: { sunlight: 0, darkness: 0, earth: 0, slope: 0 },
+    longest_darkness_hours: 0,
+    earth_visible_percent: 0,
+    slope_deg: 0,
+    site_energy: null,
+    requirements: [],
+    elevation_m: 0,
+    elevation_source: 'test',
+    warnings: [],
     sunlight_hours: 0,
     sunlight_percent: 0,
     clear_sky_percent: 0,
@@ -14,14 +26,14 @@ function ev(site_id: string, score: number): SiteEvaluation {
     energy_added_kwh: 0,
     power_margin_percent: null,
     power_status: 'none',
-    verdict: { result: 'pass', requirement: null },
+    verdict: { result: 'pass', requirement: null, unknown_requirements: [] },
   };
 }
 
 describe('ranking with a slip', () => {
-  it('ranks best score first and reports places moved and both scores', () => {
-    const planned = [ev('a', 90), ev('b', 80), ev('c', 70)];
-    const slipped = [ev('a', 60), ev('b', 85), ev('c', 75)];
+  it("keeps the backend's order (its rank), reports places moved and both scores", () => {
+    const planned = [ev('a', 90, 1), ev('b', 80, 2), ev('c', 70, 3)];
+    const slipped = [ev('b', 85, 1), ev('c', 75, 2), ev('a', 60, 3)];
     const rows = rankRows(slipped, planned);
     expect(rows.map((r) => r.siteId)).toEqual(['b', 'c', 'a']);
     expect(rows[0]).toMatchObject({ rank: 1, moved: 1, planned: { rank: 2, score: 80 } });
@@ -29,11 +41,23 @@ describe('ranking with a slip', () => {
     expect(rows[2]).toMatchObject({ rank: 3, moved: -2, planned: { rank: 1, score: 90 } });
   });
   it('has no planned values without a slip', () => {
-    const rows = rankRows([ev('a', 1), ev('b', 2)], null);
+    const rows = rankRows([ev('b', 2, 1), ev('a', 1, 2)], null);
     expect(rows.map((r) => [r.siteId, r.rank, r.moved, r.planned])).toEqual([
       ['b', 1, 0, null],
       ['a', 2, 0, null],
     ]);
+  });
+  it('never re-sorts by score: a passing site ranked above a failing one with a higher score stays above', () => {
+    const pass = { ...ev('pass', 40, 1) };
+    const unknown = { ...ev('unknown', null as unknown as number, 2), score_min: 50, score_max: 90, verdict: { result: 'unknown' as const, requirement: 'landing slope', unknown_requirements: ['landing slope'] } };
+    const fail = { ...ev('fail', 95, 3), verdict: { result: 'fail' as const, requirement: 'night power', unknown_requirements: [] } };
+    expect(rankRows([pass, unknown, fail], null).map((r) => [r.siteId, r.rank])).toEqual([
+      ['pass', 1],
+      ['unknown', 2],
+      ['fail', 3],
+    ]);
+    // Listed out of order, the rank field still sets the order.
+    expect(rankRows([fail, pass, unknown], null).map((r) => r.siteId)).toEqual(['pass', 'unknown', 'fail']);
   });
   it('words the movement', () => {
     expect(movedText(2)).toBe('up 2 places');

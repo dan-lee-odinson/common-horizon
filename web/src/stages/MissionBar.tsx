@@ -11,11 +11,11 @@ import { actions, appStore, MAX_SLIP_DAYS } from '../state/app';
 import { useData } from '../state/data';
 import { useStore } from '../state/store';
 import { missionSummary } from '../util/mission';
-import { missionDates } from '../util/quantities';
+import { missionDates, transitQuantity } from '../util/quantities';
 import { SeasonLine } from './SeasonLine';
 
 export function MissionBar() {
-  const { catalog, hardwareChosen, storageKwh, landingMs, landingGeometry, updating } = useData();
+  const { catalog, hardwareChosen, storageKwh, landingMs, landingGeometry, updating, transitDays, evaluation } = useData();
   const launchUtcMs = useStore(appStore, (s) => s.launchUtcMs);
   const slipDays = useStore(appStore, (s) => s.slipDays);
   const stayDays = useStore(appStore, (s) => s.stayDays);
@@ -23,6 +23,7 @@ export function MissionBar() {
   const slipId = useId();
   const summary = missionSummary(catalog.data?.items ?? [], hardwareChosen, storageKwh, stayDays);
   const dates = missionDates(launchUtcMs, slipDays, landingMs, landingGeometry);
+  const transit = transitQuantity(transitDays, evaluation.data !== null);
 
   return (
     <Glass as="section" brackets={false} className="flex flex-col gap-2 px-4 pb-2 pt-2.5" aria-label="Mission and launch delay" data-testid="mission-bar" data-panel>
@@ -82,6 +83,12 @@ export function MissionBar() {
             <dt className="label">Landing</dt>
             <dd className="settling m-0 text-ink" data-testid="landing">
               <span data-q-text>{dates.landing.text}</span> <span data-q-unit>{dates.landing.unit}</span>
+            </dd>
+          </div>
+          <div className="flex items-baseline gap-1.5" data-q={transit.key} title="Launch to landing. The team has not fixed a transit time: this is our estimate, sent with every evaluation. The landing above is the answer's own.">
+            <dt className="label">{transit.label}</dt>
+            <dd className="settling m-0 text-ink" data-testid="transit" data-tone={transit.tone}>
+              <span data-q-text>{transit.text}</span> <span data-q-unit>{transit.unit}</span>
             </dd>
           </div>
         </dl>

@@ -5,19 +5,28 @@
 // This module reads the descriptions only. It needs no 3D code, so the HUD can show a lander's
 // height (and work out its shadow) on a browser with no WebGL.
 //
-// The models are drawn at true scale: one model unit is one metre. A catalog item with no model
-// (the rover, or anything a backend adds later) is listed as "no model" and never drawn.
+// The models are drawn at true scale: one model unit is one metre. A catalog item with no model is
+// listed as "no model" and stands in the scene as a plain labelled marker.
 
 import { useEffect, useState } from 'react';
 import { createStore } from './store';
 
-/** Catalog id -> model file name (without extension). */
+/**
+ * THE table from catalog item to 3D model: catalog id (the planner's) -> model file name (without
+ * extension) in public/models/. Every other catalog item has no model.
+ *
+ * A model stands for the object that is landed, at its published size. The planner lists some
+ * objects twice, as a payload mass and as a power figure (backend/docs/WEBSITE_API.md, decision 8):
+ * the model goes with the payload row (`surface_habitat`, `fsp_40kwe`), so one habitat or fission
+ * unit is never drawn twice. The power rows (`fission_40kwe`, `hab_crewed`, ...) get a marker.
+ * `vsat` is the solar array mast the model was made for; VSAT-XL is a larger mast, so it has none.
+ */
 export const MODEL_FOR: Readonly<Record<string, string>> = {
-  starship: 'starship-lander',
+  starship_hls: 'starship-lander',
   griffin: 'griffin-lander',
-  hab: 'habitat-unit',
-  nuclear: 'fission-power-unit',
-  solar: 'solar-array-mast',
+  surface_habitat: 'habitat-unit',
+  fsp_40kwe: 'fission-power-unit',
+  vsat: 'solar-array-mast',
 };
 
 /** The model that stands for a catalog item, or null when it has none. */
@@ -25,15 +34,25 @@ export function modelFor(catalogId: string): string | null {
   return Object.hasOwn(MODEL_FOR, catalogId) ? MODEL_FOR[catalogId] : null;
 }
 
-/** Landers in the order they take the landing point when a mission has more than one. */
-const LANDER_ORDER = ['starship', 'griffin'] as const;
+/** Models of landers, in the order they take the landing point when a mission has more than one. */
+export const LANDER_MODELS: readonly string[] = ['starship-lander', 'griffin-lander'];
+
+/** True when the catalog item's model is a lander's. */
+export function isLanderModel(catalogId: string): boolean {
+  const m = modelFor(catalogId);
+  return m !== null && LANDER_MODELS.includes(m);
+}
 
 /**
  * The lander that stands at the landing point (the scene's origin, where the reticle sits): the
- * Starship lander when it is in the mission, else the Griffin lander, else none.
+ * first chosen item whose model is a lander's, in LANDER_MODELS order, else none.
  */
 export function primaryLanderId(chosenIds: readonly string[]): string | null {
-  return LANDER_ORDER.find((id) => chosenIds.includes(id)) ?? null;
+  for (const model of LANDER_MODELS) {
+    const id = chosenIds.find((c) => modelFor(c) === model);
+    if (id !== undefined) return id;
+  }
+  return null;
 }
 
 export interface ModelMeta {

@@ -7,7 +7,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import sitesJson from '../api/examples/sites.json';
-import { evaluateSite, geometryAt, TRANSIT_DAYS } from '../api/mock/model';
+import { evaluateSite, geometryAt, MOCK_PROVENANCE, rankResults, TRANSIT_DAYS } from '../api/mock/model';
 import type { CheckResponse, HardwareChoice, Site } from '../api/types';
 import { numbersIn, unaccountedNumbers, visibleText } from '../hud/honesty';
 import { appStore } from '../state/app';
@@ -51,7 +51,7 @@ interface Scene {
 function scene(slipDays: number, pick: string | null = null, updating = false): Scene {
   const landingMs = LAUNCH + (TRANSIT_DAYS + slipDays) * DAY_MS;
   const plannedMs = LAUNCH + TRANSIT_DAYS * DAY_MS;
-  const evaluate = (atMs: number) => SITES.map((site) => evaluateSite(site, atMs, STAY, HARDWARE, STORAGE).evaluation);
+  const evaluate = (atMs: number) => rankResults(SITES.map((site) => evaluateSite(site, atMs, STAY, HARDWARE, STORAGE).evaluation));
   const current = evaluate(landingMs);
   const rows = rankRows(current, slipDays > 0 ? evaluate(plannedMs) : null);
   const siteById = new Map<string, KnownSite>(SITES.map((s) => [s.id, s]));
@@ -60,7 +60,18 @@ function scene(slipDays: number, pick: string | null = null, updating = false): 
   const focusRow = rows.find((r) => r.siteId === focus.id) ?? null;
   const check = evaluateSite(focus, landingMs, STAY, HARDWARE, STORAGE).check;
   const geometry = geometryAt(landingMs);
-  const answer = { launch_utc: toIsoUtc(LAUNCH), landing_utc: toIsoUtc(landingMs), slip_days: slipDays, stay_days: STAY, geometry, results: current };
+  const answer = {
+    launch_utc: toIsoUtc(LAUNCH),
+    landing_utc: toIsoUtc(landingMs),
+    transit_days: TRANSIT_DAYS,
+    slip_days: slipDays,
+    stay_days: STAY,
+    time_step_s: 3600,
+    geometry,
+    results: current,
+    provenance: MOCK_PROVENANCE,
+    warnings: [],
+  };
   const value: DataValue = {
     health: idle(),
     sites: result({ sites: SITES }),
@@ -71,6 +82,9 @@ function scene(slipDays: number, pick: string | null = null, updating = false): 
     horizon: idle(),
     orbitHorizon: idle(),
     track: idle(),
+    horizonsCheck: idle(),
+    dataSource: 'example',
+    transitDays: TRANSIT_DAYS,
     allSites: SITES,
     siteById,
     highlighted,

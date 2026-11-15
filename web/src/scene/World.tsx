@@ -32,6 +32,7 @@ export function World() {
   const isPhone = useIsPhone();
   const reducedMotion = useReducedMotion();
   const savedIds = useMemo(() => new Set(saved.map((s) => s.id)), [saved]);
+  const hardwareNames = useMemo(() => Object.fromEntries((d.catalog.data?.items ?? []).map((i) => [i.id, i.name])), [d.catalog.data]);
 
   const data: SceneData = {
     track: d.track.data,
@@ -43,6 +44,7 @@ export function World() {
     savedIds,
     horizon: d.horizon.data,
     hardware: d.hardwareChosen,
+    hardwareNames,
     isPhone,
     reducedMotion,
     pickEnabled,

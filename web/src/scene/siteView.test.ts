@@ -128,7 +128,7 @@ describe('the Sun and Earth on the sky dome', () => {
     }
   });
 
-  it('the Sun stands above the skyline band exactly when the horizon answer says the site is lit', () => {
+  it('some of the Sun’s disc stands above the skyline band exactly when the horizon answer says the site is lit', () => {
     let lit = 0;
     let dark = 0;
     for (const s of SITES) {
@@ -138,9 +138,11 @@ describe('the Sun and Earth on the sky dome', () => {
         const tMs = LANDING + k * HOUR_MS;
         const sky = skyAt({ track, tMs, landingMs: LANDING, site: s, horizon });
         const sun = direction(domePoint(sky.sun!.az, sky.sun!.el));
-        const clearance = sun.el - bandTopAt(profile, sun.az);
+        // The answer's "above": any part of the disc over the skyline. The top of the disc is half
+        // the Sun's width above its centre.
+        const clearance = sun.el + sunWidthDeg() / 2 - bandTopAt(profile, sun.az);
         // Right at the skyline the two may differ by the width of a hair: the band is drawn from
-        // whole degrees of azimuth, and the answer times a crossing between two samples.
+        // its profile points, and between samples the word is the nearest sample's.
         if (Math.abs(clearance) < 0.06) continue;
         expect(clearance > 0, `${s.id} at +${k} h: ${clearance.toFixed(3)} deg`).toBe(sky.lit);
         if (sky.lit) lit++;

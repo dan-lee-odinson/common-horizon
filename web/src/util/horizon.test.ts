@@ -139,22 +139,40 @@ describe('how finely a reading is known', () => {
   it('says how far apart the samples around a sunrise or sunset are', () => {
     const change = nextSunChange(h, times[0])!;
     expect(change.sampleGapHours).toBeCloseTo(1, 2);
-    expect(change.interpolated).toBe(true);
+    // Placed by the nearest-sample rule, midway between the two samples, never read off a crossing.
+    expect(change.interpolated).toBe(false);
     const coarse = horizonFor(site('apollo-11'), T0, T0 + 29.53 * DAY_MS, 6);
     const coarseChange = nextSunChange(coarse, T0)!;
     expect(coarseChange.sampleGapHours).toBeGreaterThan(5.9);
     expect(coarseChange.sampleGapHours).toBeLessThan(6.1);
   });
 
-  it('marks a change as not interpolated when the heights do not cross the skyline between the samples', () => {
+  it("between samples, lit or dark is the nearest sample's word, and the change is midway", () => {
+    let checked = 0;
+    for (let i = 0; i + 1 < h.sun_path.length; i++) {
+      if (h.sun_path[i].state === h.sun_path[i + 1].state) continue;
+      const gap = times[i + 1] - times[i];
+      expect(sunAt(h, times[i] + 0.49 * gap)!.above).toBe(h.sun_path[i].state === 'above');
+      expect(sunAt(h, times[i] + 0.51 * gap)!.above).toBe(h.sun_path[i + 1].state === 'above');
+      expect(nextSunChange(h, times[i])!.atMs).toBe(times[i] + gap / 2);
+      checked++;
+    }
+    expect(checked).toBeGreaterThanOrEqual(2);
+  });
+
+  it("uses the answer's word as given, whatever the Sun's centre and the skyline say", () => {
+    // Near a grazing skyline the answer can say "above" (part of the disc shows) with the centre
+    // below the skyline, and the website must not overrule it. Here the heights are made to say
+    // the opposite of every word: the readings still follow the words.
+    const flipped: HorizonResponse = { ...h, sun_path: h.sun_path.map((p) => ({ ...p, el: p.state === 'above' ? -5 : 60 })) };
+    for (let i = 0; i < flipped.sun_path.length; i += 7) expect(sunAt(flipped, times[i])!.above).toBe(h.sun_path[i].state === 'above');
+    expect(litPeriods(flipped)).toEqual(litPeriods(h));
+  });
+
+  it("knows a change no more finely than the answer's own time_step_s when that is coarser", () => {
     const i = h.sun_path.findIndex((p, k) => k + 1 < h.sun_path.length && p.state !== h.sun_path[k + 1].state);
-    // The words still change between sample i and the next, but both heights are far above the terrain.
-    const odd: HorizonResponse = { ...h, sun_path: h.sun_path.map((p, k) => (k === i || k === i + 1 ? { ...p, el: 60 } : p)) };
-    const change = nextSunChange(odd, times[i] - HOUR_MS)!;
-    expect(change.interpolated).toBe(false);
-    // Placed mid-way: all that is known is that it lies between the two samples.
-    expect(change.atMs).toBe((times[i] + times[i + 1]) / 2);
-    expect(change.sampleGapHours).toBeCloseTo(1, 2);
+    expect(nextSunChange({ ...h, time_step_s: 3600 }, times[i] - HOUR_MS)!.sampleGapHours).toBeCloseTo(1, 9);
+    expect(nextSunChange({ ...h, time_step_s: 3 * 3600 }, times[i] - HOUR_MS)!.sampleGapHours).toBeCloseTo(3, 9);
   });
 });
 

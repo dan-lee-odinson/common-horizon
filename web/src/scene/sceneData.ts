@@ -22,6 +22,8 @@ export interface SceneData {
   /** The focus site's horizon over the stay (site stage). */
   horizon: HorizonResponse | null;
   hardware: HardwareChoice[];
+  /** The catalog's name for each item, by id: the site's markers carry it. */
+  hardwareNames?: Readonly<Record<string, string>>;
   isPhone: boolean;
   reducedMotion: boolean;
   /** Mission select, "Custom coordinates" mode: a press on the Moon picks that point. */

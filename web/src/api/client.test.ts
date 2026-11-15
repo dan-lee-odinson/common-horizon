@@ -4,12 +4,13 @@ import { ApiError } from './errors';
 import { configureMock } from './mock';
 import type { EvaluateRequest, SiteRef } from './types';
 import sitesJson from './examples/sites.json';
+import { TRANSIT_DAYS } from '../util/transit';
 
 const SITES = sitesJson.sites as SiteRef[];
 const LAUNCH = '2027-02-10T15:00:00Z';
 
 function request(slip: number, overrides: Partial<EvaluateRequest> = {}): EvaluateRequest {
-  return { sites: SITES, launch_utc: LAUNCH, slip_days: slip, stay_days: 14, hardware: [{ id: 'starship', count: 1 }], storage_kwh: 0, ...overrides };
+  return { sites: SITES, launch_utc: LAUNCH, slip_days: slip, stay_days: 14, hardware: [{ id: 'starship_hls', count: 1 }], storage_kwh: 0, ...overrides };
 }
 
 beforeAll(() => configureMock({ latencyMs: 0 }));
@@ -47,10 +48,19 @@ describe('mock mode (VITE_API_BASE unset)', () => {
     expect(r.sites.filter((s) => s.default_hardware?.includes('griffin'))).toHaveLength(1);
   });
 
-  it('returns the six hardware rows in the catalog', async () => {
+  it("returns the planner's catalog: its ids, the four kinds, figures with status and source", async () => {
     const r = await api.catalog();
-    expect(r.items.map((i) => i.name)).toEqual(['Starship lander', 'Hab unit', 'Rover 1', 'Nuclear generator', 'Solar panels', 'Griffin lander']);
-    expect(r.items.filter((i) => i.countable).map((i) => i.id)).toEqual(['rover', 'solar']);
+    expect(r.items.map((i) => i.id)).toContain('starship_hls');
+    expect(r.items.map((i) => i.id)).toContain('fission_40kwe');
+    expect(new Set(r.items.map((i) => i.kind))).toEqual(new Set(['lander', 'cargo', 'power', 'load']));
+    expect(r.status_labels).toContain('our estimate');
+    for (const i of r.items) for (const f of Object.values(i.figures)) expect(typeof f.source).toBe('string');
+    // Starship HLS has two published payload figures, so it has no single capacity.
+    const hls = r.items.find((i) => i.id === 'starship_hls')!;
+    expect(hls.capacity_kg).toBeNull();
+    expect(hls.capacity_options.length).toBe(2);
+    // A mass that is not published is null.
+    expect(r.items.find((i) => i.id === 'jaxa_pressurized_rover')!.mass_kg).toBeNull();
   });
 
   it('evaluates every site with every field the list shows', async () => {
@@ -64,14 +74,14 @@ describe('mock mode (VITE_API_BASE unset)', () => {
       expect(e.sunlight_percent).toBeLessThanOrEqual(100);
       expect(e.sunlight_hours).toBeLessThanOrEqual(14 * 24);
       expect(['clear', 'intermittent', 'none']).toContain(e.earth_link);
-      expect(typeof e.hardware_fits).toBe('boolean');
-      expect(Number.isFinite(e.energy_added_kwh)).toBe(true);
-      expect(['pass', 'fail']).toContain(e.verdict.result);
-      if (e.verdict.result === 'fail') expect(e.verdict.requirement).toBeTruthy();
-      else expect(e.verdict.requirement).toBeNull();
+      expect([true, false, null]).toContain(e.hardware_fits);
+      expect(e.energy_added_kwh).toBeNull();
+      expect(['pass', 'fail', 'unknown']).toContain(e.verdict.result);
+      if (e.verdict.result === 'pass') expect(e.verdict.requirement).toBeNull();
+      else expect(e.verdict.requirement).toBeTruthy();
     }
-    const scores = r.results.map((e) => e.score);
-    expect([...scores].sort((a, b) => b - a)).toEqual(scores);
+    // The answer is in rank order: 1, 2, 3, ...
+    expect(r.results.map((e) => e.rank)).toEqual(r.results.map((_, i) => i + 1));
   });
 
   it('changes with the slip so the ranking reorders', async () => {
@@ -102,9 +112,10 @@ describe('mock mode (VITE_API_BASE unset)', () => {
       landing_utc: '2027-02-15T15:00:00Z',
       stay_days: 14,
       hardware: [
-        { id: 'starship', count: 1 },
-        { id: 'hab', count: 1 },
-        { id: 'nuclear', count: 1 },
+        { id: 'starship_hls', count: 1 },
+        { id: 'surface_habitat', count: 1 },
+        { id: 'hab_crewed', count: 1 },
+        { id: 'fission_40kwe', count: 1 },
       ],
       storage_kwh: 0,
     });
@@ -118,8 +129,9 @@ describe('mock mode (VITE_API_BASE unset)', () => {
   });
 
   it('says cargo needs a lander', async () => {
-    const c = await api.check({ site: null, landing_utc: '2027-02-15T15:00:00Z', stay_days: 14, hardware: [{ id: 'hab', count: 1 }], storage_kwh: 0 });
+    const c = await api.check({ site: null, landing_utc: '2027-02-15T15:00:00Z', stay_days: 14, hardware: [{ id: 'surface_habitat', count: 1 }], storage_kwh: 0 });
     expect(c.fits).toBe(false);
+    expect(c.fit_verdict).toBe('no lander');
     expect(c.fit_notes.join(' ')).toMatch(/lander/);
   });
 
@@ -191,5 +203,66 @@ describe('live mode (VITE_API_BASE set)', () => {
     await expect(api.health()).rejects.toMatchObject({ kind: 'parse' });
     vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))));
     await expect(api.health()).rejects.toMatchObject({ kind: 'network' });
+  });
+});
+
+describe('live mode: transit, the backend’s own errors, and the JPL Horizons calls', () => {
+  it('sends transit_days (our estimate) with every evaluate request, in both modes', async () => {
+    vi.stubEnv('VITE_API_BASE', 'http://backend.test');
+    const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{"results":[]}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    await api.evaluate(request(3));
+    await api.evaluate({ ...request(0), transit_days: 12 });
+    expect(fetchSpy.mock.calls.map(([, init]) => JSON.parse(String(init?.body)).transit_days)).toEqual([TRANSIT_DAYS, TRANSIT_DAYS]);
+    expect(TRANSIT_DAYS).toBe(5);
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    // Example mode: the answer echoes it, and its landing is launch + 5 days + the delay.
+    const r = await api.evaluate(request(3));
+    expect(r.transit_days).toBe(5);
+    expect(Date.parse(r.landing_utc) - Date.parse(LAUNCH)).toBe((5 + 3) * 86_400_000);
+  });
+
+  it("shows a 422's own message from the backend, a sentence or a list of field errors", async () => {
+    vi.stubEnv('VITE_API_BASE', 'http://backend.test');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ detail: "Unknown hardware id 'starship'." }), { status: 422 })));
+    await expect(api.evaluate(request(0))).rejects.toMatchObject({ kind: 'http', status: 422, message: "Unknown hardware id 'starship'." });
+    const fields = { detail: [{ loc: ['body', 'stay_days'], msg: 'Input should be less than or equal to 365.25', type: 'x' }] };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(fields), { status: 422 })));
+    await expect(api.check({ site: null, landing_utc: LAUNCH, stay_days: 400, hardware: [], storage_kwh: 0 })).rejects.toMatchObject({
+      status: 422,
+      message: 'stay_days: Input should be less than or equal to 365.25',
+    });
+  });
+
+  it('says the physics engine is unavailable on a 503', async () => {
+    vi.stubEnv('VITE_API_BASE', 'http://backend.test');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"detail":"engine down"}', { status: 503 })));
+    await expect(api.horizon({ site: SITES[0], start_utc: LAUNCH, end_utc: '2027-02-12T15:00:00Z', step_hours: 1 })).rejects.toMatchObject({
+      status: 503,
+      message: expect.stringMatching(/physics engine is unavailable/),
+    });
+  });
+
+  it('asks the Horizons comparison for one place and minute, and says why when Horizons does not answer', async () => {
+    vi.stubEnv('VITE_API_BASE', 'http://backend.test');
+    const fetchSpy = vi.fn(async (_url: string) => new Response(JSON.stringify({ error: 'horizons_unavailable', reason: 'Horizons did not answer (OSError)' }), { status: 502 }));
+    vi.stubGlobal('fetch', fetchSpy);
+    await expect(api.horizonsCompare({ latitude_deg: -85.42, longitude_deg: 31.62, time_utc: '2027-02-15T15:00:00Z', site_height_m: 0 })).rejects.toMatchObject({
+      status: 502,
+      message: expect.stringMatching(/JPL Horizons: Horizons did not answer/),
+    });
+    const url = new URL(fetchSpy.mock.calls[0][0]);
+    expect(url.pathname).toBe('/api/v1/horizons/compare');
+    expect(Object.fromEntries(url.searchParams)).toEqual({ latitude_deg: '-85.42', longitude_deg: '31.62', time_utc: '2027-02-15T15:00:00Z', site_height_m: '0' });
+  });
+
+  it('has no comparison in example mode, and reads the stored check as a file that may be missing', async () => {
+    await expect(api.horizonsCompare({ latitude_deg: 0, longitude_deg: 0, time_utc: LAUNCH })).rejects.toMatchObject({ kind: 'unavailable' });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('Not found', { status: 404 })));
+    expect(await api.horizonsCheck()).toBeNull();
+    const file = { format: 'common-horizon/horizons-check-summary', format_version: 1, sites: { nobile: { sun_max_angle_deg: 0.005991 } } };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(file), { status: 200 })));
+    expect((await api.horizonsCheck())?.sites.nobile.sun_max_angle_deg).toBe(0.005991);
   });
 });

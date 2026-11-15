@@ -2,7 +2,7 @@
 // Components read from here; only src/api/client.ts actually makes calls.
 
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
-import { api, isEmpty } from '../api/client';
+import { api, isEmpty, isMockMode } from '../api/client';
 import type {
   CatalogResponse,
   CheckResponse,
@@ -11,6 +11,7 @@ import type {
   HardwareChoice,
   HealthResponse,
   HorizonResponse,
+  HorizonsCheckFile,
   Site,
   SiteListResponse,
   SiteRef,
@@ -35,6 +36,15 @@ export interface EvaluationBundle {
   mission: string;
 }
 
+/**
+ * Where the numbers on screen come from, for the label in the top bar:
+ *   example  example mode (no backend address): the website's own example model
+ *   test     the backend answers with provenance.is_synthetic true: its synthetic test fixture
+ *   physics  the backend answers from the real physics engine
+ *   unknown  live mode before the backend has said
+ */
+export type DataSourceKind = 'example' | 'test' | 'physics' | 'unknown';
+
 export type KnownSite = SiteRef & Pick<Site, 'note' | 'default_hardware'> & { custom?: boolean };
 
 export interface DataValue {
@@ -54,6 +64,12 @@ export interface DataValue {
   orbitHorizon: AsyncResult<HorizonResponse>;
   /** Where the Sun and Earth are overhead on the Moon across the whole window on screen. */
   track: AsyncResult<GeometryTrack>;
+  /** The stored check against NASA JPL Horizons (data/horizons-check.json); null when the file is not there. */
+  horizonsCheck: AsyncResult<HorizonsCheckFile | null>;
+  /** Where the numbers come from (see DataSourceKind). */
+  dataSource: DataSourceKind;
+  /** Transit from launch to landing, days, as the evaluation answer gives it; null when the answer does not state one. */
+  transitDays: number | null;
   /** Presets, the custom point and saved custom points: everything that gets ranked. */
   allSites: KnownSite[];
   siteById: Map<string, KnownSite>;
@@ -120,6 +136,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const stage = useStore(appStore, (s) => s.stage);
 
   const health = useAsync('health', (signal) => api.health(signal));
+  const horizonsCheck = useAsync('horizons-check', (signal) => api.horizonsCheck(signal));
   const sites = useAsync('sites', (signal) => api.listSites(signal), isEmpty.sites);
   const catalog = useAsync('catalog', (signal) => api.catalog(signal), isEmpty.catalog);
 
@@ -177,6 +194,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const landingMs = evaluation.data ? Date.parse(evaluation.data.current.landing_utc) : null;
   const plannedLandingMs = evaluation.data ? Date.parse((evaluation.data.planned ?? evaluation.data.current).landing_utc) : null;
   const landingGeometry = evaluation.data?.current.geometry ?? null;
+  const transitDays = evaluation.data ? (evaluation.data.current.transit_days ?? null) : null;
+  // The answer's own provenance wins; before the first answer, the health check's engine says.
+  const synthetic = evaluation.data?.current.provenance?.is_synthetic ?? health.data?.physics_engine?.is_synthetic;
+  const dataSource: DataSourceKind = isMockMode() ? 'example' : synthetic === true ? 'test' : synthetic === false ? 'physics' : 'unknown';
   const windowStartMs = plannedLandingMs;
   const windowEndMs = landingMs === null ? null : landingMs + stayDays * DAY_MS;
   const orbitEndMs = landingMs === null ? null : landingMs + SYNODIC_MONTH_DAYS * DAY_MS;
@@ -215,6 +236,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     horizon,
     orbitHorizon,
     track,
+    horizonsCheck,
+    dataSource,
+    transitDays,
     allSites,
     siteById,
     highlighted,
