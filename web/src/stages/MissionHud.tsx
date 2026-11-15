@@ -58,7 +58,7 @@ export function MissionHud() {
         /* On a phone the stage is one column that scrolls: the mission line and the launch delay,
            the spotlight with the way down to the site, the ranked strip, and the way into the
            presets and coordinates. It ends above the assistant's question row. */
-        <div className="hud-layer" data-depth="0.6">
+        <div className="hud-layer">
           <div className="absolute inset-x-3 bottom-[5.25rem] top-[4.25rem] flex flex-col gap-2.5 overflow-y-auto overscroll-contain pb-1" data-enter="lead" data-testid="mission-phone-column">
             {/* The stage names in the top bar do not fit a phone: this is the way back to Orbit. */}
             <button type="button" className="btn btn-glass shrink-0 self-start" onClick={actions.backToOrbit} data-testid="back-to-orbit">
@@ -84,7 +84,7 @@ export function MissionHud() {
       ) : (
         <>
           {/* Left wing: the spotlight, and the short ranked strip under it. */}
-          <div className="hud-layer" data-depth="0.9">
+          <div className="hud-layer">
             <div ref={wingRef} className="wing-l absolute left-5 top-[4.75rem] flex w-[25rem] flex-col gap-3.5 short:gap-2.5" data-enter="left">
               <Spotlight />
               <RankStrip rows={stripRows} />
@@ -92,14 +92,14 @@ export function MissionHud() {
           </div>
 
           {/* Across the top: the mission line and the launch delay. It stops short of the drawer's place. */}
-          <div className="hud-layer" data-depth="0.6">
+          <div className="hud-layer">
             <div className={`absolute left-[27.5rem] top-[4.75rem] max-lg:right-5 ${drawerOpen ? 'right-[25rem]' : 'right-[18.5rem]'}`} data-enter="lead">
               <MissionBar />
             </div>
           </div>
 
           {/* The drawer's handle. */}
-          <div className="hud-layer" data-depth="0.6">
+          <div className="hud-layer">
             <button
               type="button"
               className="btn btn-glass absolute right-5 top-[4.75rem] max-lg:top-[13.5rem]"
@@ -118,7 +118,7 @@ export function MissionHud() {
       )}
 
       {/* Along the bottom: the Mission Assistant, beside the spotlight column and clear of the drawer. */}
-      <div className="hud-layer" data-depth="0.4">
+      <div className="hud-layer">
         <div className={`absolute bottom-5 left-[27.5rem] max-md:bottom-3 max-md:left-3 max-md:right-3 ${drawerOpen ? 'right-[25rem] max-lg:right-5' : 'right-5'}`} data-enter="fade">
           <AssistantDock />
         </div>
@@ -150,7 +150,7 @@ function useStripRows(wingRef: RefObject<HTMLDivElement | null>): number {
       const row = list?.querySelector<HTMLElement>('[role="option"]');
       // Nothing to measure while the column is not laid out (it is hidden at phone widths).
       if (!strip || !list || !row || row.offsetHeight === 0) return;
-      // Layout sizes (offset*), so the entrance and the parallax, which only transform, do not count.
+      // Layout sizes (offset*), so the entrance, which only transforms, does not count.
       const chrome = strip.offsetHeight - list.offsetHeight;
       const gap = parseFloat(getComputedStyle(list).rowGap) || 0;
       const room = window.innerHeight - COLUMN_BOTTOM_PX - (wing.offsetTop + strip.offsetTop) - chrome;

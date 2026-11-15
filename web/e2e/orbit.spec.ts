@@ -240,7 +240,8 @@ test('orbit: the Sun ring carries a tick and a tag with the Sun’s overhead lon
   await orbitAt(page, 45);
   const tag = page.locator('[data-marker="sun"]');
   await expect(tag).toHaveAttribute('data-visible', 'true');
-  await expect(tag.locator('[data-marker-tag]')).toHaveText(/^Sun overhead\s*45\.99° E$/i);
+  // (The example model's value at this instant, fitted to the physics engine's: src/scene/orbitEarth.test.ts says more.)
+  await expect(tag.locator('[data-marker-tag]')).toHaveText(/^Sun overhead\s*45\.27° E$/i);
   // The tag stands at the tick: on the Sun ring, in the ring's plane, at the Sun's overhead longitude.
   const g = { sunLon: await degrees(page, 'subsolar_lon'), earthLon: await degrees(page, 'subearth_lon') };
   const cameraLon = orbitCameraLongitude(g.earthLon, 'left');
@@ -365,14 +366,16 @@ test('orbit: the Sun’s disc stands where its direction meets the picture, 0.53
   await expect(glow).toHaveAttribute('data-visible', 'true');
   await expect(disc).toHaveAttribute('data-visible', 'false');
 
-  // Turn the camera a quarter of the way round and down to 12 degrees above the ring plane: the
-  // Moon's night side faces the camera and the Sun stands 3 degrees clear of its top edge. (The
-  // Moon is 8.3 degrees in radius from here; at 9 degrees up the Sun would be half behind its edge.)
+  // Turn the camera nearly a quarter of the way round (84 degrees: the example model's Sun stands
+  // 48 degrees of longitude from Earth's overhead point at this instant) and down to 12 degrees
+  // above the ring plane: the Moon's night side faces the camera and the Sun stands clear of its
+  // top edge. (The Moon is 8.3 degrees in radius from here; at 9 degrees up the Sun would be half behind its edge.)
   await press(page, 'Shift+ArrowRight', 6);
+  await press(page, 'ArrowLeft', 2);
   await press(page, 'Shift+ArrowDown', 1);
   await press(page, 'ArrowDown', 1);
-  await turnedTo(page, 90, -18);
-  const rising = sunAt(90, -18);
+  await turnedTo(page, 84, -18);
+  const rising = sunAt(84, -18);
   expect(rising.x).toBeGreaterThan(width / 2 - 40);
   expect(rising.x).toBeLessThan(width / 2 + 40);
   await expect(disc).toHaveAttribute('data-visible', 'true');
@@ -399,8 +402,8 @@ test('orbit: the Sun’s disc stands where its direction meets the picture, 0.53
   // here a disc placed from the Moon's centre instead of from the camera would be 9 pixels out.
   await press(page, 'Shift+ArrowLeft', 1);
   await press(page, 'ArrowDown', 4);
-  await turnedTo(page, 75, -30);
-  const aside = sunAt(75, -30);
+  await turnedTo(page, 69, -30);
+  const aside = sunAt(69, -30);
   expect(aside.x).toBeLessThan(width / 2 - 300);
   await expect(disc).toHaveAttribute('data-visible', 'true');
   await expect.poll(async () => Math.hypot((await markerAt(page, 'sunDisc')).x - aside.x, (await markerAt(page, 'sunDisc')).y - aside.y)).toBeLessThan(2.5);
@@ -414,9 +417,9 @@ test('orbit: the Sun’s disc stands where its direction meets the picture, 0.53
 
   // Straight behind the Moon: the Moon is now in front of the Sun.
   await press(page, 'Shift+ArrowRight', 1);
-  await turnedTo(page, 90, -30);
+  await turnedTo(page, 84, -30);
   await expect(disc.locator('[data-marker-tag]')).toHaveText('Sun (behind the Moon)');
-  const hidden = sunAt(90, -30);
+  const hidden = sunAt(84, -30);
   await expect.poll(async () => Math.hypot((await markerAt(page, 'sunDisc')).x - hidden.x, (await markerAt(page, 'sunDisc')).y - hidden.y)).toBeLessThan(2.5);
   // The picture agrees: where the Sun would be, the Moon's dark face.
   const [covered] = await brightnessAt(page, [hidden], 1);

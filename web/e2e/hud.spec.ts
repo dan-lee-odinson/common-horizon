@@ -24,6 +24,39 @@ async function brightness(page: Page, x: number, y: number, size = 6): Promise<n
   }, shot.toString('base64'));
 }
 
+test('the panels stay still while the pointer moves (no parallax), on the Orbit stage and in mission select', async ({ page }) => {
+  test.skip(isPhone(page), 'a pointer is a desktop matter');
+  test.setTimeout(90_000);
+  // Ordinary motion, where the panels used to shift and lean with the pointer.
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  await page.getByTestId('begin').click();
+  await expect(page.getByTestId('enter-mission')).toBeVisible();
+  /** Every HUD layer's place and its own transform, after the pointer has rested at one point. */
+  const layersWith = async (x: number, y: number) => {
+    await page.mouse.move(x, y, { steps: 6 });
+    await page.waitForTimeout(1500);
+    return page.evaluate(() =>
+      Array.from(document.querySelectorAll<HTMLElement>('.hud-layer')).map((el) => {
+        const r = el.getBoundingClientRect();
+        return [Math.round(r.left), Math.round(r.top), getComputedStyle(el).transform];
+      }),
+    );
+  };
+  const { width, height } = page.viewportSize()!;
+  // (The entrance has settled once the same point twice gives the same places.)
+  await layersWith(40, 40);
+  const corner = await layersWith(40, 40);
+  expect(corner.length).toBeGreaterThan(0);
+  expect(await layersWith(width - 40, height - 40)).toEqual(corner);
+  await page.getByTestId('enter-mission').click();
+  await expect(page.getByTestId('spotlight')).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(2500);
+  await layersWith(width / 2, 40);
+  const top = await layersWith(width / 2, 40);
+  expect(await layersWith(width - 300, height - 200)).toEqual(top);
+});
+
 test('orbit: a press on "Enter mission select" counts after the pointer has rested over the picture', async ({ page }) => {
   test.skip(isPhone(page), 'a resting pointer is a desktop matter');
   await page.goto('/');

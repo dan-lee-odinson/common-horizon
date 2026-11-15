@@ -14,6 +14,9 @@ export const KIND_HEADING: Record<HardwareKind, string> = {
   load: 'Power loads',
 };
 
+/** The line under the Payload heading: what its rows count for. */
+export const PAYLOAD_HEADING_NOTE = 'Mass for the fit check only. Power is set under Power sources and Loads.';
+
 /** Names for the catalog's figure keys; an unknown key is shown with its underscores as spaces. */
 const FIGURE_NAME: Record<string, string> = {
   mass: 'Mass',

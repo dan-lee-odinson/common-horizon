@@ -1,0 +1,106 @@
+{
+  "id": "viper-rover",
+  "name": "VIPER rover",
+  "file": "viper-rover.glb",
+  "kind": "generated",
+  "status": "NASA figure",
+  "note": "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 1.749,
+    "height_y": 2.5,
+    "depth_z": 1.839
+  },
+  "dimension_sources": [
+    {
+      "dimension": "width_x",
+      "value_m": 1.749,
+      "meaning": "overall width (X, side to side, across the wheels) of the finished shape",
+      "source": "measured on the finished shape, after scaling it evenly to the published height",
+      "status": "our estimate",
+      "published": {
+        "value_m": 1.7,
+        "source": "NASA, VIPER Rover Overview and Mobility and Hardware (Bluethmann, 14 November 2024), NTRS 20240013903: 1.7 m x 1.7 m x 2.5 m",
+        "link": "https://ntrs.nasa.gov/api/citations/20240013903/downloads/LSIC_2024-Tech%20Infusion_Panel-VIPER_Mob-HW.pdf",
+        "status": "NASA figure"
+      },
+      "difference_percent": 2.9
+    },
+    {
+      "dimension": "height_y",
+      "value_m": 2.5,
+      "meaning": "overall height, from the bottom of the wheels to the top of the mast (NASA gives 5 by 5 by 8 feet, 1.5 by 1.5 by 2.5 meters)",
+      "source": "NASA Science, VIPER In Depth (page last updated 19 March 2024)",
+      "link": "https://science.nasa.gov/mission/viper/in-depth",
+      "status": "NASA figure"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 1.839,
+      "meaning": "overall length (Z, front to back) of the finished shape",
+      "source": "measured on the finished shape, after scaling it evenly to the published height",
+      "status": "our estimate",
+      "published": {
+        "value_m": 1.7,
+        "source": "NASA, VIPER Rover Overview and Mobility and Hardware (Bluethmann, 14 November 2024), NTRS 20240013903: 1.7 m x 1.7 m x 2.5 m",
+        "link": "https://ntrs.nasa.gov/api/citations/20240013903/downloads/LSIC_2024-Tech%20Infusion_Panel-VIPER_Mob-HW.pdf",
+        "status": "NASA figure"
+      },
+      "difference_percent": 8.2
+    }
+  ],
+  "generation": {
+    "picture": {
+      "description": "NASA illustration ACD20-0047, \"VIPER Drill\" (2019 design), cropped to the rover",
+      "credit": "Daniel Rutter, NASA Ames Research Center (NASA image ACD20-0047)",
+      "source_url": "https://science.nasa.gov/image-detail/amf-acd20-0047/",
+      "in_repository": false
+    },
+    "model": "TRELLIS.2",
+    "model_maker": "Microsoft",
+    "model_license": "MIT",
+    "endpoint": "fal-ai/trellis-2",
+    "service": "fal.ai",
+    "request_id": "01a1e06f-bb95-7f42-bc41-27cc7c445683",
+    "date": "2026-11-15",
+    "settings": {
+      "seed": 42,
+      "resolution": 1024,
+      "texture_size": 1024,
+      "decimation_target": 18000,
+      "remesh": true
+    },
+    "cleanup": null
+  },
+  "triangles": 17611,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "The picture is NASA's 2019 illustration of VIPER, so the shape follows that design, not the rover as finally built.",
+    "The picture shows one end and one side; the generator guessed the far end, the other side and the underside (it made the two ends and the two sides alike).",
+    "Thin parts (the mast, its spiral, the cross-arm and the drill) are rough.",
+    "The drill is lowered to the ground in the picture and hung about 5 cm below the wheels; its tip was flattened to the bottom of the wheels (finishing.flatten_below), so the rover stands on its wheels.",
+    "Scaled evenly to NASA's overall height of 2.5 m; width and length are measured from the shape. NASA's public page gives a 1.5 m by 1.5 m footprint and a 2024 NASA briefing gives 1.7 m by 1.7 m; the latter is shown beside our figures for comparison.",
+    "All colours, textures and markings removed; one plain grey material."
+  ],
+  "finishing": {
+    "rotate_deg": [
+      0,
+      0,
+      0
+    ],
+    "drop_loose_parts_below": 0,
+    "flatten_below": 0.02,
+    "flattened_vertices": 187,
+    "input_file": "trellis2_6250cf9e8cfa48fba4f9d652f32ed7bf.glb",
+    "input_sha256": "c30ed0629c7de5232bf3963eb1c4f4b38301278aec7f29f81d5976ed0cab7da2",
+    "input_triangles": 17611,
+    "removed_loose_parts": {
+      "pieces": 0,
+      "triangles": 0
+    },
+    "scale_factor": 2.566585,
+    "material": "one neutral material; every texture, image, UV coordinate, per-vertex colour and original material removed"
+  },
+  "built_by": "tools/models/finish-model.mjs"
+}

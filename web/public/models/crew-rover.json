@@ -1,0 +1,104 @@
+{
+  "id": "crew-rover",
+  "name": "Crew rover (open lunar terrain vehicle)",
+  "file": "crew-rover.glb",
+  "kind": "generated",
+  "status": "company figure (maker's own page)",
+  "note": "illustrative shape, SI/AI-generated from a photo; not the manufacturer's data",
+  "units": "meters",
+  "frame": "Y up; origin at the centre of the footprint, on the ground (lowest point at y = 0)",
+  "dimensions_m": {
+    "width_x": 2.535,
+    "height_y": 2.6,
+    "depth_z": 3.375
+  },
+  "dimension_sources": [
+    {
+      "dimension": "width_x",
+      "value_m": 2.535,
+      "meaning": "overall width (X, side to side, across the wheels) of the finished shape",
+      "source": "measured on the finished shape, after scaling it evenly to the published height",
+      "status": "our estimate",
+      "published": {
+        "value_m": 2.3,
+        "source": "same page: \"approximately 4 meters long by 2.3 meters wide\"",
+        "link": "https://astrolab.space/2026/05/26/nasa-selects-astrolab-to-provide-lunar-rover-for-artemis-astronauts-return-to-the-moon/",
+        "status": "company figure (maker's own page)"
+      },
+      "difference_percent": 10.2
+    },
+    {
+      "dimension": "height_y",
+      "value_m": 2.6,
+      "meaning": "overall height on the surface, \"about 2.6 meters to the top of its antenna\"",
+      "source": "Maker's news page, \"NASA Selects Astrolab to Provide Lunar Rover for Artemis Astronauts' Return to the Moon\" (26 May 2026)",
+      "link": "https://astrolab.space/2026/05/26/nasa-selects-astrolab-to-provide-lunar-rover-for-artemis-astronauts-return-to-the-moon/",
+      "status": "company figure (maker's own page)"
+    },
+    {
+      "dimension": "depth_z",
+      "value_m": 3.375,
+      "meaning": "overall length (Z, front to back) of the finished shape",
+      "source": "measured on the finished shape, after scaling it evenly to the published height",
+      "status": "our estimate",
+      "published": {
+        "value_m": 4,
+        "source": "same page: \"approximately 4 meters long by 2.3 meters wide\"",
+        "link": "https://astrolab.space/2026/05/26/nasa-selects-astrolab-to-provide-lunar-rover-for-artemis-astronauts-return-to-the-moon/",
+        "status": "company figure (maker's own page)"
+      },
+      "difference_percent": -15.6
+    }
+  ],
+  "generation": {
+    "picture": {
+      "description": "Photo of a full-size display mockup of the rover at an exhibition on 8 November 2026, seen from the front; before sending, everything outside the vehicle was painted white and the maker's name, flag decals and NASA insignia were covered with the colour around them",
+      "credit": "Dan Lee-Odinson (team member's own photo)",
+      "in_repository": false
+    },
+    "model": "TRELLIS.2",
+    "model_maker": "Microsoft",
+    "model_license": "MIT",
+    "endpoint": "fal-ai/trellis-2",
+    "service": "fal.ai",
+    "request_id": "01a1e07b-f7d0-7c83-84df-fbbd69871994",
+    "date": "2026-11-15",
+    "settings": {
+      "seed": 42,
+      "resolution": 1024,
+      "texture_size": 1024,
+      "decimation_target": 18000,
+      "remesh": true
+    },
+    "cleanup": null
+  },
+  "triangles": 17481,
+  "triangle_limit": 20000,
+  "simplifications": [
+    "The picture is a front view of a display mockup, so the generator guessed the sides, the back and the underside.",
+    "Thin parts (suspension links, the cab frame) are rough, and some surfaces are torn or merged.",
+    "Scaled evenly to the maker's height of about 2.6 m to the top of the antenna; width and length are measured from the shape and shown beside the maker's 2.3 m and 4 m for comparison.",
+    "The antennas came out only as short stubs below the roof box, so the top of the shape is the roof box; scaled to a height measured to the top of the antenna, the shape may therefore be slightly too large.",
+    "All colours, textures and markings removed; one plain grey material."
+  ],
+  "finishing": {
+    "rotate_deg": [
+      0,
+      0,
+      0
+    ],
+    "drop_loose_parts_below": 0,
+    "flatten_below": 0,
+    "flattened_vertices": 0,
+    "input_file": "trellis2_de69df60805c4c89a65da90784e114a2.glb",
+    "input_sha256": "cb8a0dec553cbc27df771eb0df531ba110c93a1f674dbad4661eb962de78591f",
+    "input_triangles": 17481,
+    "removed_loose_parts": {
+      "pieces": 0,
+      "triangles": 0
+    },
+    "scale_factor": 3.423918,
+    "material": "one neutral material; every texture, image, UV coordinate, per-vertex colour and original material removed"
+  },
+  "built_by": "tools/models/finish-model.mjs"
+}

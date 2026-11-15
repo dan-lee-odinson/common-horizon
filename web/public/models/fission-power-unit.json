@@ -2,6 +2,7 @@
   "id": "fission-power-unit",
   "name": "Fission power unit (radiators shown deployed, illustrative)",
   "file": "fission-power-unit.glb",
+  "kind": "code-built",
   "status": "NASA goal",
   "note": "illustrative shape, built with SI/AI-written code",
   "units": "meters",

@@ -533,7 +533,7 @@ web/
     SunlightField.tsx      Orbit: draws the lines of sunlight and the glow at the frame's edge
     Playback.tsx           the clocks: the Orbit preview, and Play through the stay
   src/hud/                 reusable HUD pieces: glass panel, readout, ring dial, reticle, line graph,
-                           drawer, sheet, leader lines, parallax; HorizonPanel.tsx (the horizon plot),
+                           drawer, sheet, leader lines; HorizonPanel.tsx (the horizon plot),
                            StayTimeline.tsx (lit and dark periods, and the scrubber), Transport.tsx
                            (play, pause, speed)
   src/scene/               the 3D space: Moon world, ring system, camera director, 2D fallback;
