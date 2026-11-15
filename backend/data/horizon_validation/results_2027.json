@@ -1,0 +1,199 @@
+{
+ "what": "check of stored horizon profiles against SPICE Sun and Earth positions; not engine output",
+ "year": 2027,
+ "step_hours": 1.0,
+ "samples": 8760,
+ "frame": "MOON_ME",
+ "positions_source": "physics engine functions: app.physics.engine.positions.get_body_position (from the Moon's centre, frame MOON_ME, aberration correction NONE), minus app.physics.engine.frames.get_site_position at the observer's radius, then frames.get_azimuth_elevation",
+ "positions_note": "physics engine modules from branch feat/physics-engine at commit 54cc093",
+ "aberration_correction": "NONE",
+ "kernels": [
+  "naif0012.tls",
+  "de440s.bsp",
+  "moon_pa_de440_200625.bpc",
+  "moon_de440_250416.tf"
+ ],
+ "sun_radius_km": 695700.0,
+ "earth_radius_km": 6378.1366,
+ "visible_means": "any part of the disc above the skyline (disc fraction > 0)",
+ "sky_check": {
+  "subsolar_latitude_min_deg": -1.5524,
+  "subsolar_latitude_max_deg": 1.5474,
+  "subearth_latitude_min_deg": -6.8301,
+  "subearth_latitude_max_deg": 6.8442,
+  "subearth_longitude_min_deg": -7.7679,
+  "subearth_longitude_max_deg": 7.6749
+ },
+ "sites": {
+  "shackleton-ridge": {
+   "latitude_deg": -89.684,
+   "longitude_deg": 196.739,
+   "site_height_m": 1726.649,
+   "observer_height_m": 2.0,
+   "skyline_min_deg": -3.33848,
+   "skyline_max_deg": 1.35179,
+   "skyline_mean_deg": -1.23107,
+   "sun_elevation_min_deg": -1.8427,
+   "sun_elevation_max_deg": 1.8373,
+   "earth_elevation_min_deg": -7.4067,
+   "earth_elevation_max_deg": 6.2837,
+   "sun_angular_radius_deg": [
+    0.26149,
+    0.27171
+   ],
+   "earth_angular_radius_deg": [
+    0.89847,
+    1.02312
+   ],
+   "comparison_site_height_m": 1711.639,
+   "skyline_difference_deg": {
+    "mean_deg": 0.23282,
+    "rms_deg": 0.65651,
+    "max_abs_deg": 2.16913,
+    "median_abs_deg": 0.02097
+   },
+   "difference_terrain_minus_comparison": {
+    "sun_any_part_visible_percent": -6.2215,
+    "sun_whole_disc_visible_percent": -5.1142,
+    "sun_mean_disc_fraction_percent": -5.9317,
+    "longest_dark_period_hours": 86.0,
+    "earth_any_part_visible_percent": 0.3425,
+    "earth_whole_disc_visible_percent": 0.742,
+    "longest_earth_outage_hours": -1.0
+   },
+   "engine_minus_own_lts_positions": {
+    "sun": {
+     "max_elevation_difference_deg": 0.000198,
+     "max_azimuth_difference_on_sky_deg": 0.005988
+    },
+    "earth": {
+     "max_elevation_difference_deg": 2.5e-05,
+     "max_azimuth_difference_on_sky_deg": 0.000209
+    }
+   },
+   "results": {
+    "terrain": {
+     "sun_any_part_visible_percent": 82.6712,
+     "sun_whole_disc_visible_percent": 73.1621,
+     "sun_mean_disc_fraction_percent": 78.1596,
+     "longest_dark_period_hours": 155.0,
+     "earth_any_part_visible_percent": 50.2397,
+     "earth_whole_disc_visible_percent": 41.0845,
+     "longest_earth_outage_hours": 324.0
+    },
+    "comparison": {
+     "sun_any_part_visible_percent": 88.8927,
+     "sun_whole_disc_visible_percent": 78.2763,
+     "sun_mean_disc_fraction_percent": 84.0913,
+     "longest_dark_period_hours": 69.0,
+     "earth_any_part_visible_percent": 49.8973,
+     "earth_whole_disc_visible_percent": 40.3425,
+     "longest_earth_outage_hours": 325.0
+    },
+    "no_terrain": {
+     "sun_any_part_visible_percent": 57.2945,
+     "sun_whole_disc_visible_percent": 49.9201,
+     "sun_mean_disc_fraction_percent": 54.3938,
+     "longest_dark_period_hours": 3349.0,
+     "earth_any_part_visible_percent": 50.6507,
+     "earth_whole_disc_visible_percent": 41.4726,
+     "longest_earth_outage_hours": 326.0
+    },
+    "terrain_own_lts": {
+     "sun_any_part_visible_percent": 82.6712,
+     "sun_whole_disc_visible_percent": 73.1735,
+     "sun_mean_disc_fraction_percent": 78.1595,
+     "longest_dark_period_hours": 155.0,
+     "earth_any_part_visible_percent": 50.2397,
+     "earth_whole_disc_visible_percent": 41.0845,
+     "longest_earth_outage_hours": 324.0
+    }
+   }
+  },
+  "nobile": {
+   "latitude_deg": -85.42088,
+   "longitude_deg": 31.6218,
+   "site_height_m": 6416.081,
+   "observer_height_m": 2.0,
+   "skyline_min_deg": -4.71774,
+   "skyline_max_deg": 6.51616,
+   "skyline_mean_deg": -0.0719,
+   "sun_elevation_min_deg": -6.1127,
+   "sun_elevation_max_deg": 6.1185,
+   "earth_elevation_min_deg": -2.9567,
+   "earth_elevation_max_deg": 10.1598,
+   "sun_angular_radius_deg": [
+    0.26149,
+    0.27171
+   ],
+   "earth_angular_radius_deg": [
+    0.89875,
+    1.02349
+   ],
+   "comparison_site_height_m": 6412.313,
+   "skyline_difference_deg": {
+    "mean_deg": 0.59917,
+    "rms_deg": 0.88831,
+    "max_abs_deg": 2.62806,
+    "median_abs_deg": 0.61864
+   },
+   "difference_terrain_minus_comparison": {
+    "sun_any_part_visible_percent": -6.6438,
+    "sun_whole_disc_visible_percent": -4.5776,
+    "sun_mean_disc_fraction_percent": -5.7577,
+    "longest_dark_period_hours": 21.0,
+    "earth_any_part_visible_percent": -9.4406,
+    "earth_whole_disc_visible_percent": -8.2306,
+    "longest_earth_outage_hours": 59.0
+   },
+   "engine_minus_own_lts_positions": {
+    "sun": {
+     "max_elevation_difference_deg": 0.000619,
+     "max_azimuth_difference_on_sky_deg": 0.00599
+    },
+    "earth": {
+     "max_elevation_difference_deg": 3.1e-05,
+     "max_azimuth_difference_on_sky_deg": 0.00021
+    }
+   },
+   "results": {
+    "terrain": {
+     "sun_any_part_visible_percent": 49.0525,
+     "sun_whole_disc_visible_percent": 41.7922,
+     "sun_mean_disc_fraction_percent": 45.1191,
+     "longest_dark_period_hours": 532.0,
+     "earth_any_part_visible_percent": 63.3676,
+     "earth_whole_disc_visible_percent": 54.4521,
+     "longest_earth_outage_hours": 246.0
+    },
+    "comparison": {
+     "sun_any_part_visible_percent": 55.6963,
+     "sun_whole_disc_visible_percent": 46.3699,
+     "sun_mean_disc_fraction_percent": 50.8769,
+     "longest_dark_period_hours": 511.0,
+     "earth_any_part_visible_percent": 72.8082,
+     "earth_whole_disc_visible_percent": 62.6826,
+     "longest_earth_outage_hours": 187.0
+    },
+    "no_terrain": {
+     "sun_any_part_visible_percent": 51.0845,
+     "sun_whole_disc_visible_percent": 47.4087,
+     "sun_mean_disc_fraction_percent": 49.2207,
+     "longest_dark_period_hours": 411.0,
+     "earth_any_part_visible_percent": 74.5205,
+     "earth_whole_disc_visible_percent": 62.7626,
+     "longest_earth_outage_hours": 175.0
+    },
+    "terrain_own_lts": {
+     "sun_any_part_visible_percent": 49.0525,
+     "sun_whole_disc_visible_percent": 41.7922,
+     "sun_mean_disc_fraction_percent": 45.1193,
+     "longest_dark_period_hours": 532.0,
+     "earth_any_part_visible_percent": 63.3676,
+     "earth_whole_disc_visible_percent": 54.4521,
+     "longest_earth_outage_hours": 246.0
+    }
+   }
+  }
+ }
+}
