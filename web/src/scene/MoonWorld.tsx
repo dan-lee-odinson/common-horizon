@@ -20,12 +20,12 @@ import { DAY_MS, SYNODIC_MONTH_DAYS } from '../util/time';
 import { earthSwing } from '../util/track';
 import { anchors, type AnchorName } from './anchors';
 import { cssColor } from './colors';
-import { glowTexture } from './glow';
+import { coronaTexture, glowTexture } from './glow';
 import { hiddenByMoon } from './occlusion';
 import { MISSION_VIEW } from './missionView';
 import { ORBIT_VIEW, ringRadii } from './orbitView';
 import { geometryNow, sceneTimeMs, toVector, type SceneData } from './sceneData';
-import { DISC_FRAGMENT, DISC_VERTEX, EARTH_FRAGMENT, EARTH_VERTEX, MOON_FRAGMENT, MOON_VERTEX, RETICLE_FRAGMENT, RETICLE_VERTEX } from './shaders';
+import { DISC_FRAGMENT, DISC_VERTEX, ATMOSPHERE_FRAGMENT, EARTH_FRAGMENT, EARTH_VERTEX, MOON_FRAGMENT, MOON_VERTEX, RETICLE_FRAGMENT, RETICLE_VERTEX } from './shaders';
 import { MOON_TEXTURE } from './textures';
 
 const SUN_BODY_RADIUS = 0.085;
@@ -48,8 +48,8 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
   /** Shared with the anchors: are the bodies drawn, and is Earth being kept off the Moon's face? */
   const shown = useRef({ bodies: false, earth: false });
   const radii = useMemo(() => ringRadii(data.isPhone), [data.isPhone]);
-  const earthDistance = data.isPhone ? ORBIT_VIEW.earthDistance * 0.8 : ORBIT_VIEW.earthDistance;
-  const earthRadius = data.isPhone ? ORBIT_VIEW.earthRadius * 0.8 : ORBIT_VIEW.earthRadius;
+  const earthDistance = ORBIT_VIEW.earthDistance;
+  const earthRadius = ORBIT_VIEW.earthRadius;
   // The range Earth's overhead point moves through over the stay: the bracket.
   const swing = useMemo(() => earthSwing(data.track, data.landingMs, data.stayEndMs), [data.track, data.landingMs, data.stayEndMs]);
   const dataRef = useRef(data);
@@ -101,6 +101,8 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
     [colors, radii],
   );
   const earthUniforms = useMemo(() => ({ uSunDir: { value: new THREE.Vector3(1, 0, 0) }, uColor: { value: colors.earth } }), [colors]);
+  // The atmosphere shares the Sun's direction with the planet (the same vector object), so the two cannot disagree.
+  const atmosphereUniforms = useMemo(() => ({ uSunDir: earthUniforms.uSunDir, uColor: { value: colors.earth.clone().lerp(new THREE.Color('#ffffff'), 0.35) } }), [colors, earthUniforms]);
 
   // The optional Moon colour map (see textures.ts). Off by default: the surface is generated.
   useEffect(() => {
@@ -214,6 +216,7 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
   }
 
   const glow = useMemo(() => glowTexture(), []);
+  const corona = useMemo(() => coronaTexture(), []);
   const discSize = (radii[3] + 0.2) * 2;
 
   return (
@@ -250,8 +253,12 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
         <sprite scale={[0.62, 0.62, 1]}>
           <spriteMaterial map={glow} color={colors.sun} transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
         </sprite>
-        <sprite scale={[1.5, 1.5, 1]}>
-          <spriteMaterial map={glow} color={colors.sun} transparent opacity={0.3} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        {/* A soft glow and a faint corona. The Sun here is a direction marker, not a body to scale. */}
+        <sprite scale={[2.0, 2.0, 1]}>
+          <spriteMaterial map={glow} color={colors.sun} transparent opacity={0.36} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        </sprite>
+        <sprite scale={[3.6, 3.6, 1]}>
+          <spriteMaterial map={corona} color={colors.sun} transparent opacity={0.5} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
         </sprite>
       </group>
       <mesh ref={sunStem} visible={false}>
@@ -261,12 +268,22 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
 
       <group ref={earthGroup} visible={false}>
         <mesh name="earth-body">
-          <sphereGeometry args={[earthRadius, 64, 40]} />
+          <sphereGeometry args={[earthRadius, 128, 80]} />
           <shaderMaterial ref={earth} vertexShader={EARTH_VERTEX} fragmentShader={EARTH_FRAGMENT} uniforms={earthUniforms} />
         </mesh>
-        <sprite scale={[earthRadius * 3.6, earthRadius * 3.6, 1]} renderOrder={-1}>
-          <spriteMaterial map={glow} color={colors.earth} transparent opacity={0.22} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-        </sprite>
+        {/* The thin glow of the atmosphere just outside the limb. */}
+        <mesh name="earth-atmosphere" renderOrder={-1}>
+          <sphereGeometry args={[earthRadius * 1.03, 128, 80]} />
+          <shaderMaterial
+            vertexShader={EARTH_VERTEX}
+            fragmentShader={ATMOSPHERE_FRAGMENT}
+            uniforms={atmosphereUniforms}
+            side={THREE.BackSide}
+            transparent
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
       </group>
       <mesh ref={earthLine} visible={false}>
         <cylinderGeometry args={[0.006, 0.006, 1, 6]} />
@@ -417,8 +434,24 @@ function MoonAnchors({
     } else {
       anchors.sun.visible = anchors.subsolar.visible = anchors.subearth.visible = false;
     }
-    if (g && shown.current.earth) place('earth', toVector(g.subearth_lat, g.subearth_lon_east, earthDistance, v), false, earthRadius);
-    else anchors.earth.visible = false;
+    place('moon', v.set(0, 0, 0), false, 1);
+    if (g && shown.current.earth) {
+      place('earth', toVector(g.subearth_lat, g.subearth_lon_east, earthDistance, v), false, earthRadius);
+      // Earth is far larger than the picture's corner it stands in, and its centre is usually off
+      // screen. Its tag and leader line start from the point of its limb nearest the Moon.
+      const e = anchors.earth;
+      const limb = anchors.earthLimb;
+      const dx = anchors.moon.x - e.x;
+      const dy = anchors.moon.y - e.y;
+      const len = Math.hypot(dx, dy) || 1;
+      limb.x = e.x + (dx / len) * e.r;
+      limb.y = e.y + (dy / len) * e.r;
+      limb.r = 0;
+      limb.visible = e.r > 0 && limb.x >= 0 && limb.x <= size.width && limb.y >= 0 && limb.y <= size.height;
+    } else {
+      anchors.earth.visible = false;
+      anchors.earthLimb.visible = false;
+    }
     // The spotlight site's anchor carries the radius of its reticle's outer ring, so its tag sits just outside.
     if (d.focus) place('site', toVector(d.focus.lat, d.focus.lon_east, MISSION_VIEW.markerRadius, v), true, MISSION_VIEW.reticleSize * MISSION_VIEW.ringShare);
     else anchors.site.visible = false;

@@ -11,11 +11,13 @@ export interface Anchor {
   r: number;
 }
 
-export type AnchorName = 'sun' | 'earth' | 'subsolar' | 'subearth' | 'site' | 'lander' | 'moon' | 'lon0' | 'lon90' | 'lon180' | 'lon270';
+export type AnchorName = 'sun' | 'earth' | 'earthLimb' | 'subsolar' | 'subearth' | 'site' | 'lander' | 'moon' | 'lon0' | 'lon90' | 'lon180' | 'lon270';
 
 export const anchors: Record<AnchorName, Anchor> = {
   sun: { x: 0, y: 0, visible: false, r: 0 },
   earth: { x: 0, y: 0, visible: false, r: 0 },
+  // The point of Earth's limb nearest the Moon: Earth's centre is usually off screen, so its tag and leader line start here.
+  earthLimb: { x: 0, y: 0, visible: false, r: 0 },
   subsolar: { x: 0, y: 0, visible: false, r: 0 },
   subearth: { x: 0, y: 0, visible: false, r: 0 },
   site: { x: 0, y: 0, visible: false, r: 0 },

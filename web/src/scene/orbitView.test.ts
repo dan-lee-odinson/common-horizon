@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { geometryAt, TRANSIT_DAYS } from '../api/mock/model';
 import { normalizeLon360, wrap180 } from '../util/geo';
 import { DAY_MS, HOUR_MS, SYNODIC_MONTH_DAYS } from '../util/time';
-import { ORBIT_COLUMN_PX, ORBIT_VIEW, orbitCameraLongitude, orbitDistance, orbitEarthSide, projectOrbit, ringRadii } from './orbitView';
+import { EARTH_RADIUS_KM, MOON_RADIUS_KM } from '../util/bodies';
+import { ORBIT_COLUMN_PX, ORBIT_VIEW, orbitCameraLongitude, orbitDistance, orbitEarthSide, orbitZoomDistance, projectOrbit, ringRadii } from './orbitView';
 
 const LANDING = Date.UTC(2027, 1, 10, 15, 0, 0) + TRANSIT_DAYS * DAY_MS;
 
@@ -57,51 +58,74 @@ for (const [width, height] of [
       }
     });
 
-    for (const side of ['left', 'right'] as const) {
-    it(`keeps Earth behind the Moon and clear of its disc, in the frame, through a lunar day (Earth on the ${side})`, () => {
+    it('draws Earth at true size behind the Moon, its limb filling the top-left corner, clear of the Moon, through a lunar day', () => {
       for (const offset of offsets) {
         for (const el of elevations) {
-          const cameraLon = orbitCameraLongitude(earthLon0, side, offset);
-          const moon = projectOrbit(0, 0, 0, cameraLon, el, distance, width, height);
           for (let h = 0; h <= SYNODIC_MONTH_DAYS * 24; h += 6) {
             const g = geometryAt(LANDING + h * HOUR_MS);
+            // The camera follows the longitude Earth is over at that instant, so Earth keeps its place
+            // from side to side and only its latitude and the camera's own sway move it.
+            const cameraLon = orbitCameraLongitude(g.subearth_lon_east, 'left', offset);
+            const moon = projectOrbit(0, 0, 0, cameraLon, el, distance, width, height);
             const earth = projectOrbit(g.subearth_lat, g.subearth_lon_east, ORBIT_VIEW.earthDistance, cameraLon, el, distance, width, height);
             const r = ORBIT_VIEW.earthRadius * earth.scale;
             // Farther from the camera than the Moon's centre: never between the camera and the Moon.
             expect(earth.depth).toBeGreaterThan(moon.depth + 1);
+            // Visibly larger than the Moon on screen, although it is farther away.
+            expect(r).toBeGreaterThan(moon.scale * 1.4);
             // Its disc does not touch the Moon's disc.
             expect(Math.hypot(earth.x - moon.x, earth.y - moon.y)).toBeGreaterThan(moon.scale + r + 12);
-            // Inside the frame, on its side.
-            if (side === 'right') {
-              expect(earth.x + r).toBeLessThan(width - 6);
-              expect(earth.x - r).toBeGreaterThan(width / 2);
-            } else {
-              expect(earth.x - r).toBeGreaterThan(6);
-              expect(earth.x + r).toBeLessThan(width / 2);
-            }
-            expect(earth.y - r).toBeGreaterThan(-height * 0.06);
-            // Above the panel that sits under it (the lower 39 % of the height).
-            expect(earth.y + r).toBeLessThan(height * 0.61);
+            // A limb in the top-left corner: the disc runs off the top and off the left of the window,
+            // and covers the corner of the picture under the navigation.
+            expect(earth.x - r).toBeLessThan(0);
+            expect(earth.y - r).toBeLessThan(0);
+            expect(Math.hypot(earth.x - 60, earth.y - 110)).toBeLessThan(r);
+            // The rest of it is off screen: it never reaches the middle of the picture.
+            expect(earth.x + r).toBeLessThan(width / 2);
           }
         }
       }
     });
-    }
+
+    it('brings the whole Earth into view when zoomed all the way out, still clear of the Moon', () => {
+      const far = orbitZoomDistance(distance, 1);
+      for (const offset of offsets) {
+        for (const el of elevations) {
+          for (let h = 0; h <= SYNODIC_MONTH_DAYS * 24; h += 6) {
+            const g = geometryAt(LANDING + h * HOUR_MS);
+            const cameraLon = orbitCameraLongitude(g.subearth_lon_east, 'left', offset);
+            const moon = projectOrbit(0, 0, 0, cameraLon, el, far, width, height);
+            const earth = projectOrbit(g.subearth_lat, g.subearth_lon_east, ORBIT_VIEW.earthDistance, cameraLon, el, far, width, height);
+            const r = ORBIT_VIEW.earthRadius * earth.scale;
+            expect(earth.x - r).toBeGreaterThan(0);
+            expect(earth.y - r).toBeGreaterThan(0);
+            expect(earth.x + r).toBeLessThan(width);
+            expect(earth.y + r).toBeLessThan(height);
+            expect(Math.hypot(earth.x - moon.x, earth.y - moon.y)).toBeGreaterThan(moon.scale + r + 12);
+            expect(r).toBeGreaterThan(moon.scale * 1.4);
+          }
+        }
+      }
+    });
   });
 }
 
+describe('zooming in Orbit', () => {
+  it('runs from the usual distance to the whole-Earth distance and no further', () => {
+    expect(orbitZoomDistance(7, 0)).toBe(7);
+    expect(orbitZoomDistance(7, 1)).toBeCloseTo(7 * ORBIT_VIEW.zoomOut, 9);
+    expect(orbitZoomDistance(7, -3)).toBe(7);
+    expect(orbitZoomDistance(7, 9)).toBeCloseTo(7 * ORBIT_VIEW.zoomOut, 9);
+  });
+  it('draws Earth to scale with the Moon', () => {
+    expect(ORBIT_VIEW.earthRadius).toBeCloseTo(EARTH_RADIUS_KM / MOON_RADIUS_KM, 3);
+  });
+});
+
 describe('which side Earth stands on', () => {
-  it('is the side from which the camera sees more of the sunlit Moon at the landing', () => {
-    // Sun overhead 70 degrees east of Earth's overhead point: looking from the east shows the lit half.
+  it('is always the left, so its limb fills the top-left corner', () => {
     expect(orbitEarthSide({ subsolar_lon_east: 70, subearth_lon_east: 0 })).toBe('left');
-    expect(orbitEarthSide({ subsolar_lon_east: 290, subearth_lon_east: 0 })).toBe('right');
-    expect(orbitEarthSide(null)).toBe('right');
-    for (const sun of [10, 100, 200, 300]) {
-      const g = { subsolar_lon_east: sun, subearth_lon_east: 355 };
-      const side = orbitEarthSide(g);
-      const other = side === 'left' ? 'right' : 'left';
-      const lit = (s: 'left' | 'right') => Math.cos(((sun - orbitCameraLongitude(355, s)) * Math.PI) / 180);
-      expect(lit(side)).toBeGreaterThanOrEqual(lit(other));
-    }
+    expect(orbitEarthSide({ subsolar_lon_east: 290, subearth_lon_east: 0 })).toBe('left');
+    expect(orbitEarthSide(null)).toBe('left');
   });
 });

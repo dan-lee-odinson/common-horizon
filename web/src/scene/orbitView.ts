@@ -1,9 +1,11 @@
 // The Orbit stage's picture, as plain arithmetic: where the camera sits, how big the ring system
 // is, and where Earth is drawn. Kept free of 3D-library code so the layout can be checked by tests.
 //
-// NOT TO SCALE. Really Earth is about 221 Moon radii away and 3.67 times the Moon's diameter. Here
-// it is drawn as a distant, larger body beyond the rings, in its true DIRECTION from the Moon: far
-// enough that it can never come between the camera and the Moon, near enough to stay in the frame.
+// SIZES TO SCALE, DISTANCES NOT. Earth is drawn at its true size beside the Moon (3.667 times the
+// Moon's radius) and in its true DIRECTION from the Moon, but far nearer than the 221 Moon radii it
+// really is: it stands behind the Moon and to the left, so that in the usual view its limb fills
+// the top-left corner of the screen and the rest of it is off screen. Zooming out brings the whole
+// disc into view. It can never come between the camera and the Moon.
 
 import { normalizeLon360 } from '../util/geo';
 
@@ -11,12 +13,15 @@ export const ORBIT_VIEW = {
   /** Vertical field of view, degrees. */
   fov: 34,
   /** Degrees the camera sits above the ring plane. */
-  elevation: 23,
-  /** Earth's distance from the Moon's centre and its radius, in Moon radii (not to scale). */
-  earthDistance: 5.5,
-  earthRadius: 0.64,
+  elevation: 30,
+  /** Earth's radius in Moon radii: 6,371.0 km over 1,737.4 km (src/util/bodies.ts). To scale. */
+  earthRadius: 3.667,
+  /** Earth's distance from the Moon's centre, in Moon radii. NOT to scale (really about 221). */
+  earthDistance: 11.5,
   /** Angle between Earth's direction and the point straight behind the Moon, as the camera sees it. */
   earthAngle: 37,
+  /** Zooming all the way out multiplies the camera's distance by this: the whole Earth is then in view. */
+  zoomOut: 3.6,
   /** The camera sways this many degrees either side of its base longitude. */
   sway: 3,
   /** The pointer leans the camera by at most this many degrees. */
@@ -69,13 +74,18 @@ export function orbitCameraLongitude(earthLonEast: number, side: EarthSide = 'ri
 }
 
 /**
- * Earth can stand to the left or to the right of the Moon; both are true to its direction. The side
- * is chosen so that, at the landing, the camera sees as much of the Moon's sunlit half as it can.
+ * Earth stands to the left of the Moon, so its limb fills the top-left corner of the picture. (The
+ * right would be just as true to its direction; one fixed side keeps the picture and the panels
+ * where a returning visitor expects them.)
  */
-export function orbitEarthSide(g: { subsolar_lon_east: number; subearth_lon_east: number } | null): EarthSide {
-  if (!g) return 'right';
-  const facing = (side: EarthSide) => Math.cos(((g.subsolar_lon_east - orbitCameraLongitude(g.subearth_lon_east, side)) * Math.PI) / 180);
-  return facing('left') > facing('right') ? 'left' : 'right';
+export function orbitEarthSide(_g?: { subsolar_lon_east: number; subearth_lon_east: number } | null): EarthSide {
+  return 'left';
+}
+
+/** Camera distance for a zoom setting: 0 is the usual view, 1 is all the way out (the whole Earth in view). */
+export function orbitZoomDistance(distance: number, zoom: number): number {
+  const z = Math.min(1, Math.max(0, zoom));
+  return distance * (1 + z * (ORBIT_VIEW.zoomOut - 1));
 }
 
 export interface ScreenPoint {

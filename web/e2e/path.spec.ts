@@ -70,7 +70,7 @@ test('orbit: the readouts run from real data, the preview pauses, and mission se
   await page.getByTestId('begin').click();
 
   await expect(page.getByTestId('example-badge')).toHaveText('Example data');
-  await expect(page.getByTestId('not-to-scale')).toContainText('sizes and distances not to scale');
+  await expect(page.getByTestId('not-to-scale')).toContainText('Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only.');
 
   // The Sun's overhead longitude is a number of degrees east, and it moves as time runs.
   await expect.poll(() => readout(page, 'subsolar_lon'), { timeout: 30_000 }).toMatch(/^\d{1,3}\.\d{2}$/);
@@ -157,16 +157,39 @@ test('orbit: through a whole lunar day, markers and their tags never touch a gla
     expect(state.panels.length).toBeGreaterThanOrEqual(4);
     for (const m of state.markers) {
       if (m.name === 'sun') sunSeen++;
-      if (m.name === 'earth') earthSeen++;
+      if (m.name === 'earthLimb') earthSeen++;
       for (const p of state.panels) {
         expect(overlap(m.body, p), `${m.name} overlaps a panel at step ${i}`).toBe(false);
         expect(overlap(m.tag, p), `${m.name} tag overlaps a panel at step ${i}`).toBe(false);
       }
     }
   }
-  // Earth is in view the whole time; the Sun is hidden only while it is behind the Moon.
+  // Earth's limb is in view the whole time; the Sun is hidden only while it is behind the Moon.
   expect(earthSeen).toBe(13);
   expect(sunSeen).toBeGreaterThanOrEqual(6);
+
+  // The caption says what is to scale, and the zoom control takes the picture out to the whole Earth and back.
+  await expect(page.getByTestId('not-to-scale')).toContainText('Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only.');
+  const zoom = page.getByTestId('orbit-zoom');
+  await expect(zoom).toHaveAttribute('aria-pressed', 'false');
+  await zoom.click();
+  await expect(zoom).toHaveAttribute('aria-pressed', 'true');
+  await expect(zoom).toHaveText(/Back to the Moon/);
+  await page.waitForTimeout(1500);
+  // Zoomed out, Earth's tag still stands clear of every panel.
+  const clash = await page.evaluate(() => {
+    const tag = document.querySelector('[data-marker="earthLimb"] [data-marker-tag]');
+    if (!tag) return 'no Earth tag';
+    const t = tag.getBoundingClientRect();
+    for (const p of Array.from(document.querySelectorAll('[data-panel]'))) {
+      const r = p.getBoundingClientRect();
+      if (t.left < r.right && r.left < t.right && t.top < r.bottom && r.top < t.bottom) return 'the Earth tag overlaps a panel';
+    }
+    return '';
+  });
+  expect(clash).toBe('');
+  await zoom.click();
+  await expect(zoom).toHaveAttribute('aria-pressed', 'false');
 });
 
 // ---------- Stage 2, mission select ----------

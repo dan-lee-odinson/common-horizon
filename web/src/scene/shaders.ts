@@ -290,8 +290,32 @@ void main() {
   surface = mix(surface, vec3(0.95), cloud * 0.75);
   float lit = smoothstep(-0.08, 0.22, dot(n, uSunDir));
   vec3 color = surface * (0.06 + lit * 1.05);
-  color += uColor * pow(1.0 - max(dot(n, view), 0.0), 2.5) * 0.7;
+  // The air seen edge-on: a thin blue rim just inside the limb, brighter on the day side.
+  color += uColor * pow(1.0 - max(dot(n, view), 0.0), 4.0) * (0.25 + 0.75 * lit);
   gl_FragColor = vec4(color, 1.0);
+  #include <colorspace_fragment>
+}
+`;
+
+/**
+ * Earth's atmosphere: a shell a little larger than the planet, drawn from the inside and added to
+ * the picture, so only the thin ring just outside the limb shows. It is brightest at the limb and
+ * fades to nothing at the shell's own edge, and it is dimmer on the night side.
+ */
+export const ATMOSPHERE_FRAGMENT = /* glsl */ `
+precision highp float;
+varying vec3 vPos;
+varying vec3 vWorld;
+uniform vec3 uSunDir;
+uniform vec3 uColor;
+void main() {
+  vec3 n = normalize(vPos);
+  vec3 view = normalize(cameraPosition - vWorld);
+  // 0 at the shell's own outline, about 0.24 where the planet's limb begins (shell radius 1.03).
+  float a = smoothstep(0.0, 0.24, abs(dot(n, view)));
+  a *= a;
+  float day = smoothstep(-0.35, 0.5, dot(n, uSunDir));
+  gl_FragColor = vec4(uColor * (0.22 + 0.9 * day) * a, 1.0);
   #include <colorspace_fragment>
 }
 `;

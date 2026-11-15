@@ -16,11 +16,12 @@ const STAGES: { id: Stage; label: string }[] = [
 /** The dark wash behind the bar: it fades out downward, into the scene. */
 const BACKING = 'linear-gradient(to bottom, rgb(2 5 11 / 0.82), rgb(2 5 11 / 0))';
 /**
- * In mission select the sunlit Moon can pass behind the bar (the picture moves up when the
- * assistant's history opens). There the wash holds to the foot of the bar's text before it fades,
- * so the words keep their contrast.
+ * In Orbit the bar sits over Earth's sunlit limb, and in mission select the sunlit Moon can pass
+ * behind it (the picture moves up when the assistant's history opens). There the wash holds to the
+ * foot of the bar's text before it fades, so the words keep their contrast: over pure white, 80 %
+ * of this wash leaves the dimmest text of the bar above 4.5 to 1.
  */
-const BACKING_UNDER_MOON = 'linear-gradient(to bottom, rgb(2 5 11 / 0.9), rgb(2 5 11 / 0.72) 70%, rgb(2 5 11 / 0))';
+const BACKING_UNDER_MOON = 'linear-gradient(to bottom, rgb(2 5 11 / 0.92), rgb(2 5 11 / 0.8) 72%, rgb(2 5 11 / 0))';
 
 export function TopBar() {
   const stage = useStore(appStore, (s) => s.stage);
@@ -39,7 +40,7 @@ export function TopBar() {
   }
 
   return (
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-14 items-center gap-x-5 px-5 max-md:gap-x-2 max-md:px-3" style={{ background: stage === 'mission' ? BACKING_UNDER_MOON : BACKING }}>
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-14 items-center gap-x-5 px-5 max-md:gap-x-2 max-md:px-3" style={{ background: stage === 'site' ? BACKING : BACKING_UNDER_MOON }}>
       <h1 className="pointer-events-auto m-0 shrink-0 font-display text-[15px] font-semibold uppercase tracking-[0.24em] text-ink max-md:text-[13px] max-md:tracking-[0.14em]">Common Horizon</h1>
 
       <nav aria-label="Stages" className="pointer-events-auto max-md:hidden">

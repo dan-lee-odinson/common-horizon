@@ -30,13 +30,14 @@ export function OrbitHud({ revealed }: { revealed: boolean }) {
   const launchUtcMs = useStore(appStore, (s) => s.launchUtcMs);
   const slipDays = useStore(appStore, (s) => s.slipDays);
   const playing = useStore(appStore, (s) => s.previewPlaying);
+  const zoomedOut = useStore(appStore, (s) => s.orbitZoom > 0.5);
   const isPhone = useIsPhone();
   // Earth stands on one side of the Moon (see scene/orbitView.ts); the panels arrange around it.
   const earthSide = orbitEarthSide(landingGeometry);
   const leaders = useMemo<LeaderSpec[]>(
     () => [
       { anchor: 'sun', to: '[data-leader-target="sun"]', color: 'var(--ch-sun)', side: earthSide === 'right' ? 'left' : 'right' },
-      { anchor: 'earth', to: '[data-leader-target="earth"]', color: 'var(--ch-earth)', edge: 'top' },
+      { anchor: 'earthLimb', to: '[data-leader-target="earth"]', color: 'var(--ch-earth)', edge: 'top' },
     ],
     [earthSide],
   );
@@ -79,7 +80,7 @@ export function OrbitHud({ revealed }: { revealed: boolean }) {
     <div ref={rootRef} className="absolute inset-0" data-testid="orbit-hud" style={{ visibility: revealed ? 'visible' : 'hidden' }}>
       <Leaders items={leaders} active={revealed && !isPhone} />
       <AnchorTag anchor="sun" label="Sun" tone="sun" q={sky.subsolarLon} />
-      <AnchorTag anchor="earth" label="Earth" tone="earth" toward={isPhone ? 180 : earthSide === 'right' ? 292 : 68} gap={10} q={sky.subearthLon} />
+      <AnchorTag anchor="earthLimb" label="Earth" tone="earth" toward="moon" gap={12} q={sky.subearthLon} />
       <AnchorTag anchor="lon0" label="0°" tone="muted" plain />
       <AnchorTag anchor="lon90" label="90° E" tone="muted" plain />
       <AnchorTag anchor="lon180" label="180°" tone="muted" plain />
@@ -284,13 +285,24 @@ export function OrbitHud({ revealed }: { revealed: boolean }) {
               <Icon name={playing ? 'pause' : 'play'} size={14} />
               {playing ? 'Pause preview' : 'Play preview'}
             </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => actions.setOrbitZoom(zoomedOut ? 0 : 1)}
+              aria-pressed={zoomedOut}
+              title="Zoom out until the whole Earth is in view, or back to the Moon. The mouse wheel zooms too."
+              data-testid="orbit-zoom"
+            >
+              <Icon name="target" size={14} />
+              {zoomedOut ? 'Back to the Moon' : 'Show whole Earth'}
+            </button>
             <button type="button" className="btn btn-primary btn-lg" onClick={actions.enterMission} data-testid="enter-mission">
               Enter mission select
               <Icon name="right" size={16} />
             </button>
           </div>
           <p className="m-0 max-w-[36rem] text-balance text-center text-[13px] leading-snug text-ink-2" data-testid="not-to-scale">
-            Sun and Earth: sizes and distances not to scale. The Moon’s surface pattern is an illustration, not a map.
+            Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only. The Moon’s surface pattern is an illustration, not a map.
           </p>
         </div>
         </div>

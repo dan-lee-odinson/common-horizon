@@ -15,6 +15,12 @@ test('stage 1: orbit', async ({ page }, info) => {
   // Let the entrance settle and the previewed time run on a couple of days.
   await page.waitForTimeout(9000);
   await page.screenshot({ path: `${DIR}/stage-1-orbit-${size}.png` });
+  if (size === '1440x900') {
+    // Zoomed all the way out: the whole Earth, to scale beside the Moon.
+    await page.getByTestId('orbit-zoom').click();
+    await page.waitForTimeout(4000);
+    await page.screenshot({ path: `${DIR}/stage-1-orbit-whole-earth-${size}.png` });
+  }
 });
 
 test('stage 2: mission select', async ({ page }, info) => {

@@ -57,6 +57,10 @@ export interface AppState {
   assistantOpen: boolean;
   /** Orbit: the time preview is running. */
   previewPlaying: boolean;
+  /** What the Moon's surface is showing: the drawn stand-in, or the real maps once they have loaded. */
+  moonSurface: 'drawn' | 'map';
+  /** Orbit stage zoom: 0 is the usual view with the Moon large, 1 is all the way out with the whole Earth in view. */
+  orbitZoom: number;
   /** Site stage: time is playing, and how fast (simulated days per second). */
   playing: boolean;
   speed: number;
@@ -144,6 +148,8 @@ export const appStore = createStore<AppState>({
   horizonOpen: false,
   assistantOpen: false,
   previewPlaying: !prefersReducedMotion(),
+  orbitZoom: 0,
+  moonSurface: 'drawn',
   playing: false,
   speed: DEFAULT_SPEED,
   flight: null,
@@ -189,7 +195,7 @@ export const actions = {
   /** Orbit -> mission select. */
   enterMission() {
     flightSeq++;
-    appStore.set({ stage: 'mission', flight: null, playing: false, ...CLOSED_PANELS });
+    appStore.set({ stage: 'mission', flight: null, playing: false, orbitZoom: 0, ...CLOSED_PANELS });
     simClock.set({ nowMs: null });
     orbitClock.set({ nowMs: null });
   },
@@ -330,6 +336,13 @@ export const actions = {
   },
   setPreviewPlaying(previewPlaying: boolean) {
     appStore.set({ previewPlaying });
+  },
+  setMoonSurface(moonSurface: 'drawn' | 'map') {
+    if (appStore.get().moonSurface !== moonSurface) appStore.set({ moonSurface });
+  },
+  /** Orbit zoom, kept between 0 (the usual view) and 1 (the whole Earth in view). */
+  setOrbitZoom(orbitZoom: number) {
+    appStore.set({ orbitZoom: Math.min(1, Math.max(0, orbitZoom)) });
   },
   setPlaying(playing: boolean) {
     appStore.set({ playing });

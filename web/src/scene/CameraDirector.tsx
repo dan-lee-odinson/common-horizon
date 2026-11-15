@@ -21,7 +21,7 @@ import { normalizeLon360 } from '../util/geo';
 import { DAY_MS, SYNODIC_MONTH_DAYS } from '../util/time';
 import { earthSwing } from '../util/track';
 import { missionCameraLatitude, missionDistance as missionDistanceFor, missionFrame, placeInFrame } from './missionView';
-import { MOON_CLIP, ORBIT_VIEW, orbitCameraLongitude, orbitDistance, orbitEarthSide } from './orbitView';
+import { MOON_CLIP, ORBIT_VIEW, orbitCameraLongitude, orbitDistance, orbitEarthSide, orbitZoomDistance } from './orbitView';
 import { geometryNow, toVector, type SceneData } from './sceneData';
 
 /** The parts of OrbitControls the director uses. */
@@ -56,8 +56,12 @@ interface Pose {
 export function CameraDirector({ data }: { data: SceneData }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const size = useThree((s) => s.size);
+  const canvas = useThree((s) => s.gl.domElement);
   const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
   const stage = useStore(appStore, (s) => s.stage);
+  const orbitZoom = useStore(appStore, (s) => s.orbitZoom);
+  /** The zoom the camera is at right now: it follows the store's setting with a short eased move. */
+  const zoomNow = useRef({ value: 0 });
   const flight = useStore(appStore, (s) => s.flight);
   const { isPhone, reducedMotion } = data;
   const focusLat = data.focus?.lat ?? null;
@@ -101,8 +105,31 @@ export function CameraDirector({ data }: { data: SceneData }) {
 
   function orbitPosition(out: THREE.Vector3): THREE.Vector3 {
     const d = drift.current;
-    return toVector(ORBIT_VIEW.elevation + d.leanY, orbitCameraLongitude(earthLon, earthSide, d.sway + d.leanX), orbitD, out);
+    // The camera keeps to the longitude Earth is over at the instant shown, so Earth's limb holds its
+    // place in the corner while time runs (Earth's overhead point swings several degrees in a
+    // month); until the data arrives, the middle of that swing stands in.
+    const now = geometryNow(data);
+    const lon = now ? now.subearth_lon_east : earthLon;
+    return toVector(ORBIT_VIEW.elevation + d.leanY, orbitCameraLongitude(lon, earthSide, d.sway + d.leanX), orbitZoomDistance(orbitD, zoomNow.current.value), out);
   }
+
+  // Zooming in Orbit: out until the whole Earth is in view, and back. The wheel changes the setting;
+  // the camera eases to it (at once for visitors who prefer reduced motion).
+  useEffect(() => {
+    const tween = gsap.to(zoomNow.current, { value: orbitZoom, duration: reducedMotion ? 0 : 0.9, ease: 'power2.inOut', overwrite: true });
+    return () => {
+      tween.kill();
+    };
+  }, [orbitZoom, reducedMotion]);
+  useEffect(() => {
+    if (stage !== 'orbit') return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      actions.setOrbitZoom(appStore.get().orbitZoom + Math.sign(e.deltaY) * 0.2);
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
+  }, [stage, canvas]);
 
   function poseFor(target: 'orbit' | 'mission'): Pose {
     if (target === 'orbit') {

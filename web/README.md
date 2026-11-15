@@ -191,12 +191,16 @@ equatorial plane and is seen at an angle. From the inside out:
   end caps spans the range that the longitude of Earth's overhead point really moves through over
   the stay (its "swing", from the data layer), with a mark at where it is now.
 
-**Earth** itself is drawn as a distant, larger body out along its true direction from the Moon,
-joined to its bracket by a line. It is placed farther from the Moon than the camera ever goes in
-mission select and is only drawn while it is behind the Moon's centre as the camera sees it, so it
-can never come between the camera and the Moon or cover a site marker. Sizes and distances are
-**not to scale** (really Earth is about 221 Moon radii away and 3.67 times the Moon's diameter), and
-a line on screen says so.
+**Earth** itself is drawn at its **true size beside the Moon** (3.667 times the Moon's radius),
+behind the Moon and out along its true direction, joined to its bracket by a line. In the usual
+view only part of it shows: a large limb, with a thin glow of atmosphere, filling the top-left
+corner of the screen behind the navigation; its lit side faces the Sun, as the Moon's does.
+**Show whole Earth** (or the mouse wheel) zooms out until the whole disc is in view, and **Back to
+the Moon** returns. Earth can never come between the camera and the Moon or cover a site marker.
+The Sun on its ring is a **direction marker** with a soft glow, not a body to scale. A line on
+screen says it: *Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction
+marker only.* (Really Earth is about 221 Moon radii away.) The navigation bar keeps a dark backing
+so its words stay readable over Earth's sunlit limb.
 
 The camera looks from the side of the Moon away from Earth, so Earth stands behind the Moon and off
 to one side. Which side is chosen so that the camera sees as much of the Moon's sunlit half as it
