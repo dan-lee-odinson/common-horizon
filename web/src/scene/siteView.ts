@@ -18,11 +18,18 @@ export const SITE_VIEW = {
   /** Vertical field of view, degrees: wide enough for a 52 m lander and the horizon behind it. */
   fov: 42,
   fovPhone: 58,
-  /** Nearest and farthest things drawn, metres. */
+  /**
+   * Nearest and farthest things drawn, metres. The far ground reaches 32 km; the depth buffer still
+   * parts the ground from the hardware to a fraction of a millimetre near the lander and to about
+   * a metre at 3 km (near / far stays at 1 : 100,000).
+   */
   near: 0.5,
-  far: 12_000,
-  /** Radius of the sky dome around the camera, metres. A drawing distance only: the sky has none. */
-  dome: 9_000,
+  far: 50_000,
+  /**
+   * Radius of the sky dome around the camera, metres. A drawing distance only: the sky has none. It
+   * lies beyond the farthest ground (32 km), so the ground stands in front of the sky.
+   */
+  dome: 40_000,
   /** The skyline band reaches this far below level, so the ground's far edge is always in front of it. */
   bandFloorDeg: -12,
   /** Width of the bright line along the skyline, degrees. */
@@ -54,6 +61,14 @@ export const SITE_VIEW = {
    * window (a panel across the bottom, such as the Data checks band, leaves the picture less height).
    */
   pitchLowDeg: 1,
+  /**
+   * On arrival the skyline (the data's line and the drawn terrain, whichever is higher in the view)
+   * sits at least this many degrees below the top of the clear part of the window, so there is sky
+   * above it. Where it stands high (Apollo 15, Apollo 17) the camera tips up to show it, by as much
+   * as `lookUpMaxDeg`.
+   */
+  skyMarginDeg: 2,
+  lookUpMaxDeg: 14,
   /** How near and how far the visitor may zoom, metres from the point looked at. */
   minDistance: 8,
   maxDistance: 400,
@@ -258,6 +273,18 @@ export function arrivalPitch(sun: { az: number; el: number } | null, clearUpDeg:
 }
 
 /**
+ * The arrival pitch (degrees above level the camera looks down from; negative looks up) that keeps
+ * the skyline in view with sky above it: no more than `pitchDeg` (see `arrivalPitch`), and low
+ * enough that a skyline `skylineDeg` above level sits `skyMarginDeg` under the top of the clear part
+ * of the window (`clearUpDeg` above its middle). Never tipped up more than `lookUpMaxDeg`.
+ */
+export function skylinePitch(pitchDeg: number, clearUpDeg: number, skylineDeg: number | null): number {
+  if (skylineDeg === null || !Number.isFinite(skylineDeg) || !Number.isFinite(clearUpDeg)) return pitchDeg;
+  const fit = clearUpDeg - skylineDeg - SITE_VIEW.skyMarginDeg;
+  return Math.max(-SITE_VIEW.lookUpMaxDeg, Math.min(pitchDeg, fit));
+}
+
+/**
  * How far above the middle of the picture the clear part of the window reaches, degrees: half the
  * free height less a margin (room for a body's tag), as an angle at the given field of view.
  */
@@ -289,8 +316,13 @@ export interface RestInput {
   freeShare: number;
   /** Compass direction the camera faces (see `arrivalAzimuth`). */
   viewAzDeg: number;
-  /** Degrees above level the camera looks down from (see `arrivalPitch`); `SITE_VIEW.pitchDeg` when left out. */
+  /** Degrees above level the camera looks down from (see `arrivalPitch`, `skylinePitch`; negative looks up); `SITE_VIEW.pitchDeg` when left out. */
   pitchDeg?: number;
+  /**
+   * True when the pitch was lowered to keep the skyline in sight (`skylinePitch`): it may then go
+   * under `pitchLowDeg`, as far as tipping up `lookUpMaxDeg`. Otherwise `pitchLowDeg` is the least.
+   */
+  forSkyline?: boolean;
 }
 
 export interface SitePose {
@@ -314,8 +346,12 @@ export function restPose(input: RestInput): SitePose {
   const share = clampTo(input.freeShare, 0.2, 1);
   const span = Math.max(H / 0.72, 0.9 * Math.max(0, input.layoutRadius));
   const distance = clampTo(span / (2 * Math.tan((input.fovDeg * DEG) / 2) * share), 14, 260);
-  const target = { x: 0, y: targetH, z: 0 };
-  const polarDeg = 90 - clampTo(input.pitchDeg ?? SITE_VIEW.pitchDeg, SITE_VIEW.pitchLowDeg, SITE_VIEW.pitchDeg);
+  const pitch = clampTo(input.pitchDeg ?? SITE_VIEW.pitchDeg, input.forSkyline ? -SITE_VIEW.lookUpMaxDeg : SITE_VIEW.pitchLowDeg, SITE_VIEW.pitchDeg);
+  // Tipped up to a high skyline the camera stands below the point it looks at: that point is raised
+  // straight up, as far as it takes to keep the camera clear of the level ground.
+  const lookUp = Math.max(0, -pitch);
+  const target = { x: 0, y: Math.max(targetH, SITE_VIEW.minCameraHeight + 0.3 + distance * Math.sin(lookUp * DEG)), z: 0 };
+  const polarDeg = 90 - pitch;
   return { target, position: orbitPosition(target, distance, input.viewAzDeg, polarDeg), distance, azDeg: input.viewAzDeg, polarDeg };
 }
 

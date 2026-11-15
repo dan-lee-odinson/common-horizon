@@ -5,8 +5,11 @@
 // is the mission's. WHERE each piece stands is an illustration (siteLayout.ts); the data has no
 // positions. An item with no model stands as a plain labelled marker instead (SiteMarkers.tsx).
 //
-// Shadows are flat projections on the level ground: every vertex of a model is dropped onto the
-// ground along the sunlight (in the ground's own shader), so a shadow has exactly the length and
+// Each piece stands on the ground: at a site with real terrain, at the ground's height under the
+// middle of its footprint (siteLayout.ts, `standOnGround`).
+//
+// Shadows are flat projections on the level of each model's base: every vertex of a model is
+// dropped onto that level along the sunlight (in the ground's own shader), so a shadow has exactly the length and
 // direction the readouts give: height / tan(Sun's elevation), pointing away from the Sun. They are
 // drawn only while the horizon answer says the site is lit and the Sun's whole disc is above
 // level. Hardware casts shadows on the ground only, not on other hardware.
@@ -68,7 +71,7 @@ export function SiteHardware({ layout, now, uniforms }: { layout: SiteLayout; no
         {layout.items.map((item) => {
           const model = shapes[item.modelId];
           return model ? (
-            <mesh key={item.key} geometry={model.shadow} material={shadowMaterial} position={[item.x, 0, item.z]} rotation={[0, item.rotY, 0]} renderOrder={-1} frustumCulled={false} />
+            <mesh key={item.key} geometry={model.shadow} material={shadowMaterial} position={[item.x, item.y ?? 0, item.z]} rotation={[0, item.rotY, 0]} renderOrder={-1} frustumCulled={false} />
           ) : null;
         })}
       </group>
@@ -76,7 +79,7 @@ export function SiteHardware({ layout, now, uniforms }: { layout: SiteLayout; no
         {layout.items.map((item) => {
           const model = shapes[item.modelId];
           return model ? (
-            <group key={item.key} position={[item.x, 0, item.z]} rotation={[0, item.rotY, 0]}>
+            <group key={item.key} position={[item.x, item.y ?? 0, item.z]} rotation={[0, item.rotY, 0]}>
               {model.parts.map((part, i) => (
                 <mesh key={i} geometry={part.geometry} material={part.material} />
               ))}

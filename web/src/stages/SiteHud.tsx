@@ -54,6 +54,7 @@ import { AnchorTag } from './AnchorTag';
 import { ClockPanel, EarthPanel, HardwarePanel, Inline, SunPanel } from './SitePanels';
 import { useEntrance } from './useEntrance';
 import { SiteChecks } from './SiteChecks';
+import { GroundNote, GroundPanel, useGroundWing } from './GroundNote';
 import { SiteMap } from './SiteMap';
 import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
@@ -82,6 +83,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   const sheetOpen = useStore(appStore, (s) => s.horizonOpen);
   const isPhone = useIsPhone();
   const short = useShortWindow();
+  const groundWing = useGroundWing();
   const rootRef = useRef<HTMLDivElement>(null);
   // In a short window the Data checks band would take too much of the picture: it is shown on request.
   const [checksShown, setChecksShown] = useState(false);
@@ -344,7 +346,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
   const trueSize = (
     <p className="m-0 text-[13px] leading-snug text-ink-2" data-testid="true-size">
-      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. Lit means some part of the Sun's disc is above the skyline, so the disc can sit mostly behind a ridge while the site is lit. <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
+      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. Lit means some part of the Sun's disc is above the skyline, so the disc can sit mostly behind a ridge while the site is lit. <GroundNote siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} />{' '}
       <span data-testid="site-rings">
         Range rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
       </span>
@@ -402,6 +404,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             {clockPanel({ bare: true })}
             {sunPanel({ bare: true })}
             {earthPanel({ bare: true })}
+            {webgl ? <GroundPanel siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} bare /> : null}
             {hardwarePanel({ bare: true })}
             {checks('bare')}
           </div>
@@ -419,7 +422,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             )}
             {webgl ? (
               <p className="m-0 text-[12px] leading-snug text-ink-2" data-testid="true-size">
-                Sun <Inline q={fixed.sunWidth} />, Earth <Inline q={q.earthWidth} />: true apparent size (mean distances). <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
+                Sun <Inline q={fixed.sunWidth} />, Earth <Inline q={q.earthWidth} />: true apparent size (mean distances). <GroundNote siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} pointer />{' '}
                 <span data-testid="site-rings">
                   Rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
                 </span>
@@ -511,6 +514,8 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       <div className="hud-layer">
         <div className="site-wing wing-l absolute left-5 top-[8rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="left" data-site-zone="left">
           {sunPanel()}
+          {/* Under the Sun panel, where the wing has room: the wings do not frame the picture. */}
+          {webgl && groundWing === 'left' ? <GroundPanel siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} /> : null}
         </div>
       </div>
 
@@ -518,6 +523,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       <div className="hud-layer">
         <div className="site-wing site-wing-r wing-r absolute right-5 top-[4.75rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="right" data-site-zone="right">
           {earthPanel()}
+          {webgl && groundWing === 'right' ? <GroundPanel siteId={focus?.id ?? null} custom={Boolean(focus?.custom)} /> : null}
           {hardwarePanel({ className: 'max-lg:hidden [@media(max-height:759px)]:hidden' })}
         </div>
       </div>

@@ -22,7 +22,7 @@ export function SiteMarkers({ layout, names, now, active }: { layout: SiteLayout
   return (
     <group ref={group} dispose={null}>
       {layout.markers.map((m, i) => (
-        <group key={m.key} position={[m.x, 0, m.z]}>
+        <group key={m.key} position={[m.x, m.y ?? 0, m.z]}>
           <mesh position={[0, MARKER_HEIGHT_M / 2, 0]}>
             <cylinderGeometry args={[0.06, 0.06, MARKER_HEIGHT_M, 6]} />
             <meshBasicMaterial color="#9fb3c8" />

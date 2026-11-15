@@ -27,6 +27,7 @@ import {
   lookUpLimit,
   orbitPosition,
   restPose,
+  skylinePitch,
   SITE_VIEW,
   skylineMinDeg,
   sunDiscRadius,
@@ -437,5 +438,32 @@ describe('the descent to the rest pose', () => {
     expect(descentPose(0, near).distance).toBe(600);
     expect(descentPose(0, far).distance).toBe(1500);
     expect(Math.cos(DESCENT.startPolarDeg * DEG) * 1500).toBeLessThan(SITE_VIEW.far);
+  });
+});
+
+describe('the arrival view keeps the skyline in sight', () => {
+  it('lowers the pitch, as far as tipping up, until the skyline sits under the top of the clear part', () => {
+    const up = 6;
+    // A low skyline changes nothing.
+    expect(skylinePitch(9, up, -1)).toBe(Math.min(9, up + 1 - SITE_VIEW.skyMarginDeg));
+    expect(skylinePitch(3, up, 0)).toBe(3);
+    expect(skylinePitch(9, up, null)).toBe(9);
+    // A skyline 12 degrees up: the camera tips up 8 degrees, so it sits 2 degrees under the top.
+    expect(skylinePitch(9, up, 12)).toBeCloseTo(up - 12 - SITE_VIEW.skyMarginDeg, 12);
+    // Never more than the most it may tip up.
+    expect(skylinePitch(9, up, 40)).toBe(-SITE_VIEW.lookUpMaxDeg);
+  });
+
+  it('tipped up, stands the camera clear of the level ground, looking up at a point raised above the lander', () => {
+    const base = { heightM: 52, layoutRadius: 60, fovDeg: 42, freeShare: 0.5, viewAzDeg: 0 };
+    const level = restPose({ ...base, pitchDeg: 3 });
+    const up = restPose({ ...base, pitchDeg: -8, forSkyline: true });
+    // Without the skyline asking, the least pitch is still pitchLowDeg.
+    expect(restPose({ ...base, pitchDeg: -8 }).polarDeg).toBe(90 - SITE_VIEW.pitchLowDeg);
+    expect(up.polarDeg).toBeCloseTo(98, 12);
+    expect(up.distance).toBe(level.distance);
+    expect(up.position.y).toBeGreaterThanOrEqual(SITE_VIEW.minCameraHeight);
+    expect(up.target.y).toBeGreaterThanOrEqual(level.target.y);
+    expect(up.position.y).toBeLessThan(up.target.y);
   });
 });

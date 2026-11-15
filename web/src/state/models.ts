@@ -20,13 +20,24 @@ import { createStore } from './store';
  * the model goes with the payload row (`surface_habitat`, `fsp_40kwe`), so one habitat or fission
  * unit is never drawn twice. The power rows (`fission_40kwe`, `hab_crewed`, ...) get a marker.
  * `vsat` is the solar array mast the model was made for; VSAT-XL is a larger mast, so it has none.
+ * Blue Moon Mark 1 is a lander. The crew rover stands for Astrolab's FLEX-class `astrolab_clv1`, the
+ * pressurized rover for JAXA's, and VIPER stands in for the science rover (`science_rover_recharge`).
+ *
+ * How each shape was made differs, and each description says so in its own `note`: code-built
+ * (Starship, Griffin, the habitat, the fission unit, the mast: "built with SI/AI-written code"),
+ * imported (Blue Moon Mark 1: "from a community CAD model") or generated (the three rovers:
+ * "SI/AI-generated from a photo"). Every one is drawn at its published size.
  */
 export const MODEL_FOR: Readonly<Record<string, string>> = {
   starship_hls: 'starship-lander',
   griffin: 'griffin-lander',
+  blue_moon_mk1: 'blue-moon-mk1',
   surface_habitat: 'habitat-unit',
   fsp_40kwe: 'fission-power-unit',
   vsat: 'solar-array-mast',
+  astrolab_clv1: 'crew-rover',
+  jaxa_pressurized_rover: 'pressurized-rover',
+  science_rover_recharge: 'viper-rover',
 };
 
 /** The model that stands for a catalog item, or null when it has none. */
@@ -35,7 +46,7 @@ export function modelFor(catalogId: string): string | null {
 }
 
 /** Models of landers, in the order they take the landing point when a mission has more than one. */
-export const LANDER_MODELS: readonly string[] = ['starship-lander', 'griffin-lander'];
+export const LANDER_MODELS: readonly string[] = ['starship-lander', 'griffin-lander', 'blue-moon-mk1'];
 
 /** True when the catalog item's model is a lander's. */
 export function isLanderModel(catalogId: string): boolean {

@@ -3,7 +3,9 @@
 // A world in metres. The landing point is the origin; x points east, y up, z south. What is drawn:
 //   the sky      stars, Earth, the Sun, its path over the stay and the terrain skyline, on a dome
 //                round the camera (SiteSky)
-//   the ground   a level disc with range rings: an illustration (SiteGround)
+//   the ground   at a preset site, the real ground from the LOLA height files at true scale out
+//                to 32 km, with range rings painted on it; elsewhere a level disc with range rings,
+//                an illustration (SiteGround, siteTerrain.ts)
 //   the hardware the mission's models at true scale, and their shadows (SiteHardware)
 // The Sun's and Earth's directions and the lit / dark word come from `skyAt`, the same function the
 // readouts use, at the instant the site clock shows. The light follows the word: with the terrain
@@ -26,10 +28,12 @@ import type { SceneData } from './sceneData';
 import { SiteGround } from './SiteGround';
 import { SiteHardware } from './SiteHardware';
 import { SiteMarkers } from './SiteMarkers';
-import { hiddenByHardware, siteLayout, type PlacedItem, type SiteLayout } from './siteLayout';
+import { hiddenByHardware, siteLayout, standOnGround, type PlacedItem, type SiteLayout } from './siteLayout';
 import { createGroundUniforms, createSiteClock, createSiteNow, type GroundUniforms, type SiteNow } from './siteNow';
 import { SiteRig } from './SiteRig';
 import { SiteSky } from './SiteSky';
+import { everyOtherPost, groundHeight, terrainSkylineDeg, type SiteGroundShape } from './siteTerrain';
+import { useSiteTerrain } from './siteTerrainLoad';
 import { bandProfile, bandTopAt, domePoint, earthDiscRadius, insideFrame, siteArrival, siteFrame, SITE_VIEW, sunDiscRadius, sunPathOnDome } from './siteView';
 
 const NOTHING: readonly PlacedItem[] = [];
@@ -47,7 +51,21 @@ export function SiteWorld({ data, active }: { data: SceneData; active: boolean }
   const choices = useMemo(() => data.hardware, [hardwareKey]);
   const ids = useMemo(() => choices.map((h) => h.id), [choices]);
   const metas = useModelMetas(ids);
-  const layout = useMemo(() => siteLayout(choices, metas), [choices, metas]);
+  // The real ground, at a preset site whose near file has loaded (custom points keep the level ground).
+  const terrain = useSiteTerrain(data.focus?.custom ? null : (data.focus?.id ?? null));
+  // On phones the far ground keeps every other post.
+  const isPhone = data.isPhone;
+  const shape = useMemo<SiteGroundShape | null>(
+    () => (terrain.near ? { near: terrain.near, far: terrain.far ? (isPhone ? everyOtherPost(terrain.far) : terrain.far) : null } : null),
+    [terrain.near, terrain.far, isPhone],
+  );
+  const groundAt = useMemo(() => (shape ? (x: number, z: number) => groundHeight(shape, x, z) : null), [shape]);
+  const layout = useMemo(() => standOnGround(siteLayout(choices, metas), groundAt), [choices, metas, groundAt]);
+  // How high the skyline stands toward a direction: the higher of the data's line and the drawn terrain.
+  const skylineAt = useMemo(
+    () => (profile || shape ? (az: number, eye: { x: number; y: number; z: number }) => Math.max(profile ? bandTopAt(profile, az) : -90, shape ? terrainSkylineDeg(shape, eye, az) : -90) : null),
+    [profile, shape],
+  );
 
   const dataRef = useRef(data);
   dataRef.current = data;
@@ -61,12 +79,12 @@ export function SiteWorld({ data, active }: { data: SceneData; active: boolean }
     <group visible={active}>
       {/* First, so every other part reads this frame's sky. */}
       <SiteClock active={active} dataRef={dataRef} horizonRef={horizonRef} now={now} uniforms={uniforms} />
-      <SiteGround uniforms={uniforms} />
+      <SiteGround uniforms={uniforms} shape={shape} />
       <SiteHardware layout={layout} now={now} uniforms={uniforms} />
       <SiteMarkers layout={layout} names={data.hardwareNames ?? {}} now={now} active={active} />
       <SiteSky now={now} profile={profile} sunPath={sunPath} />
-      <SiteAnchors active={active} now={now} profile={profile} landerMid={landerMid} layout={layout} />
-      <SiteRig active={active} data={data} heightM={layout.heightM} layoutRadius={layout.radius} />
+      <SiteAnchors active={active} now={now} profile={profile} landerMid={landerMid} layout={layout} ground={shape ? (shape.far ? 'terrain' : 'terrain-near') : 'level'} shape={shape} />
+      <SiteRig active={active} data={data} heightM={layout.heightM} layoutRadius={layout.radius} groundAt={groundAt} skylineAt={skylineAt} />
     </group>
   );
 }
@@ -128,18 +146,26 @@ function SiteAnchors({
   profile,
   landerMid,
   layout,
+  ground,
+  shape,
 }: {
   active: boolean;
   now: SiteNow;
   profile: readonly number[] | null;
   landerMid: RefObject<number>;
   layout: SiteLayout;
+  shape: SiteGroundShape | null;
+  /** What ground is drawn: the real ground from the height files, or the level illustration. */
+  ground: string;
 }) {
   const size = useThree((s) => s.size);
   const gl = useThree((s) => s.gl);
   const v = useMemo(() => new THREE.Vector3(), []);
   const host = useMemo(() => gl.domElement.closest<HTMLElement>('[data-testid="world"]'), [gl]);
   const said = useRef({ sun: '', earth: '', hardware: '' });
+  /** Where the camera stood when the skyline's place in the picture was last worked out. */
+  const skylineFrom = useMemo(() => new THREE.Vector3(Number.NaN, 0, 0), []);
+  const skylineShape = useRef<SiteGroundShape | null>(null);
 
   // Outside the stage the scene says nothing about the site's sky.
   useEffect(() => {
@@ -149,8 +175,20 @@ function SiteAnchors({
       delete host.dataset.siteSun;
       delete host.dataset.siteEarth;
       delete host.dataset.siteHardware;
+      delete host.dataset.siteFacing;
+      delete host.dataset.siteSkyline;
+      skylineFrom.set(Number.NaN, 0, 0);
     };
   }, [active, host]);
+
+  // Which ground is drawn, on the scene's element, where it can be checked.
+  useEffect(() => {
+    if (!active || !host) return;
+    host.dataset.siteGround = ground;
+    return () => {
+      delete host.dataset.siteGround;
+    };
+  }, [active, host, ground]);
 
   useFrame(({ camera }) => {
     if (!active) return;
@@ -200,6 +238,31 @@ function SiteAnchors({
     v.set(0, now.beforeLanding ? 0 : landerMid.current, 0);
     anchors.lander.visible = project('lander');
     anchors.lander.r = 36;
+
+    // The compass direction the camera faces, whole degrees: where the picture can be checked against the ground.
+    cam.getWorldDirection(v);
+    const facingDeg = ((Math.atan2(v.x, -v.z) * RAD) % 360 + 360) % 360;
+    const facing = String(Math.round(facingDeg) % 360);
+    if (host && host.dataset.siteFacing !== facing) host.dataset.siteFacing = facing;
+    // Whether the skyline at that direction is in the clear part of the window with sky above it:
+    // the data's line and the drawn terrain's top, each projected (worked out once the camera rests,
+    // and again only when it has moved).
+    if (host && profile && settled && (!cam.position.equals(skylineFrom) || skylineShape.current !== shape)) {
+      skylineFrom.copy(cam.position);
+      skylineShape.current = shape;
+      let inView = true;
+      const tops = [bandTopAt(profile, facingDeg)];
+      if (shape) tops.push(terrainSkylineDeg(shape, cam.position, facingDeg));
+      for (const el of tops) {
+        const p = domePoint(facingDeg, el);
+        v.set(p.x, p.y, p.z).add(cam.position).project(cam);
+        const x = ((v.x + 1) / 2) * size.width;
+        const y = ((1 - v.y) / 2) * size.height;
+        if (!(v.z < 1) || !insideFrame(frame, x, y, 24)) inView = false;
+      }
+      const says = inView ? 'in-view' : 'out-of-view';
+      if (host.dataset.siteSkyline !== says) host.dataset.siteSkyline = says;
+    }
 
     // Before the landing no hardware stands at the site.
     const hardwareSays = now.beforeLanding ? 'hidden' : 'shown';

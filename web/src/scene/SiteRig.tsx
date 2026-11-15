@@ -23,7 +23,7 @@ import type { ControlsLike } from './CameraDirector';
 import { MOON_CLIP } from './orbitView';
 import type { SceneData } from './sceneData';
 import { RAD } from '../util/geo';
-import { arrivalAzimuth, arrivalPitch, clearUpDeg, descentPose, facePose, frameShift, lookUpLimit, orbitPosition, restPose, siteArrival, siteFrame, siteLook, SITE_VIEW, type SitePose } from './siteView';
+import { arrivalAzimuth, arrivalPitch, clearUpDeg, descentPose, facePose, frameShift, lookUpLimit, orbitPosition, restPose, siteArrival, siteFrame, siteLook, SITE_VIEW, skylinePitch, type SitePose } from './siteView';
 
 /** Seconds: the descent, and the settle when the rest pose changes (a resize, a panel changing height). */
 const DESCENT_S = 1.6;
@@ -32,6 +32,8 @@ const SETTLE_S = 0.4;
 const SETTLED_AT = 0.99;
 /** Seconds to swing the view round to the Sun, to Earth or back to the lander. */
 const LOOK_S = 0.3;
+/** Compass directions either side of the view's middle at which the arrival view keeps the skyline in sight, degrees. */
+const SKY_SPREAD_DEG = [-15, 0, 15];
 
 type Controls = ControlsLike & { enableDamping: boolean };
 
@@ -45,7 +47,26 @@ export function lookStep(seq: number, looked: number, mode: 'idle' | 'descent' |
   return mode === 'rest' ? 'turn' : 'wait';
 }
 
-export function SiteRig({ active, data, heightM, layoutRadius }: { active: boolean; data: SceneData; heightM: number | null; layoutRadius: number }) {
+export function SiteRig({
+  active,
+  data,
+  heightM,
+  layoutRadius,
+  groundAt = null,
+  skylineAt = null,
+}: {
+  active: boolean;
+  data: SceneData;
+  heightM: number | null;
+  layoutRadius: number;
+  /** The ground's height at a point (x east, z south), metres, where the real ground is drawn; null on level ground. */
+  groundAt?: ((x: number, z: number) => number) | null;
+  /**
+   * How high the skyline stands toward a compass direction seen from a point, degrees: the higher
+   * of the data's line and the drawn terrain. Null with neither. The arrival view keeps it in sight.
+   */
+  skylineAt?: ((azDeg: number, eye: { x: number; y: number; z: number }) => number) | null;
+}) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const gl = useThree((s) => s.gl);
   const size = useThree((s) => s.size);
@@ -60,6 +81,10 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
 
   const dataRef = useRef(data);
   dataRef.current = data;
+  const groundRef = useRef(groundAt);
+  groundRef.current = groundAt;
+  const skylineRef = useRef(skylineAt);
+  skylineRef.current = skylineAt;
   /** The compass direction the camera faces at rest, and the Sun it was chosen by: fixed once, on arrival. */
   const viewAz = useRef(0);
   const arrivalSun = useRef<{ az: number; el: number } | null>(null);
@@ -75,8 +100,22 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
   const shift = frameShift(frame, size.width, size.height);
   const freeHeight = frame.measured && frame.bottom > frame.top ? frame.bottom - frame.top : size.height;
   const freeShare = size.height > 0 ? freeHeight / size.height : 1;
-  const restNow = (): SitePose =>
-    restPose({ heightM, layoutRadius, fovDeg: fov, freeShare, viewAzDeg: viewAz.current, pitchDeg: arrivalPitch(arrivalSun.current, clearUpDeg(freeHeight, size.height, fov)) });
+  const restNow = (): SitePose => {
+    const up = clearUpDeg(freeHeight, size.height, fov);
+    const input = { heightM, layoutRadius, fovDeg: fov, freeShare, viewAzDeg: viewAz.current };
+    const sunPitch = arrivalPitch(arrivalSun.current, up);
+    let pitch = sunPitch;
+    // The skyline across the middle of the view, seen from where the camera will stand (worked out
+    // twice: tipping the camera up moves it).
+    const sky = skylineRef.current;
+    if (sky) {
+      for (let i = 0; i < 2; i++) {
+        const eye = restPose({ ...input, pitchDeg: pitch, forSkyline: true }).position;
+        pitch = skylinePitch(pitch, up, Math.max(...SKY_SPREAD_DEG.map((o) => sky(viewAz.current + o, eye))));
+      }
+    }
+    return restPose({ ...input, pitchDeg: pitch, forSkyline: pitch < sunPitch });
+  };
   // What the running descent heads for; it follows a rest pose that changes on the way (the panels being measured).
   const goal = useRef({ rest: restNow(), shiftX: shift.x, shiftY: shift.y });
   goal.current = { rest: restNow(), shiftX: shift.x, shiftY: shift.y };
@@ -101,7 +140,8 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
     controls.minDistance = SITE_VIEW.minDistance;
     controls.maxDistance = Math.max(SITE_VIEW.maxDistance, distance);
     controls.minPolarAngle = Math.min(SITE_VIEW.minPolar, polar);
-    controls.maxPolarAngle = SITE_VIEW.maxPolar;
+    // A view tipped up to a high skyline stays tipped up (see `lookUpLimit`).
+    controls.maxPolarAngle = Math.max(lookUpLimit(controls.target.y, distance), polar);
     controls.autoRotate = false;
     controls.enableZoom = true;
     controls.enabled = true;
@@ -302,6 +342,15 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
     if (!active) return;
     // At rest: how far down the camera may swing depends on how close it is (see `lookUpLimit`).
     if (mode.current === 'rest' && controls) controls.maxPolarAngle = lookUpLimit(controls.target.y, camera.position.distanceTo(controls.target));
+    // Over real ground the camera never goes into it: it keeps `minCameraHeight` above the ground under it.
+    const ground = groundRef.current;
+    if (ground) {
+      const floor = ground(camera.position.x, camera.position.z) + SITE_VIEW.minCameraHeight;
+      if (camera.position.y < floor) {
+        camera.position.y = floor;
+        if (controls) camera.lookAt(controls.target);
+      }
+    }
     const x = Math.round(view.current.x);
     const y = Math.round(view.current.y);
     const key = `${size.width}x${size.height}:${x},${y}`;
