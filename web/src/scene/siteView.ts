@@ -35,9 +35,14 @@ export const SITE_VIEW = {
   ringMajor: 100,
   /** Light on the ground with no direct sunlight (a share of full sunlight). */
   ambient: 0.06,
-  /** Strength of the sunlight and of the dim fill on the hardware. */
+  /**
+   * Light on the hardware: the sunlight; a dim fill from above that is always there; and sunlight
+   * thrown back up by the lit ground, which follows the ground's own brightness (so it is gone
+   * when the site is dark) and keeps a backlit lander from being a plain black shape.
+   */
   sunLight: 3.0,
   fillLight: 0.35,
+  bounceLight: 3.0,
   /**
    * On arrival the camera looks at the landing point from this many degrees above level; from as
    * little as `pitchMinDeg` while the Sun stands a few degrees up (see `arrivalPitch`).
@@ -47,9 +52,15 @@ export const SITE_VIEW = {
   /** How near and how far the visitor may zoom, metres from the point looked at. */
   minDistance: 8,
   maxDistance: 400,
-  /** The camera's angle from straight overhead stays between these (radians): never below the point looked at. */
+  /**
+   * The camera's angle from straight overhead stays between these (radians). As a rule it never
+   * goes below the point it looks at; near a tall lander it may, to look up (see `lookUpLimit`),
+   * but never lower than `minCameraHeight` metres above the ground.
+   */
   minPolar: 0.15,
   maxPolar: Math.PI / 2 - 0.03,
+  maxPolarLookUp: Math.PI - 0.3,
+  minCameraHeight: 1.2,
 } as const;
 
 export interface SiteFrame {
@@ -127,6 +138,21 @@ export function sunDiscRadius(dome: number = SITE_VIEW.dome): number {
 /** The same for Earth, from a site where it stands `earthElDeg` above level (the site's own place on the Moon counts). */
 export function earthDiscRadius(earthElDeg: number, dome: number = SITE_VIEW.dome): number {
   return (dome * EARTH_RADIUS_KM) / earthDistanceFromSiteKm(earthElDeg);
+}
+
+/**
+ * The Sun's path through a horizon answer's window as points on the dome (x, y, z for each sample,
+ * one after another): the same samples the horizon plot draws its path through. Samples that are
+ * not numbers are left out.
+ */
+export function sunPathOnDome(path: readonly { az: number; el: number }[], dome: number = SITE_VIEW.dome): number[] {
+  const out: number[] = [];
+  for (const p of path) {
+    if (!Number.isFinite(p.az) || !Number.isFinite(p.el)) continue;
+    const v = azElToLocal(p.az, p.el, dome);
+    out.push(v.x, v.y, v.z);
+  }
+  return out;
 }
 
 /** The lowest point of a skyline, degrees; null for an empty one. */
@@ -224,6 +250,18 @@ export function clearUpDeg(freeHeightPx: number, viewHeightPx: number, fovDeg: n
   return Math.atan(Math.max(0, freeHeightPx / 2 - marginPx) / focal) / DEG;
 }
 
+/**
+ * How far from straight overhead the camera may swing, radians, when it looks at a point `targetH`
+ * metres up from `distance` metres away. Close to a tall lander the camera may drop below the point
+ * it looks at and so look up at the sky (to find a high Sun, or Earth); it is stopped where it
+ * would come within `minCameraHeight` of the ground, and well short of straight underneath.
+ */
+export function lookUpLimit(targetH: number, distance: number): number {
+  if (!(distance > 0) || !Number.isFinite(targetH)) return SITE_VIEW.maxPolar;
+  const floor = Math.acos(clampTo(-(targetH - SITE_VIEW.minCameraHeight) / distance, -1, 1));
+  return Math.max(SITE_VIEW.maxPolar, Math.min(SITE_VIEW.maxPolarLookUp, floor));
+}
+
 export interface RestInput {
   /** Height of what stands at the landing point, metres (the lander, else the tallest thing drawn); null with nothing. */
   heightM: number | null;
@@ -262,6 +300,51 @@ export function restPose(input: RestInput): SitePose {
   const target = { x: 0, y: targetH, z: 0 };
   const polarDeg = 90 - clampTo(input.pitchDeg ?? SITE_VIEW.pitchDeg, SITE_VIEW.pitchMinDeg, SITE_VIEW.pitchDeg);
   return { target, position: orbitPosition(target, distance, input.viewAzDeg, polarDeg), distance, azDeg: input.viewAzDeg, polarDeg };
+}
+
+export interface FaceInput {
+  /** The body to look at. */
+  body: { az: number; el: number };
+  /** The height the camera looks at when at rest (the middle of the lander), metres. */
+  restTargetY: number;
+  /** The distance to keep, metres (the visitor's own). */
+  distance: number;
+  /** How far above the middle of the picture the clear part of the window reaches, degrees (see `clearUpDeg`). */
+  clearUpDeg: number;
+}
+
+/**
+ * A pose that brings a body of the sky (the Sun, Earth) into the clear part of the picture: the
+ * camera faces a little to one side of it, so the lander does not stand in front, and looks up
+ * far enough to hold it in the upper part of the window. For a low body that is about the rest
+ * pose turned round. For a high one the camera comes down to the ground and looks up; if the point
+ * it looks at is too low for that, the point is raised straight up above the landing point, so the
+ * camera never goes under the ground.
+ */
+export function facePose(input: FaceInput): SitePose {
+  const distance = clampTo(input.distance, SITE_VIEW.minDistance, SITE_VIEW.maxDistance);
+  // The view's own elevation: the body sits three quarters of the way up the clear part.
+  const lookUp = clampTo(input.body.el - 0.75 * input.clearUpDeg, -SITE_VIEW.pitchDeg, SITE_VIEW.maxPolarLookUp / DEG - 90 - 1);
+  const polarDeg = 90 + lookUp;
+  const floor = SITE_VIEW.minCameraHeight + 0.3 + distance * Math.sin(lookUp * DEG);
+  const target = { x: 0, y: Math.max(input.restTargetY, floor), z: 0 };
+  const azDeg = (((input.body.az + 12) % 360) + 360) % 360;
+  return { target, position: orbitPosition(target, distance, azDeg, polarDeg), distance, azDeg, polarDeg };
+}
+
+/**
+ * A request from the HUD to turn the view: to a body of the sky, or (`home`) back to the rest pose
+ * beside the lander. Each request carries a new number, so asking twice turns the view twice.
+ */
+export const siteLook = createStore<{ seq: number; home: boolean; az: number; el: number }>({ seq: 0, home: false, az: 0, el: 0 });
+
+export function lookAtBody(body: { az: number; el: number } | null): void {
+  if (!body || !Number.isFinite(body.az) || !Number.isFinite(body.el)) return;
+  siteLook.set({ seq: siteLook.get().seq + 1, home: false, az: body.az, el: body.el });
+}
+
+export function lookAtLander(): void {
+  siteLook.set({ seq: siteLook.get().seq + 1, home: true });
 }
 
 /** Where the descent starts: this far up, this close to straight overhead, turned this far from the rest direction. */

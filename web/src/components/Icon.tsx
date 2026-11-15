@@ -29,7 +29,8 @@ export type IconName =
   | 'reset'
   | 'search'
   | 'target'
-  | 'edit';
+  | 'edit'
+  | 'skip';
 
 const PATHS: Record<IconName, string> = {
   play: 'M7 5.5v13l11-6.5z',
@@ -61,6 +62,7 @@ const PATHS: Record<IconName, string> = {
   search: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.3 15.3L20 20',
   target: 'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5',
   edit: 'M5 19h3.5L19 8.5 15.5 5 5 15.5zM13.5 7l3.5 3.5',
+  skip: 'M6 6l8.5 6L6 18zM17.5 5.5v13',
 };
 
 const FILLED = new Set<IconName>(['play', 'star-filled']);

@@ -183,3 +183,37 @@ export function shapeMatches(minY: number, maxY: number, heightM: number): boole
   if (![minY, maxY, heightM].every(Number.isFinite) || !(heightM > 0)) return false;
   return Math.abs(maxY - minY - heightM) <= heightM * 0.01 && Math.abs(minY) <= 0.01;
 }
+
+/**
+ * True when a piece of hardware stands between a viewpoint and a far-off body of the sky: the ray
+ * from `from` along `dir` passes through one of the footprints, taken as a box as tall as the item.
+ * The scene uses it to drop the Sun's or Earth's tag while the body is behind the lander.
+ */
+export function hiddenByHardware(from: { x: number; y: number; z: number }, dir: { x: number; y: number; z: number }, items: readonly PlacedItem[]): boolean {
+  for (const item of items) {
+    let near = 0;
+    let far = Infinity;
+    const slabs: [number, number, number, number][] = [
+      [from.x, dir.x, item.x - item.halfX, item.x + item.halfX],
+      [from.y, dir.y, 0, item.height],
+      [from.z, dir.z, item.z - item.halfZ, item.z + item.halfZ],
+    ];
+    let hit = true;
+    for (const [o, d, lo, hi] of slabs) {
+      if (Math.abs(d) < 1e-12) {
+        if (o < lo || o > hi) hit = false;
+      } else {
+        const a = (lo - o) / d;
+        const b = (hi - o) / d;
+        near = Math.max(near, Math.min(a, b));
+        far = Math.min(far, Math.max(a, b));
+      }
+      if (!hit || near > far) {
+        hit = false;
+        break;
+      }
+    }
+    if (hit) return true;
+  }
+  return false;
+}

@@ -54,7 +54,7 @@ export function AnchorReticle({
       className="pointer-events-none absolute left-0 top-0"
       style={{ opacity: 0, transition: 'opacity 200ms ease', willChange: 'transform' }}
       data-testid={testId}
-      data-marker={anchor ?? undefined}
+      data-follows={anchor ?? undefined}
       data-visible="false"
       aria-hidden
     >

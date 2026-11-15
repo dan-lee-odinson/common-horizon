@@ -98,6 +98,42 @@ function overlap(a: Omit<Box, 'id'>, b: Omit<Box, 'id'>): boolean {
   return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
 
+/** Where the spotlight site's marker is on screen in mission select, once the camera has come to rest. */
+async function restingSiteMarker(page: Page): Promise<{ x: number; y: number }> {
+  const read = () =>
+    page.evaluate(() => {
+      const m = document.querySelector<HTMLElement>('[data-testid="mission-hud"] [data-marker="site"]');
+      return m && m.dataset.visible === 'true' ? `${m.dataset.ax},${m.dataset.ay}` : '';
+    });
+  let last = '';
+  let same = 0;
+  await expect
+    .poll(
+      async () => {
+        const now = await read();
+        same = now !== '' && now === last ? same + 1 : 0;
+        last = now;
+        return same;
+      },
+      { timeout: 30_000, intervals: [400] },
+    )
+    .toBeGreaterThanOrEqual(2);
+  const [x, y] = last.split(',').map(Number);
+  return { x, y };
+}
+
+/** What the 3D scene says of the Sun and Earth: drawn "above" or "below" the skyline band, or "none". */
+async function sceneSays(page: Page): Promise<{ sun: string | null; earth: string | null }> {
+  const world = page.getByTestId('world');
+  return { sun: await world.getAttribute('data-site-sun'), earth: await world.getAttribute('data-site-earth') };
+}
+
+/** The same, read off the horizon plot's own markers against its own skyline. */
+async function plotSays(page: Page): Promise<{ sun: string; earth: string }> {
+  const word = (v: string | null) => (v === null ? 'none' : v === 'true' ? 'above' : 'below');
+  return { sun: word(await page.getByTestId('horizon-sun').getAttribute('data-above')), earth: word(await page.getByTestId('horizon-earth').getAttribute('data-above')) };
+}
+
 /** Smallest text size drawn inside an element, in pixels (HTML and SVG text alike). */
 function smallestText(page: Page, testId: string): Promise<number> {
   return page.getByTestId(testId).evaluate((root) => {
@@ -153,25 +189,38 @@ test('site: zoom in from mission select; the title, the clocks, the sky readouts
   expect(await readout(page, 'earth_width')).toMatch(/^1\.9[01]$/);
   await expect(trueSize.locator('[data-q="sun_width"]')).toHaveText('0.53°');
   await expect(trueSize.locator('[data-q="earth_width"]')).toHaveText(/^1\.9[01]°$/);
-  // What is an illustration is said to be one.
+  // What is an illustration is said to be one, and the rings on the ground say what they measure.
   await expect(page.getByTestId('site-illustration-ground')).toHaveText('The ground is an illustration.');
+  const rings = page.getByTestId('site-rings');
+  await expect(rings.locator('[data-q="ground_ring_minor"]')).toHaveText(/^10\s?m$/);
+  await expect(rings.locator('[data-q="ground_ring_major"]')).toHaveText(/^100\s?m$/);
 
   // The hardware of the example mission, with each model's height (the rover has no model).
   await expect(page.getByTestId('hardware-row')).toHaveCount(4);
   await expect.poll(() => readout(page, 'hw_height:starship')).toBe('52');
   expect(await readout(page, 'hw_height:rover')).toBe('no model');
   expect(await readout(page, 'hw_count:solar')).toBe('× 4');
+  // It is drawn at true scale, and its place is said to be an illustration. Every shape has loaded:
+  // no row says its item is missing from the picture.
+  await expect(page.getByTestId('site-illustration')).toContainText('true scale');
+  await expect(page.getByTestId('site-illustration')).toContainText('Where each piece stands is an illustration');
+  await expect(page.getByTestId('hardware-shape')).toHaveCount(0);
 
-  // The reticle is on the landing point, clear of every panel.
+  // The reticle is on the lander and names it once the camera has come to rest; it is clear of every panel.
   const reticle = page.getByTestId('lander-reticle');
   await expect(reticle).toHaveAttribute('data-visible', 'true');
-  await expect(reticle).toContainText('Landing point');
+  await expect(reticle).toHaveAttribute('data-follows', 'lander');
+  await expect(reticle.locator('[data-marker-tag]')).toHaveText('Starship lander');
+  // The Sun is up at this landing: its tag is in the picture too, with the readout's own elevation.
+  const sunTag = page.getByTestId('body-label-sun');
+  await expect(sunTag).toHaveAttribute('data-visible', 'true');
+  await expect.poll(async () => sunTag.locator('[data-q="sun_el"] [data-q-text]').textContent()).toBe(await readout(page, 'sun_el'));
   await expect
     .poll(async () => {
-      const mark = await reticle.locator('svg').boundingBox();
-      const tag = await reticle.locator('[data-marker-tag]').boundingBox();
-      if (!mark || !tag) return ['no reticle'];
-      const boxes = [mark, tag].map((b) => ({ left: b.x, top: b.y, right: b.x + b.width, bottom: b.y + b.height }));
+      const marks = [reticle.locator('svg'), reticle.locator('[data-marker-tag]'), sunTag.locator('[data-marker-tag]')];
+      const found = await Promise.all(marks.map((m) => m.boundingBox()));
+      if (found.some((b) => b === null)) return ['a marker is missing'];
+      const boxes = found.map((b) => ({ left: b!.x, top: b!.y, right: b!.x + b!.width, bottom: b!.y + b!.height }));
       return (await panels(page)).filter((p) => boxes.some((b) => overlap(b, p))).map((p) => p.id);
     })
     .toEqual([]);
@@ -411,6 +460,11 @@ test('site: with a launch delay the timeline shows the planned landing, the dela
   await expect(page.getByTestId('before-landing')).toBeHidden();
   const needle = (await page.getByTestId('stay-needle').boundingBox())!;
   expect(Math.abs(needle.x + needle.width / 2 - (lane.x + lane.width / 2))).toBeLessThanOrEqual(2);
+  // At the landing the hardware stands at the site, and the reticle names the lander.
+  const world = page.getByTestId('world');
+  const reticleName = page.getByTestId('lander-reticle').locator('[data-marker-tag]');
+  await expect(world).toHaveAttribute('data-site-hardware', 'shown');
+  await expect(reticleName).toHaveText('Starship lander');
 
   // Scrubbing into the delay: the stage says it is before the landing, and how long until it.
   await scrub.focus();
@@ -421,8 +475,10 @@ test('site: with a launch delay the timeline shows the planned landing, the dela
   await expect(before).toContainText('before landing');
   await expect(before.locator('[data-q="to_landing"]')).toHaveText('1 h');
   expect(await readout(page, 'since_landing')).toBe('−0 d 01 h');
-  // No lander stands there yet.
+  // No lander stands there yet: the scene shows the site without hardware, and the reticle marks the bare landing point.
   expect(await readout(page, 'shadow_lander')).toBe('not landed');
+  await expect(world).toHaveAttribute('data-site-hardware', 'hidden');
+  await expect(reticleName).toHaveText('Landing point');
   await page.keyboard.press('Home');
   await expect.poll(() => hours(page)).toBe(-336);
   expect(await readout(page, 'since_landing')).toBe('−14 d 00 h');
@@ -455,20 +511,34 @@ test('site: with a launch delay the timeline shows the planned landing, the dela
   await page.getByTestId('site-restart').click();
   await expect.poll(() => hours(page)).toBe(0);
   await expect(hud).toHaveAttribute('data-phase', 'stay');
+  await expect(world).toHaveAttribute('data-site-hardware', 'shown');
+  await expect(reticleName).toHaveText('Starship lander');
 });
 
-test('site: back to mission select returns to the same spotlight, time after time, and Orbit opens from the site', async ({ page }) => {
+test('site: down and back twice, to two different sites, then Orbit: one canvas throughout, and the camera returns to where it was', async ({ page }) => {
   test.skip(isPhone(page), 'the phone layout has its own test');
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await enterMission(page);
-  const name = (await page.getByTestId('spotlight-name').textContent())!;
-  for (let round = 0; round < 2; round++) {
+  await page.goto('/');
+  await page.getByTestId('begin').click();
+  // One 3D space: the same single canvas in every stage.
+  await expect(page.locator('canvas')).toHaveCount(1);
+  await page.getByTestId('enter-mission').click();
+  await expect(page.getByTestId('mission-hud')).toBeVisible();
+  await expect(page.getByTestId('spotlight-name')).not.toHaveText('', { timeout: 30_000 });
+  const first = (await page.getByTestId('spotlight-name').textContent())!;
+  const firstAt = await restingSiteMarker(page);
+  await expect(page.locator('canvas')).toHaveCount(1);
+
+  /** Down to the spotlight site, leave time running, and back. */
+  const downAndBack = async (name: string) => {
     // A double press starts one flight, not two.
     await page.getByTestId('zoom-to-site').dblclick();
     await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'site', { timeout: 15_000 });
+    await expect(page.locator('canvas')).toHaveCount(1);
     await expect(page.getByTestId('scene-title')).toHaveText(name);
     await expect(page.getByTestId('site-scrub')).toBeEnabled({ timeout: 30_000 });
+    await expect(page.getByTestId('lander-reticle')).toHaveAttribute('data-visible', 'true');
     // Time is left running: going back stops it, and the next visit starts paused at the landing.
     await page.getByTestId('site-scrub').fill('48');
     await page.getByTestId('site-play').click();
@@ -476,16 +546,168 @@ test('site: back to mission select returns to the same spotlight, time after tim
     await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'mission');
     await expect(page.getByTestId('spotlight-name')).toHaveText(name);
     await expect(page.getByTestId('zoom-to-site')).toBeEnabled({ timeout: 15_000 });
-  }
+    // The reticle that rode down with the camera has let go.
+    await expect(page.getByTestId('lander-reticle')).toHaveAttribute('data-visible', 'false');
+    await expect(page.locator('canvas')).toHaveCount(1);
+  };
+
+  await downAndBack(first);
+  // The camera is back in the Moon's world, on the same pose: the site's marker is where it was.
+  const back = await restingSiteMarker(page);
+  expect(Math.abs(back.x - firstAt.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(back.y - firstAt.y)).toBeLessThanOrEqual(2);
+
+  // Another site, down and back again.
+  const second = first === 'Apollo 11' ? 'Apollo 15' : 'Apollo 11';
+  await spotlight(page, second);
+  const secondAt = await restingSiteMarker(page);
+  await downAndBack(second);
+  const backAgain = await restingSiteMarker(page);
+  expect(Math.abs(backAgain.x - secondAt.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(backAgain.y - secondAt.y)).toBeLessThanOrEqual(2);
+
+  // A third visit starts paused at the landing; then Orbit, straight from the site.
   await zoomIn(page);
   await expect(page.getByTestId('site-play')).toHaveAttribute('aria-pressed', 'false');
   expect(await hours(page)).toBe(0);
-  // Orbit, straight from the site.
   await page.getByTestId('stage-orbit').click();
   await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'orbit');
   await expect(page.getByTestId('orbit-hud')).toBeVisible();
+  await expect(page.locator('canvas')).toHaveCount(1);
   await expect.poll(() => readout(page, 'utc')).toMatch(/^\d{4}-\d{2}-\d{2} /);
+  // The camera came back from the site's world (metres) to the Moon's: Earth stands in the Orbit
+  // picture with its tag, inside the window.
+  const earth = page.getByTestId('body-label-earth');
+  await expect(earth).toHaveAttribute('data-visible', 'true', { timeout: 15_000 });
+  const view = page.viewportSize()!;
+  await expect
+    .poll(async () => {
+      const [x, y] = [Number(await earth.getAttribute('data-ax')), Number(await earth.getAttribute('data-ay'))];
+      return x > 0 && x < view.width && y > 0 && y < view.height;
+    })
+    .toBe(true);
+  // The scene no longer speaks of the site's sky.
+  await expect(page.getByTestId('world')).not.toHaveAttribute('data-site-sun');
   expect(errors).toEqual([]);
+});
+
+test('site: the Sun and Earth stand above or below the skyline in the 3D scene exactly as on the horizon plot', async ({ page }) => {
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  await enterMission(page);
+  // Apollo 11: the Sun sets about eleven days into the stay.
+  await spotlight(page, 'Apollo 11');
+  await zoomIn(page);
+  // The scene carries a tag for each body (shown while the body is in the clear part of the picture).
+  await expect(page.getByTestId('body-label-sun')).toHaveCount(1);
+  await expect(page.getByTestId('body-label-earth')).toHaveCount(1);
+  const scrub = page.getByTestId('site-scrub');
+  const seen = new Set<string>();
+  for (const at of [0, 120, 290, 330]) {
+    await scrub.fill(String(at));
+    await expect.poll(() => hours(page)).toBe(at);
+    await twoFrames(page);
+    const plot = await plotSays(page);
+    expect(['above', 'below']).toContain(plot.sun);
+    expect(['above', 'below']).toContain(plot.earth);
+    await expect.poll(() => sceneSays(page)).toEqual(plot);
+    // And both agree with the word on the Sun panel.
+    expect(await readout(page, 'sun_state')).toBe(plot.sun === 'above' ? 'lit' : 'dark');
+    seen.add(plot.sun);
+  }
+  expect([...seen].sort()).toEqual(['above', 'below']);
+
+  // "Look" turns the view to a body: Earth stands high over this site, out of the picture on
+  // arrival; after the press its tag is in the picture, inside the window and clear of the panels.
+  await scrub.fill('0');
+  await expect.poll(() => hours(page)).toBe(0);
+  const view = page.viewportSize()!;
+  for (const body of ['earth', 'sun'] as const) {
+    await page.getByTestId(`look-${body}`).click();
+    const tag = page.getByTestId(`body-label-${body}`);
+    await expect(tag).toHaveAttribute('data-visible', 'true', { timeout: 15_000 });
+    await expect
+      .poll(async () => {
+        const box = await tag.locator('[data-marker-tag]').boundingBox();
+        if (!box) return ['no tag'];
+        const b = { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height };
+        const out = b.left < 0 || b.top < 0 || b.right > view.width || b.bottom > view.height ? ['outside the window'] : [];
+        return [...out, ...(await panels(page)).filter((p) => overlap(b, p)).map((p) => p.id)];
+      })
+      .toEqual([]);
+    // The tag carries the readout's own elevation.
+    expect(await tag.locator(`[data-q="${body}_el"] [data-q-text]`).textContent()).toBe(await readout(page, `${body}_el`));
+  }
+  // Looking up at the sky takes the lander out of the picture; "Reset view" brings it back.
+  const reticle = page.getByTestId('lander-reticle');
+  await page.getByTestId('look-earth').click();
+  await expect(reticle).toHaveAttribute('data-visible', 'false', { timeout: 15_000 });
+  await page.getByTestId('reset-view').click();
+  await expect(reticle).toHaveAttribute('data-visible', 'true', { timeout: 15_000 });
+  await expect
+    .poll(async () => {
+      const box = await reticle.locator('svg').boundingBox();
+      if (!box) return ['no reticle'];
+      const b = { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height };
+      return (await panels(page)).filter((p) => overlap(b, p)).map((p) => p.id);
+    })
+    .toEqual([]);
+});
+
+test('site: "Back" pressed during the descent, and "Zoom in" again straight after, leave the stage working', async ({ page }) => {
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await enterMission(page);
+  const name = (await page.getByTestId('spotlight-name').textContent())!;
+  const before = await restingSiteMarker(page);
+  await page.getByTestId('zoom-to-site').click();
+  await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'site', { timeout: 15_000 });
+  // At once: the camera is still on its way down to the lander.
+  await page.getByTestId('back-to-mission').click();
+  await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'mission');
+  await expect(page.getByTestId('spotlight-name')).toHaveText(name);
+  await expect(page.getByTestId('zoom-to-site')).toBeEnabled({ timeout: 15_000 });
+  const after = await restingSiteMarker(page);
+  expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(2);
+  // Down again, straight away: the stage arrives whole.
+  await zoomIn(page);
+  await expect(page.getByTestId('scene-title')).toHaveText(name);
+  await expect(page.locator('canvas')).toHaveCount(1);
+  await expect(page.getByTestId('lander-reticle').locator('[data-marker-tag]')).toHaveText('Starship lander');
+  await expect.poll(async () => (await sceneSays(page)).sun).toMatch(/above|below/);
+  expect(errors).toEqual([]);
+});
+
+test('site: a resize during the dive does not hold it up', async ({ page }) => {
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  await enterMission(page);
+  const name = (await page.getByTestId('spotlight-name').textContent())!;
+  await restingSiteMarker(page);
+  // Press, and time the flight in the page: from the press to the change of stage.
+  const flight = page.evaluate(
+    () =>
+      new Promise<number>((done) => {
+        const app = document.querySelector<HTMLElement>('[data-testid="app"]')!;
+        const t0 = performance.now();
+        new MutationObserver(() => {
+          if (app.dataset.stage === 'site') done(performance.now() - t0);
+        }).observe(app, { attributes: true, attributeFilter: ['data-stage'] });
+        document.querySelector<HTMLButtonElement>('[data-testid="zoom-to-site"]')!.click();
+      }),
+  );
+  await page.setViewportSize({ width: 1280, height: 800 });
+  // The dive takes a second and a half. Had the resize stopped it, the stage would only change when
+  // the flight's time limit (four and a half seconds) ran out.
+  expect(await flight).toBeLessThan(4000);
+  await expect(page.getByTestId('scene-title')).toHaveText(name);
+  await expect(page.getByTestId('site-scrub')).toBeEnabled({ timeout: 30_000 });
+  await expect(page.getByTestId('lander-reticle')).toHaveAttribute('data-visible', 'true');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // And the way back still works at the new size.
+  await page.getByTestId('back-to-mission').click();
+  await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'mission');
+  await expect(page.getByTestId('zoom-to-site')).toBeEnabled({ timeout: 15_000 });
 });
 
 for (const [width, height] of [

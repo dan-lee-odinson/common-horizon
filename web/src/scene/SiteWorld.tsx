@@ -1,7 +1,8 @@
 // The site world: stage 3, inside the same canvas as the Moon.
 //
 // A world in metres. The landing point is the origin; x points east, y up, z south. What is drawn:
-//   the sky      stars, Earth, the Sun and the terrain skyline on a dome round the camera (SiteSky)
+//   the sky      stars, Earth, the Sun, its path over the stay and the terrain skyline, on a dome
+//                round the camera (SiteSky)
 //   the ground   a level disc with range rings: an illustration (SiteGround)
 //   the hardware the mission's models at true scale, and their shadows (SiteHardware)
 // The Sun's and Earth's directions and the lit / dark word come from `skyAt`, the same function the
@@ -24,11 +25,13 @@ import { cssColor } from './colors';
 import type { SceneData } from './sceneData';
 import { SiteGround } from './SiteGround';
 import { SiteHardware } from './SiteHardware';
-import { siteLayout } from './siteLayout';
+import { hiddenByHardware, siteLayout, type PlacedItem, type SiteLayout } from './siteLayout';
 import { createGroundUniforms, createSiteClock, createSiteNow, type GroundUniforms, type SiteNow } from './siteNow';
 import { SiteRig } from './SiteRig';
 import { SiteSky } from './SiteSky';
-import { bandProfile, bandTopAt, domePoint, earthDiscRadius, insideFrame, siteArrival, siteFrame, SITE_VIEW, sunDiscRadius } from './siteView';
+import { bandProfile, bandTopAt, domePoint, earthDiscRadius, insideFrame, siteArrival, siteFrame, SITE_VIEW, sunDiscRadius, sunPathOnDome } from './siteView';
+
+const NOTHING: readonly PlacedItem[] = [];
 
 export function SiteWorld({ data, active }: { data: SceneData; active: boolean }) {
   const now = useMemo(() => createSiteNow(), []);
@@ -36,6 +39,7 @@ export function SiteWorld({ data, active }: { data: SceneData; active: boolean }
   // The answer on hand can still be the previous site's while a new one loads: that is not this site's skyline.
   const horizon = data.horizon && data.focus && data.horizon.site_id === data.focus.id ? data.horizon : null;
   const profile = useMemo(() => (horizon && horizon.skyline.length > 0 ? bandProfile(horizon.skyline) : null), [horizon]);
+  const sunPath = useMemo(() => (horizon ? sunPathOnDome(horizon.sun_path) : null), [horizon]);
 
   // Where the hardware stands: from the models' published sizes, which arrive before their shapes.
   const hardwareKey = data.hardware.map((h) => `${h.id}:${h.count}`).join(',');
@@ -58,8 +62,8 @@ export function SiteWorld({ data, active }: { data: SceneData; active: boolean }
       <SiteClock active={active} dataRef={dataRef} horizonRef={horizonRef} now={now} uniforms={uniforms} />
       <SiteGround uniforms={uniforms} />
       <SiteHardware layout={layout} now={now} uniforms={uniforms} />
-      <SiteSky now={now} profile={profile} />
-      <SiteAnchors active={active} now={now} profile={profile} landerMid={landerMid} />
+      <SiteSky now={now} profile={profile} sunPath={sunPath} />
+      <SiteAnchors active={active} now={now} profile={profile} landerMid={landerMid} layout={layout} />
       <SiteRig active={active} data={data} heightM={layout.heightM} layoutRadius={layout.radius} />
     </group>
   );
@@ -83,8 +87,9 @@ function SiteClock({
   uniforms: GroundUniforms;
 }) {
   const sunLight = useRef<THREE.DirectionalLight>(null);
+  const bounce = useRef<THREE.HemisphereLight>(null);
   const update = useMemo(() => createSiteClock(now, uniforms), [now, uniforms]);
-  const colors = useMemo(() => ({ sky: cssColor('--ch-ink-2'), space: cssColor('--ch-space') }), []);
+  const colors = useMemo(() => ({ sky: cssColor('--ch-ink-2'), space: cssColor('--ch-space'), ground: cssColor('--ch-ground'), none: '#000000' }), []);
   useFrame((_, delta) => {
     if (!active) return;
     const d = dataRef.current;
@@ -94,11 +99,14 @@ function SiteClock({
       light.intensity = now.hasSun ? SITE_VIEW.sunLight * now.lit : 0;
       if (now.hasSun) light.position.copy(now.sunDir).multiplyScalar(100);
     }
+    // The lit ground throws light back up: as bright as the ground itself is drawn.
+    if (bounce.current) bounce.current.intensity = SITE_VIEW.bounceLight * now.lit * uniforms.uSunTerm.value;
   });
   return (
     <>
       <directionalLight ref={sunLight} intensity={0} />
       <hemisphereLight args={[colors.sky, colors.space, SITE_VIEW.fillLight]} />
+      <hemisphereLight ref={bounce} args={[colors.none, colors.ground, 0]} />
     </>
   );
 }
@@ -107,23 +115,37 @@ function SiteClock({
  * Writes where the Sun, Earth and the lander are on screen, for the HUD's tags, leader lines and
  * reticle. A tag shows only while its body is in the clear part of the window: the Sun while the
  * answer says the site is lit, Earth while it stands above the skyline band at its direction.
- * The scene's own account of each body (drawn above or below the band) is also written on the
- * scene's element, where the picture can be checked against the horizon plot.
+ * The scene's own account of each body (drawn above or below the band), and of whether the
+ * hardware is shown, is also written on the scene's element, where the picture can be checked
+ * against the horizon plot and the clock.
  */
-function SiteAnchors({ active, now, profile, landerMid }: { active: boolean; now: SiteNow; profile: readonly number[] | null; landerMid: RefObject<number> }) {
+function SiteAnchors({
+  active,
+  now,
+  profile,
+  landerMid,
+  layout,
+}: {
+  active: boolean;
+  now: SiteNow;
+  profile: readonly number[] | null;
+  landerMid: RefObject<number>;
+  layout: SiteLayout;
+}) {
   const size = useThree((s) => s.size);
   const gl = useThree((s) => s.gl);
   const v = useMemo(() => new THREE.Vector3(), []);
   const host = useMemo(() => gl.domElement.closest<HTMLElement>('[data-testid="world"]'), [gl]);
-  const said = useRef({ sun: '', earth: '' });
+  const said = useRef({ sun: '', earth: '', hardware: '' });
 
   // Outside the stage the scene says nothing about the site's sky.
   useEffect(() => {
     if (!active || !host) return;
     return () => {
-      said.current = { sun: '', earth: '' };
+      said.current = { sun: '', earth: '', hardware: '' };
       delete host.dataset.siteSun;
       delete host.dataset.siteEarth;
+      delete host.dataset.siteHardware;
     };
   }, [active, host]);
 
@@ -142,8 +164,9 @@ function SiteAnchors({ active, now, profile, landerMid }: { active: boolean; now
       return v.z > -1 && v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1;
     };
     const sky = now.sky;
-    // The bodies' tags wait until the camera has come to rest.
+    // The bodies' tags wait until the camera has come to rest, and step back while the hardware stands in front of their body.
     const settled = siteArrival.settled;
+    const blockers = now.beforeLanding ? NOTHING : layout.items;
 
     let sunSays = 'none';
     if (now.hasSun) {
@@ -154,7 +177,7 @@ function SiteAnchors({ active, now, profile, landerMid }: { active: boolean; now
       v.copy(now.sunDir).multiplyScalar(SITE_VIEW.dome).add(cam.position);
       const seen = project('sun');
       anchors.sun.r = Math.max(4, (sunDiscRadius() / SITE_VIEW.dome) * focal);
-      anchors.sun.visible = settled && sky?.lit === true && seen && insideFrame(frame, anchors.sun.x, anchors.sun.y, 24);
+      anchors.sun.visible = settled && sky?.lit === true && seen && insideFrame(frame, anchors.sun.x, anchors.sun.y, 24) && !hiddenByHardware(cam.position, now.sunDir, blockers);
     } else anchors.sun.visible = false;
 
     let earthSays = 'none';
@@ -163,10 +186,11 @@ function SiteAnchors({ active, now, profile, landerMid }: { active: boolean; now
       const clear = e.el > (profile ? bandTopAt(profile, e.az) : 0);
       earthSays = clear ? 'above' : 'below';
       const p = domePoint(e.az, e.el);
+      const behind = hiddenByHardware(cam.position, p, blockers);
       v.set(p.x, p.y, p.z).add(cam.position);
       const seen = project('earth');
       anchors.earth.r = Math.max(6, (earthDiscRadius(e.el) / SITE_VIEW.dome) * focal);
-      anchors.earth.visible = settled && clear && seen && insideFrame(frame, anchors.earth.x, anchors.earth.y, 24);
+      anchors.earth.visible = settled && clear && seen && insideFrame(frame, anchors.earth.x, anchors.earth.y, 24) && !behind;
     } else anchors.earth.visible = false;
 
     // The reticle: on the middle of the lander once it has landed, on the landing point before.
@@ -174,10 +198,13 @@ function SiteAnchors({ active, now, profile, landerMid }: { active: boolean; now
     anchors.lander.visible = project('lander');
     anchors.lander.r = 36;
 
-    if (host && (said.current.sun !== sunSays || said.current.earth !== earthSays)) {
-      said.current = { sun: sunSays, earth: earthSays };
+    // Before the landing no hardware stands at the site.
+    const hardwareSays = now.beforeLanding ? 'hidden' : 'shown';
+    if (host && (said.current.sun !== sunSays || said.current.earth !== earthSays || said.current.hardware !== hardwareSays)) {
+      said.current = { sun: sunSays, earth: earthSays, hardware: hardwareSays };
       host.dataset.siteSun = sunSays;
       host.dataset.siteEarth = earthSays;
+      host.dataset.siteHardware = hardwareSays;
     }
   });
   return null;

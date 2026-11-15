@@ -39,8 +39,8 @@ export function TopBar() {
   }
 
   return (
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-14 items-center gap-x-5 px-5 max-md:gap-x-3 max-md:px-3" style={{ background: stage === 'mission' ? BACKING_UNDER_MOON : BACKING }}>
-      <h1 className="pointer-events-auto m-0 shrink-0 font-display text-[15px] font-semibold uppercase tracking-[0.24em] text-ink max-md:text-[13px] max-md:tracking-[0.18em]">Common Horizon</h1>
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-14 items-center gap-x-5 px-5 max-md:gap-x-2 max-md:px-3" style={{ background: stage === 'mission' ? BACKING_UNDER_MOON : BACKING }}>
+      <h1 className="pointer-events-auto m-0 shrink-0 font-display text-[15px] font-semibold uppercase tracking-[0.24em] text-ink max-md:text-[13px] max-md:tracking-[0.14em]">Common Horizon</h1>
 
       <nav aria-label="Stages" className="pointer-events-auto max-md:hidden">
         <ol className="m-0 flex list-none items-center gap-1 p-0">
@@ -81,7 +81,7 @@ export function TopBar() {
       {stage !== 'mission' ? (
         <button
           type="button"
-          className="btn btn-quiet pointer-events-auto shrink-0 max-md:w-11 max-md:px-0"
+          className="btn btn-quiet pointer-events-auto shrink-0 max-md:-ml-1.5 max-md:w-11 max-md:px-0"
           onClick={() => actions.setAssistantOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={assistantOpen}

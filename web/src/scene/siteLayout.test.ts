@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { MODEL_FOR, modelUrl, parseModelMeta, type ModelMeta } from '../state/models';
-import { footprintGap, shapeMatches, siteLayout } from './siteLayout';
+import { footprintGap, hiddenByHardware, shapeMatches, siteLayout } from './siteLayout';
 
 // The layout is checked with the sizes of the models that are really served.
 function served(modelId: string): ModelMeta {
@@ -142,5 +142,33 @@ describe('a shape is drawn only if it is the size its description states', () =>
     expect(shapeMatches(-1, 51, 52)).toBe(false);
     expect(shapeMatches(0, Number.NaN, 52)).toBe(false);
     expect(shapeMatches(0, 52, 0)).toBe(false);
+  });
+});
+
+describe('a body of the sky behind the hardware', () => {
+  const { items } = siteLayout(EXAMPLE, METAS);
+  const unit = (az: number, el: number) => {
+    const a = (az * Math.PI) / 180;
+    const e = (el * Math.PI) / 180;
+    return { x: Math.cos(e) * Math.sin(a), y: Math.sin(e), z: -Math.cos(e) * Math.cos(a) };
+  };
+
+  it('is hidden when the lander stands in the line of sight, and not when the line passes beside or over it', () => {
+    // From 165 m south of the lander at 30 m up, looking north: the lander is dead ahead.
+    const from = { x: 0, y: 30, z: 165 };
+    expect(hiddenByHardware(from, unit(0, 0), items)).toBe(true);
+    expect(hiddenByHardware(from, unit(0, 5), items)).toBe(true);
+    // Twelve degrees to one side, or above the nose (52 m tall, so above about 7.6 degrees from here): clear.
+    expect(hiddenByHardware(from, unit(12, 0), items)).toBe(false);
+    expect(hiddenByHardware(from, unit(348, 0), items)).toBe(false);
+    expect(hiddenByHardware(from, unit(0, 9), items)).toBe(false);
+    // Looking away from it: nothing behind the viewpoint counts.
+    expect(hiddenByHardware(from, unit(180, 0), items)).toBe(false);
+  });
+
+  it('counts every piece, and nothing when there is none', () => {
+    // The habitat stands 40 m east: from further east, level with it, it hides what lies due west.
+    expect(hiddenByHardware({ x: 80, y: 4, z: 0 }, unit(270, 0), items)).toBe(true);
+    expect(hiddenByHardware({ x: 80, y: 4, z: 0 }, unit(270, 0), [])).toBe(false);
   });
 });

@@ -29,6 +29,22 @@ The site drawer, slid in from its handle and open on the preset list:
 
 ![The site drawer open at the right of mission select, listing the preset sites with their ranks](docs/screens/stage-2-drawer-1440x900.png)
 
+**Stage 3, Site.** Down at the site: the mission's hardware at true scale on level ground, the
+terrain skyline from the data along the horizon, and the instrument around it. Here the Sun is about
+45 degrees up, so the lander's shadow is about as long as the lander is tall.
+
+![Stage 3, Site: a tall lander, a habitat and solar masts on level ground with range rings, glass panels of Sun, Earth and hardware readouts, and the horizon plot above the stay timeline along the bottom](docs/screens/stage-3-site-1440x900.png)
+
+A site at the lunar south pole at its landing: the Sun grazes the terrain skyline and shadows run
+for kilometres.
+
+![The site stage at a polar site: the Sun's disc sits on the skyline with its tag, and long shadows cross the ground](docs/screens/stage-3-site-low-sun-1440x900.png)
+
+After sunset the terrain hides the Sun: only a dim fill is left, the stage says "dark", and the
+skyline, the range rings and the reticle stay lit.
+
+![The site stage in darkness: the hardware dim, the Sun panel reading dark](docs/screens/stage-3-site-dark-1440x900.png)
+
 ## Run it on your computer
 
 You need Node.js 22 or newer (it includes `npm`). Then, in a terminal:
@@ -223,14 +239,67 @@ Presets, coordinates and saved sites are in a glass **drawer** at the right, so 
 buries the one site that matters; the **Mission Assistant** runs along the bottom. The picture
 shifts to keep the site's marker and tag clear of the open panels (`src/scene/missionView.ts`).
 
-**Stage 3, Site.** **Zoom in to this site** goes down to the site, and time runs through the stay.
-A strip across the top names the site (rank, pass or fail, coordinates) and holds **Back to mission
-select**. Two wings read the sky at the instant shown: the **Sun** (lit or dark, the time to the
-next sunrise or sunset, azimuth and elevation, the shadow of a metre of height and of the lander on
-level ground, and its light over the stay) and **Earth** (azimuth, elevation, apparent width and the
-Earth link over the stay), with the mission's **hardware** and the height of each model. A console
-along the bottom holds the **mission clock** (UTC and the LTC model value), **Play**, **Back to the
-landing** and three **speeds**, and the **horizon plot** directly above the **stay timeline**:
+**Stage 3, Site.** **Zoom in to this site** flies the camera down to the site, inside the same
+canvas, and time runs through the stay.
+
+*The way down.* The camera dives at the site on the Moon. Over the last moments of the dive a veil
+closes over the picture, the camera is placed in the site's own world (measured in metres, with the
+landing point at its origin) and the veil lifts on a descent: from high over the landing point
+looking straight down, the ground turning underneath, then tipping up until the horizon rises and
+the camera rests beside the lander. One reticle stays on the landing point all the way, from the
+Moon's surface to the lander, so the eye keeps its target across the change of worlds. **Back to
+mission select** returns the same way and the spotlight is unchanged. A second press during a flight
+does nothing, and a flight that nothing finishes ends by itself after 4.5 seconds. A press or a
+wheel turn during the descent hands the view over at once.
+
+*The picture: what is data, and what is an illustration.*
+
+* **The sky** rides on a dome centred on the camera, because the data gives directions and no
+  distances. The **Sun** and **Earth** stand where the readouts say (one function, `skyAt` in
+  `src/util/quantities.ts`, serves the readouts, the plot, the timeline and the scene, so they
+  cannot disagree). Each is a ball of exactly the size that makes it as wide as it looks from the
+  site, at mean distances: about 0.53° for the Sun and 1.90° to 1.91° for Earth
+  (`src/util/bodies.ts`, sources in `SOURCES-web.md`), true at any zoom, and a line on screen says
+  so. The soft glow round the Sun is faint and is not the disc. Earth's lit side faces the Sun. A
+  thin line across the sky is the Sun's path over the stay, through the same samples as the plot.
+* **The skyline** is the horizon answer's own, at every compass direction: a band from below level
+  up to the skyline, with the skyline drawn as a bright line. It is the only thing in the sky that
+  hides anything, so the Sun goes behind it exactly when the data says the terrain hides the Sun
+  (`src/scene/siteView.test.ts` checks this for every preset site through a stay). It has no
+  distance, and the screen says so.
+* **The light** follows the answer's word. Lit: sunlight from the Sun's direction. Dark: the
+  terrain hides the Sun, only a dim fill is left and the stage says "dark". Close to a sunrise or
+  sunset the disc can sit a hair above or below the skyline while the word has already changed (or
+  not yet): the answer's samples are up to an hour apart.
+* **The ground** is a level plane and an illustration (the data has no terrain near the site); the
+  screen says so. It is never drawn above a cut-off below the lowest point of the skyline, so it
+  cannot cover sky the data says is open. Its brightness follows the Sun's height by a display
+  curve, not lunar photometry. **Range rings** mark every 10 m out to 200 m and every 100 m out to
+  2 km.
+* **The hardware** is the mission's, in the mission's counts, drawn from the models in
+  `public/models/` at **true scale**: one model unit is one metre and nothing is ever scaled
+  (`src/scene/models.test.ts` pins each shape to its published size, and a shape that does not
+  match is not drawn). Where each piece stands is an illustration, laid out so nothing overlaps
+  (`src/scene/siteLayout.ts`). The shapes are loaded on demand with three.js's own `GLTFLoader`;
+  while one is loading, or if its file fails, its row in the hardware list says so and the rest of
+  the scene carries on. The rover has no model: it is listed, never drawn.
+* **Shadows** are flat projections on the level ground: each model is flattened onto the ground
+  along the sunlight, so a shadow is height ÷ tan(Sun's elevation) long and points away from the
+  Sun, the same figures as the shadow readouts. They are drawn while the site is lit and the Sun's
+  whole disc is above level. Hardware casts shadows on the ground only, not on other hardware.
+
+Drag to turn the view; the wheel or a pinch zooms; close to a tall lander the view can be tipped up
+to the sky. The reticle on the lander carries its name. The Sun and Earth carry tags with their
+elevation, joined to their panels by leader lines, while they are in the clear part of the picture.
+
+*The instrument.* A strip across the top names the site (rank, pass or fail, coordinates) and holds
+**Back to mission select**. Two wings read the sky at the instant shown: the **Sun** (lit or dark,
+the time to the next sunrise or sunset, azimuth and elevation, the shadow of a metre of height and
+of the lander on level ground, and its light over the stay) and **Earth** (azimuth, elevation,
+apparent width and the Earth link over the stay), with the mission's **hardware** and the height of
+each model. A console along the bottom holds the **mission clock** (UTC and the LTC model value),
+**Play**, **Back to the landing**, a **jump** to the next sunrise or sunset and three **speeds**,
+and the **horizon plot** directly above the **stay timeline**:
 
 * the horizon plot is the sky unrolled (compass direction across, height above level upward) with
   the terrain skyline, the Sun's path (solid above the skyline, dashed where the terrain hides it),
@@ -240,16 +309,11 @@ landing** and three **speeds**, and the **horizon plot** directly above the **st
   Up and Page Down a day; Home and End the ends; Space plays and pauses). With a launch delay it
   starts at the planned landing: the stretch before the landing is hatched and labelled with the
   delay, a dashed marker stands at the planned landing and a bracket spans the stay. Scrubbed into
-  that stretch, the stage says "before landing" and how long until it. Play always runs the stay
-  itself, from the landing to its end, and stops there.
+  that stretch, the stage says "before landing" and how long until it, and the scene shows the site
+  without hardware. Play always runs the stay itself, from the landing to its end, and stops there.
 
-The Sun's disc and Earth's disc are drawn at their true apparent size from the site, at mean
-distances (about 0.53° and 1.90° to 1.91°; `src/util/bodies.ts`, sources in `SOURCES-web.md`), and
-a line on screen says so; the skyline is the horizon answer's own; the ground is an illustration,
-and the screen says that too. One function gives the sky at the instant shown (`skyAt` in
-`src/util/quantities.ts`) to the readouts, the plot, the timeline and the scene, so they cannot
-disagree. On a phone the same parts are a status card, a dock along the bottom and a sheet that
-rises above it; without WebGL the horizon plot takes the scene's place.
+On a phone the same parts are a status card, a dock along the bottom and a sheet that rises above
+it; without WebGL the horizon plot takes the scene's place and every readout still runs.
 
 **Where the numbers come from.** Every readout shows a quantity from the API layer (in mock mode,
 the mock model): nothing on screen is random or made up, and a readout shows a dash until its data
@@ -279,7 +343,8 @@ Margin of 25 % or more: green. From 0 % up to 25 %: yellow (exactly 0 % counts a
 red. The words next to the number repeat the meaning and name the limiting check.
 
 **Reduced motion.** Visitors whose system asks for reduced motion get no camera sway or lean, no
-flights (stages switch at once), a preview that starts paused and a ranking that reorders at once
+flights (stages switch at once; down to the site and back is a cut with a short fade), a preview
+that starts paused, a site clock that never starts by itself, and a ranking that reorders at once
 instead of sliding.
 
 **Type and colour.** Three type families, served from this site: Oxanium (titles and labels), Geist
@@ -310,6 +375,8 @@ web/
     Assistant.tsx          the Mission Assistant (along the bottom, or as a sheet)
     SiteHud.tsx            the site stage: where its panels sit, and what they leave of the window
     SitePanels.tsx         its reading panels: Sun, mission clock, Earth, hardware
+    SiteVeil.tsx           the veil over the picture while the camera changes worlds
+    LanderReticle.tsx      the reticle that rides the landing point from the Moon down to the lander
     Playback.tsx           the clocks: the Orbit preview, and Play through the stay
   src/hud/                 reusable HUD pieces: glass panel, readout, ring dial, reticle, line graph,
                            drawer, sheet, leader lines, parallax; HorizonPanel.tsx (the horizon plot),
@@ -317,6 +384,14 @@ web/
                            (play, pause, speed)
   src/scene/               the 3D space: Moon world, ring system, camera director, 2D fallback;
                            orbitView.ts and missionView.ts (where things sit on screen, as arithmetic)
+    SiteWorld.tsx          the site's world: lights, anchors, and the parts below
+    SiteSky.tsx            the sky dome: stars, Earth, the Sun and its path, the terrain skyline
+    SiteGround.tsx         the level ground with its range rings (siteShaders.ts)
+    SiteHardware.tsx       the hardware models and their shadows (siteModels.ts loads the shapes)
+    SiteRig.tsx            the camera at the site: the descent, the rest pose, turn and zoom
+    siteView.ts            the site's picture as arithmetic: dome, disc sizes, ground cut, camera poses
+    siteLayout.ts          where the hardware stands
+    siteNow.ts             the sky at the instant shown, shared by every part of the scene
   src/components/          icons, ComparePanel.tsx (saved sites side by side) and shared parts
   src/util/                time (LTC), geometry, the Sun and Earth track, horizon reading, readout
                            quantities, season, power colours, ranking, mission.ts (the one-line

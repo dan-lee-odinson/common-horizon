@@ -17,7 +17,9 @@ as installed by npm from the public npm registry.
 
 Only these five packages (and what they import) end up in the built site. drei pulls in further
 packages (for example three-stdlib, camera-controls, troika-three-text, maath, zustand); the website
-imports only `OrbitControls`, `Html` (marker labels) and `useTexture` from drei.
+imports only `OrbitControls` from drei. The hardware models' shapes are loaded with three.js's own
+`GLTFLoader` (`three/examples/jsm/loaders/GLTFLoader.js`, part of the three.js package above), on
+demand; no other loader and no decoder is used.
 
 ## Tools — used to build and test, not shipped
 
@@ -50,7 +52,7 @@ one for origin; the table above covers every package the website adds directly.
 | Draper SERIES-2 (planned; NASA's later documents name the lander APEX 1.0): Schrodinger basin on the far side; the basin's center (75.0 S, 132.4 E) is shown because the landing point is not published | NASA Science, "Schrodinger Impact Basin" and the CP-12 delivery page | NASA media guidelines | https://science.nasa.gov/lunar-science/clps-deliveries/cp-12/ |
 | Notes on existing entries: Blue Moon Mark 1 is planned for the Shackleton Connecting Ridge; IM-4 is planned for Mons Mouton; Peregrine Mission-1 was bound for Sinus Viscositatis and did not reach the Moon | NASA news release 26-046 (26 May 2026); NASA CLPS IM-2 press kit NP-2025-02-005-JSC; NASA CLPS Peregrine press kit NP-2023-12-017-JSC | NASA media guidelines | https://www.nasa.gov/news-release/nasa-provides-update-on-moon-base-rovers-landers-missions |
 | Hardware catalog numbers (`src/api/examples/catalog.json`) | Invented placeholders for mock mode, not specifications | This project | — |
-| Hardware model sizes: each model's name, the words that say how well founded its size is, and its width, height and depth in metres (`public/models/*.json`) | The models and their descriptions are made by another part of the team (`tools/models/`), which lists the source of every dimension in the same files; the website reads them and changes nothing. The site view shows each height with those words beside it | Team-provided | — |
+| Hardware models: each model's shape (`public/models/*.glb`) and its description (`public/models/*.json`: its name, the words that say how well founded its size is, and its width, height and depth in metres) | The models and their descriptions are made by another part of the team (`tools/models/`), which lists the source of every dimension in the same files; the website reads them and changes nothing. The site view draws each shape at true scale (one model unit is one metre; no shape is ever scaled, and one whose height differs from its description by more than 1 % is not drawn) and shows each height with those words beside it. The five models: Starship lander, Griffin lander, habitat unit, fission power unit, solar array mast. The rover has no model and is not drawn | Team-provided | — |
 | Mock terrain, slopes and skylines (`src/api/examples/mock-model.json`) | Invented for mock mode | This project | — |
 | Assistant example answers (`src/api/examples/assistant.json`) | Written for mock mode | This project | — |
 
@@ -98,7 +100,9 @@ No logos, insignia, flags or agency or company lettering are used anywhere. Name
 | Earth to Moon mean distance 384,400 km | The same disc and readout | NASA Moon Fact Sheet (National Space Science Data Coordinated Archive), semi-major axis | link to add (not opened: blocked) |
 | Moon mean radius 1,737.4 km | The site's own distance from the Moon's centre, when working out how far Earth is from the site | NASA Moon Fact Sheet (National Space Science Data Coordinated Archive), volumetric mean radius | link to add (not opened: blocked) |
 | Apparent width of a body seen from a site = 2 × asin(radius ÷ distance from the site to the body's centre). Sun: 0.53°. Earth: 1.90° on the horizon to 1.91° overhead (the site is one Moon radius from the Moon's centre; Earth's centre is 384,400 km along the direction to Earth) | Sizes of the two discs in the site view and their two readouts | Geometry, from the five values above. Both distances are mean values, so the screen says "mean distances"; the answers of the data layer carry directions only | — |
-| Shadow length on level ground = height ÷ tan(Sun's elevation), pointing away from the Sun. No length is given while the Sun's disc touches the level plane (elevation under 0.27°, half the disc's width); one figure, labelled "about", up to 5.3° (ten disc widths); two figures above | The shadow readouts in the site view (`src/util/shadow.ts`) | Geometry. The limits follow from the Sun's apparent width above; the site's real ground is not in the data, so every length is for level ground | — |
+| Brightness of the ground in the site view: (sine of the Sun's elevation) to the power 0.35, times whether the site is lit | The illustrative level ground (`groundSunTerm` in `src/scene/siteView.ts`) | A display curve chosen for this website so that grazing sunlight at a polar site (Sun about 1° up) is still readable. It is not a photometric model of the lunar surface | — |
+| Site view layout: where each piece of hardware stands round the landing point; range rings every 10 m (out to 200 m) and every 100 m (out to 2 km); field of view 42° (58° on phones) | The site view (`src/scene/siteLayout.ts`, `src/scene/siteView.ts`) | Chosen for this website. The data has no positions for hardware and no terrain near the site: the screen says the ground and the places are an illustration | — |
+| Shadow length on level ground = height ÷ tan(Sun's elevation), pointing away from the Sun. No length is given while the Sun's disc touches the level plane (elevation under 0.27°, half the disc's width); one figure, labelled "about", up to 5.3° (ten disc widths); two figures above | The shadow readouts in the site view (`src/util/shadow.ts`), and the shadows drawn on the ground there (each model flattened onto the level ground along the sunlight) | Geometry. The limits follow from the Sun's apparent width above; the site's real ground is not in the data, so every length is for level ground | — |
 
 ## SI/AI use
 

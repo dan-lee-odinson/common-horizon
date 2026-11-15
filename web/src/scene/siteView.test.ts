@@ -19,15 +19,18 @@ import {
   descentPose,
   domePoint,
   earthDiscRadius,
+  facePose,
   frameShift,
   groundCutDeg,
   groundSunTerm,
   insideFrame,
+  lookUpLimit,
   orbitPosition,
   restPose,
   SITE_VIEW,
   skylineMinDeg,
   sunDiscRadius,
+  sunPathOnDome,
   type SiteFrame,
 } from './siteView';
 
@@ -146,6 +149,23 @@ describe('the Sun and Earth on the sky dome', () => {
     }
     expect(lit).toBeGreaterThan(500);
     expect(dark).toBeGreaterThan(500);
+  });
+});
+
+describe('the Sun\u2019s path across the sky', () => {
+  it('runs through the horizon answer\u2019s own samples, each on the dome in its own direction', () => {
+    const horizon = horizonFor(site('apollo-11'), LANDING, LANDING + 14 * DAY_MS, 1);
+    const points = sunPathOnDome(horizon.sun_path);
+    expect(points).toHaveLength(horizon.sun_path.length * 3);
+    for (let i = 0; i < horizon.sun_path.length; i += 17) {
+      const back = direction({ x: points[i * 3], y: points[i * 3 + 1], z: points[i * 3 + 2] });
+      expect(back.distance).toBeCloseTo(SITE_VIEW.dome, 6);
+      expect(back.el).toBeCloseTo(horizon.sun_path[i].el, 9);
+      if (Math.abs(horizon.sun_path[i].el) < 89.9) expect(Math.abs(((back.az - horizon.sun_path[i].az + 540) % 360) - 180)).toBeLessThan(1e-7);
+    }
+    // A sample that is not a number is left out, not drawn at the origin.
+    expect(sunPathOnDome([{ az: 10, el: 5 }, { az: Number.NaN, el: 5 }, { az: 20, el: 6 }])).toHaveLength(6);
+    expect(sunPathOnDome([])).toEqual([]);
   });
 });
 
@@ -287,6 +307,72 @@ describe('where the camera comes to rest', () => {
     // The steepest the camera may look down is still short of straight overhead; the flattest is short of level.
     expect(polarMin).toBeGreaterThan(5);
     expect(polarMax).toBeLessThan(90);
+  });
+
+  it('may tip up to the sky close to a tall lander, but never to within reach of the ground', () => {
+    // Far from a 52 m lander: a little below the point looked at. Close to it: steeply up.
+    expect(lookUpLimit(26, 165) * RAD).toBeGreaterThan(95);
+    expect(lookUpLimit(26, 165) * RAD).toBeLessThan(100);
+    expect(lookUpLimit(26, 30) * RAD).toBeGreaterThan(140);
+    expect(lookUpLimit(26, 8)).toBe(SITE_VIEW.maxPolarLookUp);
+    // A low lander gives almost no room to look up, and never less than the usual limit.
+    expect(lookUpLimit(1.5, 8) * RAD).toBeLessThan(93);
+    expect(lookUpLimit(1.5, 400)).toBeGreaterThanOrEqual(SITE_VIEW.maxPolar);
+    expect(lookUpLimit(0.5, 20)).toBe(SITE_VIEW.maxPolar);
+    expect(lookUpLimit(Number.NaN, 20)).toBe(SITE_VIEW.maxPolar);
+    for (const targetH of [1.5, 5, 26, 30]) {
+      for (const distance of [SITE_VIEW.minDistance, 20, 50, 165, SITE_VIEW.maxDistance]) {
+        const polar = lookUpLimit(targetH, distance) * RAD;
+        expect(orbitPosition({ x: 0, y: targetH, z: 0 }, distance, 40, polar).y, `${targetH} m up, ${distance} m away`).toBeGreaterThanOrEqual(1);
+      }
+    }
+    expect(SITE_VIEW.maxPolarLookUp).toBeLessThan(Math.PI);
+  });
+});
+
+describe('turning the view to the Sun or to Earth', () => {
+  const up = clearUpDeg(516, 900, 42);
+  /** How far above the middle of the picture, and how far to the side of it, the body ends up. */
+  const where = (body: { az: number; el: number }, pose: ReturnType<typeof facePose>) => ({ above: body.el - (pose.polarDeg - 90), aside: ((pose.azDeg - body.az + 540) % 360) - 180 });
+
+  it('a low body: about the rest pose, turned to face a little to one side of it', () => {
+    const body = { az: 232, el: 0.4 };
+    const pose = facePose({ body, restTargetY: 26, distance: 165, clearUpDeg: up });
+    expect(pose.target).toEqual({ x: 0, y: 26, z: 0 });
+    expect(pose.distance).toBe(165);
+    expect(pose.azDeg).toBe(244);
+    // Looking down, as at rest, but no more than the rest pose does.
+    expect(pose.polarDeg).toBeGreaterThanOrEqual(81);
+    expect(pose.polarDeg).toBeLessThan(90);
+    expect(where(body, pose).above).toBeLessThanOrEqual(up);
+    expect(where(body, pose).above).toBeGreaterThan(0);
+  });
+
+  it('a high body: the camera comes down to the ground and looks up, and the body sits in the clear part of the picture', () => {
+    for (const body of [{ az: 95, el: 77.5 }, { az: 259, el: 61 }, { az: 10, el: 30 }, { az: 359, el: 89 }]) {
+      for (const [restTargetY, distance] of [[26, 165], [26, 20], [1.5, 14], [5, 400]] as const) {
+        const pose = facePose({ body, restTargetY, distance, clearUpDeg: up });
+        const at = where(body, pose);
+        expect(at.aside).toBeCloseTo(12, 9);
+        // Three quarters of the way up the clear part, or (straight overhead) as high as the camera may look.
+        if (body.el < 80) expect(at.above).toBeCloseTo(0.75 * up, 9);
+        expect(pose.polarDeg * DEG).toBeLessThan(SITE_VIEW.maxPolarLookUp);
+        // Never under the ground: the point looked at is raised when it has to be, and never lowered.
+        expect(pose.position.y).toBeGreaterThanOrEqual(SITE_VIEW.minCameraHeight);
+        expect(pose.target.y).toBeGreaterThanOrEqual(restTargetY);
+        expect(pose.target.x).toBe(0);
+        expect(pose.target.z).toBe(0);
+        // And inside what the controls allow from there, so they do not pull the camera back.
+        expect(pose.polarDeg * DEG).toBeLessThanOrEqual(lookUpLimit(pose.target.y, pose.distance));
+      }
+    }
+  });
+
+  it('keeps the visitor\u2019s distance, within the limits of the controls', () => {
+    const body = { az: 0, el: 20 };
+    expect(facePose({ body, restTargetY: 26, distance: 3, clearUpDeg: up }).distance).toBe(SITE_VIEW.minDistance);
+    expect(facePose({ body, restTargetY: 26, distance: 90, clearUpDeg: up }).distance).toBe(90);
+    expect(facePose({ body, restTargetY: 26, distance: 9000, clearUpDeg: up }).distance).toBe(SITE_VIEW.maxDistance);
   });
 });
 

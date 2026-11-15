@@ -4,8 +4,10 @@
 // straight down with the landing point in the middle of the screen (where the dive from the Moon
 // left it), turning and tipping up until the horizon rises and it rests beside the lander.
 //
-// At rest the visitor turns the view by dragging and zooms with the wheel or a pinch. The landing
-// point is kept in the middle of the part of the window the panels leave free. A press or a wheel
+// At rest the visitor turns the view by dragging and zooms with the wheel or a pinch; close to a
+// tall lander the view can also be tipped up to the sky, and the HUD can ask for the view to be
+// turned to the Sun or to Earth. The landing point is kept in the middle of the part of the window
+// the panels leave free. A press or a wheel
 // turn during the descent stops it there and hands the view over. Visitors who prefer reduced
 // motion arrive at the rest pose at once.
 //
@@ -20,11 +22,14 @@ import { skyAt } from '../util/quantities';
 import type { ControlsLike } from './CameraDirector';
 import { MOON_CLIP } from './orbitView';
 import type { SceneData } from './sceneData';
-import { arrivalAzimuth, arrivalPitch, clearUpDeg, descentPose, frameShift, restPose, siteArrival, siteFrame, SITE_VIEW, type SitePose } from './siteView';
+import { RAD } from '../util/geo';
+import { arrivalAzimuth, arrivalPitch, clearUpDeg, descentPose, facePose, frameShift, lookUpLimit, orbitPosition, restPose, siteArrival, siteFrame, siteLook, SITE_VIEW, type SitePose } from './siteView';
 
 /** Seconds: the descent, and the settle when the rest pose changes (a resize, a panel changing height). */
 const DESCENT_S = 1.6;
 const SETTLE_S = 0.4;
+/** Seconds to swing the view round to the Sun, to Earth or back to the lander. */
+const LOOK_S = 0.3;
 
 type Controls = ControlsLike & { enableDamping: boolean };
 
@@ -34,6 +39,9 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
   const size = useThree((s) => s.size);
   const controls = useThree((s) => s.controls) as unknown as Controls | null;
   const frame = useStore(siteFrame, (s) => s);
+  const look = useStore(siteLook, (s) => s);
+  /** The last request to turn the view that was carried out (or was already there on arrival). */
+  const looked = useRef(look.seq);
   const fov = data.isPhone ? SITE_VIEW.fovPhone : SITE_VIEW.fov;
 
   const dataRef = useRef(data);
@@ -106,6 +114,7 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
     viewAz.current = arrivalAzimuth(sky?.sun ?? null, sky?.earth ?? null);
     goal.current = { ...goal.current, rest: restNow() };
     moved.current = false;
+    looked.current = siteLook.get().seq;
 
     camera.near = SITE_VIEW.near;
     camera.far = SITE_VIEW.far;
@@ -146,9 +155,10 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
     const onGrab = (e: Event) => {
       if (e.target !== gl.domElement) return;
       moved.current = true;
-      if (mode.current !== 'descent') return;
+      // Whatever move is under way stops where it is.
       tween.current?.kill();
       tween.current = null;
+      if (mode.current !== 'descent') return;
       release();
       settle();
     };
@@ -160,7 +170,6 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
       window.removeEventListener('wheel', onGrab, { capture: true });
       tween.current?.kill();
       tween.current = null;
-      gsap.killTweensOf(view.current);
       mode.current = 'idle';
       siteArrival.settled = false;
       camera.clearViewOffset();
@@ -178,6 +187,16 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
     const from = { y: controls.target.y, d: camera.position.distanceTo(controls.target), sx: view.current.x, sy: view.current.y };
     // A visitor who has zoomed keeps their distance.
     const distance = moved.current ? from.d : g.rest.distance;
+    const apply = () => {
+      scratch.copy(camera.position).sub(controls.target).normalize();
+      controls.target.y = from.y;
+      camera.position.copy(controls.target).addScaledVector(scratch, from.d);
+      // A view that was tipped up to the sky comes down with the point it looks at, never under the ground.
+      camera.position.y = Math.max(camera.position.y, SITE_VIEW.minCameraHeight);
+      controls.maxPolarAngle = lookUpLimit(controls.target.y, from.d);
+      view.current.x = from.sx;
+      view.current.y = from.sy;
+    };
     tween.current?.kill();
     tween.current = gsap.to(from, {
       y: g.rest.target.y,
@@ -186,14 +205,10 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
       sy: g.shiftY,
       duration: dataRef.current.reducedMotion ? 0 : SETTLE_S,
       ease: 'power3.out',
-      onUpdate: () => {
-        scratch.copy(camera.position).sub(controls.target).normalize();
-        controls.target.y = from.y;
-        camera.position.copy(controls.target).addScaledVector(scratch, from.d);
-        view.current.x = from.sx;
-        view.current.y = from.sy;
-      },
+      onUpdate: apply,
       onComplete: () => {
+        // (A move of no length, for visitors who prefer reduced motion, lands here directly.)
+        apply();
         tween.current = null;
       },
     });
@@ -208,10 +223,48 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
     // `settle` reads the goal of this render.
   }, [active, restKey]);
 
+  // "Look" at the Sun or Earth, and "Reset view": swing the view round, the short way, in a third of a second.
+  useLayoutEffect(() => {
+    if (!active || !controls || look.seq === looked.current) return;
+    looked.current = look.seq;
+    if (mode.current !== 'rest') return;
+    // Back to the lander: the rest pose, at its own distance again.
+    moved.current = !look.home;
+    const offset = scratch.copy(camera.position).sub(controls.target);
+    const d0 = offset.length();
+    const from = { y: controls.target.y, d: d0, az: Math.atan2(-offset.x, offset.z) * RAD, polar: Math.acos(THREE.MathUtils.clamp(offset.y / Math.max(d0, 1e-6), -1, 1)) * RAD };
+    const to = look.home ? goal.current.rest : facePose({ body: { az: look.az, el: look.el }, restTargetY: goal.current.rest.target.y, distance: d0, clearUpDeg: clearUpDeg(freeHeight, size.height, fov) });
+    const turn = ((((to.azDeg - from.az) % 360) + 540) % 360) - 180;
+    const proxy = { k: 0 };
+    const apply = () => {
+      const k = proxy.k;
+      const distance = from.d + (to.distance - from.d) * k;
+      controls.target.y = from.y + (to.target.y - from.y) * k;
+      const pose = orbitPosition({ x: 0, y: controls.target.y, z: 0 }, distance, from.az + turn * k, from.polar + (to.polarDeg - from.polar) * k);
+      // The limit follows the new height at once, so the controls do not pull the camera back.
+      controls.maxPolarAngle = lookUpLimit(controls.target.y, distance);
+      camera.position.set(pose.x, Math.max(pose.y, SITE_VIEW.minCameraHeight), pose.z);
+    };
+    tween.current?.kill();
+    tween.current = gsap.to(proxy, {
+      k: 1,
+      duration: dataRef.current.reducedMotion ? 0 : LOOK_S,
+      ease: 'power3.out',
+      onUpdate: apply,
+      onComplete: () => {
+        apply();
+        tween.current = null;
+      },
+    });
+    // A request is carried out once; the sizes it reads are those of the moment it was made.
+  }, [active, controls, look.seq]);
+
   // Every frame: the picture shift, written only when it or the window has changed.
   const applied = useRef('');
   useFrame(() => {
     if (!active) return;
+    // At rest: how far down the camera may swing depends on how close it is (see `lookUpLimit`).
+    if (mode.current === 'rest' && controls) controls.maxPolarAngle = lookUpLimit(controls.target.y, camera.position.distanceTo(controls.target));
     const x = Math.round(view.current.x);
     const y = Math.round(view.current.y);
     const key = `${size.width}x${size.height}:${x},${y}`;

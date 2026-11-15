@@ -1,4 +1,5 @@
 // The site's sky: stars, Earth, the Sun and the terrain skyline, all on a dome centred on the camera.
+// The Sun's path over the stay is drawn across it as a thin line.
 //
 // The data gives directions only (where the Sun and Earth stand, how high the terrain reaches at
 // each compass direction) and no distances, so nothing here has a place in the world: the whole
@@ -24,7 +25,7 @@ import { Stars } from './Stars';
 const GLOW_WIDTHS = 10;
 const GLOW_OPACITY = 0.38;
 
-export function SiteSky({ now, profile }: { now: SiteNow; profile: readonly number[] | null }) {
+export function SiteSky({ now, profile, sunPath }: { now: SiteNow; profile: readonly number[] | null; sunPath: readonly number[] | null }) {
   const group = useRef<THREE.Group>(null);
   const sun = useRef<THREE.Mesh>(null);
   const glow = useRef<THREE.Sprite>(null);
@@ -77,6 +78,7 @@ export function SiteSky({ now, profile }: { now: SiteNow; profile: readonly numb
   return (
     <group ref={group}>
       <Stars radius={SITE_VIEW.dome - 200} count={900} upperOnly renderOrder={0} />
+      {sunPath && sunPath.length >= 6 ? <SunPath points={sunPath} /> : null}
       <mesh ref={earth} visible={false} renderOrder={1} frustumCulled={false}>
         <sphereGeometry args={[earthBase, 40, 24]} />
         <shaderMaterial vertexShader={EARTH_VERTEX} fragmentShader={EARTH_FRAGMENT} uniforms={earthUniforms} transparent depthWrite={false} />
@@ -91,6 +93,31 @@ export function SiteSky({ now, profile }: { now: SiteNow; profile: readonly numb
       {profile ? <SkylineBand profile={profile} /> : null}
     </group>
   );
+}
+
+/**
+ * The Sun's path over the window the horizon answer covers, as a thin line across the sky: the same
+ * samples the horizon plot draws. It is drawn behind the skyline band, so the stretches where the
+ * terrain hides the Sun are hidden here too.
+ */
+function SunPath({ points }: { points: readonly number[] }) {
+  const line = useMemo(() => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    const material = new THREE.LineBasicMaterial({ color: cssColor('--ch-sun'), transparent: true, opacity: 0.5, depthWrite: false, toneMapped: false });
+    const object = new THREE.Line(geometry, material);
+    object.frustumCulled = false;
+    object.renderOrder = 0.5;
+    return object;
+  }, [points]);
+  useEffect(
+    () => () => {
+      line.geometry.dispose();
+      line.material.dispose();
+    },
+    [line],
+  );
+  return <primitive object={line} />;
 }
 
 /**

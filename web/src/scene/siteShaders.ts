@@ -77,7 +77,7 @@ void main() {
   float w = fwidth(r);
   float near = ringLine(r, uRings.x, w) * (1.0 - smoothstep(uRings.y - 0.5 * uRings.x, uRings.y + 0.5 * uRings.x, r)) * (1.0 - smoothstep(0.1, 0.25, w / uRings.x));
   float far = ringLine(r, uRings.z, w) * (1.0 - smoothstep(10.0 * uRings.y - 0.5 * uRings.z, 10.0 * uRings.y + 0.5 * uRings.z, r)) * (1.0 - smoothstep(0.1, 0.25, w / uRings.z));
-  col += uLine * max(near * 0.45, far * 0.8) * step(0.5 * uRings.x, r);
+  col += uLine * max(near * 0.4, far * 0.6) * step(0.5 * uRings.x, r);
 
   // Toward the cut-off, and toward the edge of the disc, the ground takes the skyline band's colour.
   float keep = smoothstep(uTanCut, uTanCut * 2.5, t) * (1.0 - smoothstep(0.55 * uRadius, 0.95 * uRadius, r));

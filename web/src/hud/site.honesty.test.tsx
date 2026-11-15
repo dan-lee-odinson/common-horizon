@@ -11,12 +11,14 @@ import sitesJson from '../api/examples/sites.json';
 import { configureMock } from '../api/mock';
 import { evaluateSite, horizonFor, MOCK_CATALOG, TRANSIT_DAYS } from '../api/mock/model';
 import type { HardwareChoice, SiteRef } from '../api/types';
+import { SITE_VIEW } from '../scene/siteView';
 import { SPEEDS } from '../state/app';
 import { clearGeometryCache, loadTrack } from '../state/geometry';
 import { ClockPanel, EarthPanel, HardwarePanel, Inline, SunPanel } from '../stages/SitePanels';
 import { litPeriods } from '../util/horizon';
 import {
   DASH,
+  groundRingQuantities,
   hardwareQuantities,
   horizonAxisQuantities,
   liveSiteQuantities,
@@ -215,6 +217,23 @@ describe('the reading panels show only their quantities', () => {
     expect(unaccountedNumbers(list, hardware.map((r) => [r.count, r.height, r.name, r.status ?? '']))).toEqual([]);
     expect(visibleText(list)).toContain('no model');
     expect(visibleText(list)).toContain(note);
+    // An item whose shape is not in the picture says so on its row, in words; one that is drawn says nothing more.
+    const shapes = { starship: 'failed', hab: 'loading', solar: 'ready' } as const;
+    const withShapes = renderToStaticMarkup(<HardwarePanel rows={hardware} note={note} shapes={shapes} />);
+    expect(unaccountedNumbers(withShapes, hardware.map((r) => [r.count, r.height, r.name, r.status ?? '']))).toEqual([]);
+    expect(visibleText(withShapes)).toContain('Not drawn: its shape could not be loaded.');
+    expect(visibleText(withShapes)).toContain('Loading its shape…');
+    expect(withShapes.match(/data-testid="hardware-shape"/g)).toHaveLength(2);
+    expect(list).not.toContain('hardware-shape');
+    // The range rings on the ground say what they measure, as readouts.
+    const rings = groundRingQuantities(SITE_VIEW.ringMinor, SITE_VIEW.ringMajor);
+    const ringLine = renderToStaticMarkup(
+      <span>
+        Range rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
+      </span>,
+    );
+    expect(visibleText(ringLine)).toMatch(/Range rings every 10 ?m and 100 ?m/);
+    expect(unaccountedNumbers(ringLine, rings.minor, rings.major)).toEqual([]);
     // Before the landing no lander stands there.
     if (hoursIn < 0) {
       expect(live.beforeLanding).toBe(true);
@@ -263,7 +282,17 @@ describe('the reading panels show only their quantities', () => {
 
 describe('nothing in the site stage is set under 12 px', () => {
   const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
-  const FILES = ['./HorizonPanel.tsx', './StayTimeline.tsx', './Transport.tsx', './AnchorReticle.tsx', '../stages/SitePanels.tsx', '../stages/SiteHud.tsx', '../components/ComparePanel.tsx'];
+  const FILES = [
+    './HorizonPanel.tsx',
+    './StayTimeline.tsx',
+    './Transport.tsx',
+    './AnchorReticle.tsx',
+    '../stages/SitePanels.tsx',
+    '../stages/SiteHud.tsx',
+    '../stages/LanderReticle.tsx',
+    '../stages/SiteVeil.tsx',
+    '../components/ComparePanel.tsx',
+  ];
 
   it.each(FILES)('%s', (file) => {
     const source = read(file);

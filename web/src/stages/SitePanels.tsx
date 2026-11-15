@@ -3,6 +3,7 @@
 // The running figures are rewritten in place by the stage's ticker (see SiteHud).
 
 import type { ReactNode } from 'react';
+import { Icon } from '../components/Icon';
 import { Glass } from '../hud/Glass';
 import { Readout, ReadoutRow } from '../hud/Readout';
 import type { HardwareRow, Quantity } from '../util/quantities';
@@ -25,6 +26,16 @@ export function Inline({ q, className = '' }: { q: Quantity; className?: string 
 }
 
 type ShellTone = 'cyan' | 'sun' | 'earth';
+
+/** "Look": turns the 3D view to the body the panel is about. Sits at the far end of the panel's heading. */
+function LookButton({ what, onLook, disabled, testId }: { what: string; onLook: () => void; disabled: boolean; testId: string }) {
+  return (
+    <button type="button" className="btn btn-quiet -my-1.5 -mr-1.5 ml-auto min-h-8 gap-1.5 px-2 text-[12px]" onClick={onLook} disabled={disabled} aria-label={`Look at ${what}: turn the view`} title={`Turn the view to ${what}`} data-testid={testId}>
+      <Icon name="target" size={14} />
+      Look
+    </button>
+  );
+}
 
 /**
  * A panel's surface: a glass panel floating over the scene, or (`bare`) a plain section for use
@@ -74,6 +85,8 @@ export interface SunPanelProps {
   sunlightPercent: Quantity;
   sunlightHours: Quantity;
   longestDark: Quantity;
+  /** Turn the 3D view to the Sun (where there is a 3D view to turn). */
+  onLook?: () => void;
   /** Fewer rows, whatever the window's height. */
   dense?: boolean;
   /** No glass of its own: inside a sheet. */
@@ -94,6 +107,7 @@ export function SunPanel({
   sunlightPercent,
   sunlightHours,
   longestDark,
+  onLook,
   dense = false,
   bare = false,
   className = '',
@@ -104,6 +118,7 @@ export function SunPanel({
       <header className="flex items-center gap-2">
         <span className="size-2 rounded-full bg-sun" style={{ boxShadow: '0 0 12px var(--ch-sun-glow)' }} aria-hidden />
         <h3 className="panel-title m-0">Sun</h3>
+        {onLook ? <LookButton what="the Sun" onLook={onLook} disabled={sunAz.value === null} testId="look-sun" /> : null}
       </header>
       <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
         <Readout q={sunState} size="lg" className="short:[&_.readout-value]:text-[22px]" />
@@ -173,18 +188,21 @@ export interface EarthPanelProps {
   earthWidth: Quantity;
   earthLink: Quantity;
   clearSky: Quantity;
+  /** Turn the 3D view to Earth (where there is a 3D view to turn). */
+  onLook?: () => void;
   dense?: boolean;
   bare?: boolean;
   className?: string;
 }
 
 /** Earth in the site's sky now, and the Earth link over the stay. */
-export function EarthPanel({ earthAz, earthEl, earthWidth, earthLink, clearSky, dense = false, bare = false, className = '' }: EarthPanelProps) {
+export function EarthPanel({ earthAz, earthEl, earthWidth, earthLink, clearSky, onLook, dense = false, bare = false, className = '' }: EarthPanelProps) {
   return (
     <Shell bare={bare} tone="earth" label="Earth" testId="earth-panel" leaderTarget="earth" className={className}>
       <header className="flex items-center gap-2">
         <span className="size-2 rounded-full bg-earth" style={{ boxShadow: '0 0 12px var(--ch-earth-glow)' }} aria-hidden />
         <h3 className="panel-title m-0">Earth</h3>
+        {onLook ? <LookButton what="Earth" onLook={onLook} disabled={earthAz.value === null} testId="look-earth" /> : null}
       </header>
       <div className="grid grid-cols-2 gap-x-3">
         <Readout q={earthAz} size="sm" />

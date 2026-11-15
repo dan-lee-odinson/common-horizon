@@ -12,7 +12,7 @@
 // scene. So the picture and the numbers cannot disagree. Nothing here re-renders while time runs: the readouts
 // are rewritten in place once per frame, and only when the instant has changed.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react';
 import type { SiteRef } from '../api/types';
 import { AsyncView } from '../components/AsyncView';
 import { Icon } from '../components/Icon';
@@ -26,11 +26,11 @@ import { StayTimeline, type StayState } from '../hud/StayTimeline';
 import { Transport } from '../hud/Transport';
 import { useTicker } from '../hud/useTicker';
 import { hideAnchors } from '../scene/anchors';
-import { siteFrame, SITE_VIEW } from '../scene/siteView';
+import { lookAtBody, lookAtLander, siteFrame, SITE_VIEW } from '../scene/siteView';
 import { actions, appStore, simClock, SPEEDS } from '../state/app';
 import { useData } from '../state/data';
 import { modelShapes, primaryLanderId, useModelMetas } from '../state/models';
-import { useStore } from '../state/store';
+import { createStore, useStore } from '../state/store';
 import { useIsPhone, useShortWindow } from '../state/useMedia';
 import { litPeriods } from '../util/horizon';
 import {
@@ -58,6 +58,11 @@ const LEADERS: LeaderSpec[] = [
   { anchor: 'sun', to: '[data-leader-target="sun"]', color: 'var(--ch-sun)' },
   { anchor: 'earth', to: '[data-leader-target="earth"]', color: 'var(--ch-earth)' },
 ];
+
+/** Which change of light lies ahead of the instant shown. Written when it differs, so the jump control can say which. */
+const nextChangeAhead = createStore<{ kind: 'sunrise' | 'sunset' | null }>({ kind: null });
+/** A jump lands this far past the change, so the new state is the one showing. */
+const JUMP_PAST_MS = 60_000;
 
 /** What of the hardware in the picture is true and what is an illustration. (Without 3D there is no picture: only what the heights are.) */
 const HARDWARE_NOTE = 'Drawn at true scale from its models; each height is the model’s. Where each piece stands is an illustration. An item with no model is listed, not drawn.';
@@ -119,7 +124,10 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
     if (root.dataset.lit !== lit) root.dataset.lit = lit;
     const phase = q.beforeLanding ? 'before-landing' : 'stay';
     if (root.dataset.phase !== phase) root.dataset.phase = phase;
+    // Which change lies ahead (it differs only a few times in a stay): the jump control follows it.
+    nextChangeAhead.set({ kind: q.sky.change?.kind ?? null });
   });
+  const nextKind = useStore(nextChangeAhead, (s) => s.kind);
 
   useEntrance(rootRef, true, 0.35);
   useSiteFrame(rootRef, isPhone);
@@ -154,6 +162,12 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
   function restart() {
     actions.setPlaying(false);
     simClock.set({ nowMs: null });
+  }
+  /** To a minute past the next sunrise or sunset: the new state is showing, and the next press goes on to the one after. */
+  function jumpToChange() {
+    const at = live().sky.change?.atMs;
+    if (at === undefined || !Number.isFinite(at) || !ranged) return;
+    scrubTo(Math.min(endMs, at + JUMP_PAST_MS));
   }
 
   // What the plot's markers and the timeline read each frame. Each answer is kept for the instant.
@@ -238,7 +252,20 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
     />
   );
 
-  const transport = <Transport playing={playing} speed={speed} speeds={speeds} onTogglePlay={togglePlay} onRestart={restart} onSpeed={actions.setSpeed} disabled={!ranged} />;
+  const transport = (trailing?: ReactNode) => (
+    <Transport
+      playing={playing}
+      speed={speed}
+      speeds={speeds}
+      onTogglePlay={togglePlay}
+      onRestart={restart}
+      onSpeed={actions.setSpeed}
+      onJump={jumpToChange}
+      nextChange={ready ? nextKind : null}
+      trailing={trailing}
+      disabled={!ranged}
+    />
+  );
 
   const beforeLanding = (
     <p className="tag tag-warn m-0 min-h-9 w-fit shrink-0 px-3 normal-case tracking-[0.04em]" data-testid="before-landing">
@@ -264,11 +291,22 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       sunlightPercent={result.sunlightPercent}
       sunlightHours={result.sunlightHours}
       longestDark={fixed.longestDark}
+      onLook={webgl && !isPhone ? () => lookAtBody(live().sky.sun) : undefined}
       {...extra}
     />
   );
   const clockPanel = (extra: { dense?: boolean; bare?: boolean } = {}) => <ClockPanel utc={q.utcClock} ltc={q.ltcClock} ltcOffset={q.ltcOffset} sinceLanding={q.sinceLanding} stayEnd={fixed.stayEnd} {...extra} />;
-  const earthPanel = (extra: { dense?: boolean; bare?: boolean } = {}) => <EarthPanel earthAz={q.earthAz} earthEl={q.earthEl} earthWidth={q.earthWidth} earthLink={fixed.earthLink} clearSky={result.clearSky} {...extra} />;
+  const earthPanel = (extra: { dense?: boolean; bare?: boolean } = {}) => (
+    <EarthPanel
+      earthAz={q.earthAz}
+      earthEl={q.earthEl}
+      earthWidth={q.earthWidth}
+      earthLink={fixed.earthLink}
+      clearSky={result.clearSky}
+      onLook={webgl && !isPhone ? () => lookAtBody(live().sky.earth) : undefined}
+      {...extra}
+    />
+  );
   const hardwarePanel = (extra: { bare?: boolean; className?: string } = {}) => <HardwarePanel rows={hardware} note={webgl ? HARDWARE_NOTE : HARDWARE_NOTE_FLAT} shapes={webgl ? shapes : undefined} {...extra} />;
 
   const trueSize = (
@@ -336,23 +374,18 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
         <div className="hud-layer z-[45]">
           <section className="site-dock glass glass-strong absolute inset-x-0 bottom-0 flex flex-col gap-2 rounded-b-none border-x-0 border-b-0 px-3 pt-2.5" aria-label="Time through the stay" data-enter="rise" data-site-zone="dock" data-panel data-testid="site-dock">
             {timeline}
-            <div className="flex items-center justify-between gap-2">
-              {transport}
-              <button
-                type="button"
-                className="btn shrink-0 px-3"
-                aria-expanded={sheetOpen}
-                aria-controls="site-sheet"
-                onClick={() => actions.setHorizonOpen(!sheetOpen)}
-                data-testid="site-horizon-toggle"
-              >
+            {transport(
+              <button type="button" className="btn shrink-0 px-3" aria-expanded={sheetOpen} aria-controls="site-sheet" onClick={() => actions.setHorizonOpen(!sheetOpen)} data-testid="site-horizon-toggle">
                 <Icon name="horizon" size={15} />
                 Horizon
-              </button>
-            </div>
+              </button>,
+            )}
             {webgl ? (
               <p className="m-0 text-[12px] leading-snug text-ink-2" data-testid="true-size">
-                Sun <Inline q={fixed.sunWidth} />, Earth <Inline q={q.earthWidth} />: true apparent size (mean distances). <span data-testid="site-illustration-ground">The ground is an illustration.</span>
+                Sun <Inline q={fixed.sunWidth} />, Earth <Inline q={q.earthWidth} />: true apparent size (mean distances). <span data-testid="site-illustration-ground">The ground is an illustration.</span>{' '}
+                <span data-testid="site-rings">
+                  Rings every <Inline q={rings.minor} /> and <Inline q={rings.major} />.
+                </span>
               </p>
             ) : null}
           </section>
@@ -404,6 +437,14 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             <Inline q={fixed.siteLat} />
             <Inline q={fixed.siteLon} />
           </span>
+          {/* The way back after turning the view to the sky. */}
+          {webgl ? (
+            <button type="button" className="btn btn-glass shrink-0" onClick={lookAtLander} aria-label="Reset the view: back to the lander" title="Back to the view beside the lander" data-testid="reset-view">
+              <Icon name="target" size={14} />
+              {/* Room for the words only in a wide window: the site's name comes first. */}
+              <span className="max-[1439px]:hidden">Reset view</span>
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -447,11 +488,11 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       {/* The console: sky and time. The plot sits directly above the timeline that scrubs it.
           This layer does not drift with the pointer: the needle stays under the hand that drags it. */}
       <div className="hud-layer">
-        <Glass as="section" strong className="absolute bottom-5 left-5 right-5 grid grid-cols-[22rem_minmax(0,1fr)] gap-x-5 px-4 py-3.5 short:py-3 max-lg:grid-cols-[17rem_minmax(0,1fr)]" aria-label="Sky and time" data-enter="rise" data-site-zone="console" data-panel data-testid="site-console">
+        <Glass as="section" strong className="absolute bottom-5 left-5 right-5 grid grid-cols-[24rem_minmax(0,1fr)] gap-x-5 px-4 py-3.5 short:py-3 max-xl:grid-cols-[22.5rem_minmax(0,1fr)] max-lg:grid-cols-[17rem_minmax(0,1fr)]" aria-label="Sky and time" data-enter="rise" data-site-zone="console" data-panel data-testid="site-console">
           <div className="flex min-w-0 flex-col gap-2.5 short:gap-2">
             <h3 className="sr-only">Sky and time</h3>
             {clockPanel({ bare: true, dense: true })}
-            {transport}
+            {transport()}
             {webgl ? trueSize : null}
           </div>
           <div className="flex min-w-0 flex-col gap-1.5">
