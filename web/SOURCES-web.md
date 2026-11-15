@@ -53,6 +53,18 @@ one for origin; the table above covers every package the website adds directly.
 | Mock terrain, slopes and skylines (`src/api/examples/mock-model.json`) | Invented for mock mode | This project | — |
 | Assistant example answers (`src/api/examples/assistant.json`) | Written for mock mode | This project | — |
 
+## Fonts
+
+Three families, served from this website only (no font service is called). The files and each
+project's licence text are in `src/assets/fonts/`. Each was taken from the project's own GitHub
+repository, which was cloned and read when this file was written.
+
+| Font | Used for | File in `src/assets/fonts/` | Taken from | Licence | Maintained by | Link |
+| --- | --- | --- | --- | --- | --- | --- |
+| Oxanium (variable, weight 200 to 800) | Titles and labels | `Oxanium-Variable.woff2` | `fonts/variable/Oxanium[wght].ttf` at commit a8f39e0 (30 September 2020), compressed to WOFF2 with fontTools 4.68.0; the glyphs are unchanged | SIL Open Font License 1.1 (`Oxanium-OFL.txt`) | Severin Meyer (The Oxanium Project Authors) | https://github.com/sevmeyer/oxanium |
+| Geist Mono (variable, weight 100 to 900) | Numeric readouts | `GeistMono-Variable.woff2` | `fonts/GeistMono/webfonts/GeistMono[wght].woff2` at commit ef2597c (6 November 2026), copied unchanged | SIL Open Font License 1.1 (`Geist-OFL.txt`) | Vercel, with Basement Studio (The Geist Project Authors) | https://github.com/vercel/geist-font |
+| Geist (variable, weight 100 to 900) | Chat and longer text | `Geist-Variable.woff2` | `fonts/Geist/webfonts/Geist[wght].woff2` at the same commit, copied unchanged | SIL Open Font License 1.1 (`Geist-OFL.txt`) | Vercel, with Basement Studio (The Geist Project Authors) | https://github.com/vercel/geist-font |
+
 ## Images
 
 | What | Where it came from | Licence | Link |
@@ -66,6 +78,7 @@ No logos, insignia, flags or agency or company lettering are used anywhere. Name
 
 | Figure | Used for | Source | Link |
 | --- | --- | --- | --- |
+| Lunar south pole season: summer while the Sun's overhead point is south of the lunar equator, when sunlit periods at the south pole run longer | The "Lunar south pole: summer / winter" line (`src/util/season.ts`) | NASA, "Lunar Site Selection" white paper, 2023 Moon to Mars Architecture Concept Review | link to add |
 | LTC rate: 56.02 microseconds per day, counted from the landing time | LTC (model value) display | Team brief; lunar time standard still being defined | link to add |
 | Synodic month 29.530589 days | Mock Sun motion | Standard astronomical value | link to add |
 | Reference new moon 2000-01-06 18:14 UTC | Mock Sun phase | Standard reference epoch for lunations | link to add |

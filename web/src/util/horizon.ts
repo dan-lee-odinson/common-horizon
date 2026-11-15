@@ -1,0 +1,156 @@
+// Reading a horizon answer (POST /horizon): where the Sun is at a time, when it next rises or sets
+// behind the terrain, and the lit and dark periods of the window.
+//
+// The answer's own "above" / "hidden" words are the authority. Between two samples whose words
+// differ, the moment of change is placed where the Sun's height crosses the terrain skyline
+// (a straight line between the two samples), so a sunrise is not snapped to the sample grid.
+
+import type { HorizonResponse } from '../api/types';
+import { normalizeLon360, sampleProfile, wrap180 } from './geo';
+import { HOUR_MS } from './time';
+
+export interface SunNow {
+  az: number;
+  el: number;
+  /** True when the Sun is above the terrain skyline. */
+  above: boolean;
+}
+
+export interface SunChange {
+  kind: 'sunrise' | 'sunset';
+  atMs: number;
+  /** Hours from the asked time to the change. */
+  hours: number;
+}
+
+export interface Period {
+  start: number;
+  end: number;
+  lit: boolean;
+}
+
+interface Crossing {
+  atMs: number;
+  /** The state after the crossing. */
+  toAbove: boolean;
+}
+
+interface Prepared {
+  times: number[];
+  crossings: Crossing[];
+  startsAbove: boolean;
+}
+
+const prepared = new WeakMap<HorizonResponse, Prepared>();
+
+function prepare(data: HorizonResponse): Prepared {
+  const hit = prepared.get(data);
+  if (hit) return hit;
+  const path = data.sun_path;
+  const times = path.map((p) => Date.parse(p.t));
+  const crossings: Crossing[] = [];
+  for (let i = 0; i + 1 < path.length; i++) {
+    const a = path[i];
+    const b = path[i + 1];
+    if (a.state === b.state) continue;
+    const ma = a.el - sampleProfile(data.skyline, a.az);
+    const mb = b.el - sampleProfile(data.skyline, b.az);
+    // Opposite signs: the height above the skyline passes zero between the samples.
+    const f = ma * mb < 0 ? ma / (ma - mb) : 0.5;
+    crossings.push({ atMs: times[i] + f * (times[i + 1] - times[i]), toAbove: b.state === 'above' });
+  }
+  const out: Prepared = { times, crossings, startsAbove: path.length > 0 && path[0].state === 'above' };
+  prepared.set(data, out);
+  return out;
+}
+
+function aboveAt(p: Prepared, tMs: number): boolean {
+  let above = p.startsAbove;
+  for (const c of p.crossings) {
+    if (c.atMs > tMs) break;
+    above = c.toAbove;
+  }
+  return above;
+}
+
+/** Sample times of the Sun's path, in milliseconds (cached per answer). */
+export function sunPathTimes(data: HorizonResponse): readonly number[] {
+  return prepare(data).times;
+}
+
+/** Sun position at a time, interpolated between samples. Null when the answer has no path. */
+export function sunAt(data: HorizonResponse, tMs: number): SunNow | null {
+  const p = prepare(data);
+  const times = p.times;
+  const n = times.length;
+  if (n === 0) return null;
+  let i = 0;
+  let j = n - 1;
+  if (tMs <= times[0]) j = 0;
+  else if (tMs >= times[n - 1]) i = n - 1;
+  else {
+    while (j - i > 1) {
+      const m = (i + j) >> 1;
+      if (times[m] <= tMs) i = m;
+      else j = m;
+    }
+  }
+  const hi = Math.max(i, j);
+  const a = data.sun_path[i];
+  const b = data.sun_path[hi];
+  const span = times[hi] - times[i];
+  const f = span > 0 ? (tMs - times[i]) / span : 0;
+  return {
+    az: normalizeLon360(a.az + wrap180(b.az - a.az) * f),
+    el: a.el + (b.el - a.el) * f,
+    above: aboveAt(p, Math.min(times[n - 1], Math.max(times[0], tMs))),
+  };
+}
+
+/** The next sunrise or sunset after a time, or null when the Sun does not change inside the window. */
+export function nextSunChange(data: HorizonResponse, tMs: number): SunChange | null {
+  const p = prepare(data);
+  for (const c of p.crossings) {
+    if (c.atMs > tMs) return { kind: c.toAbove ? 'sunrise' : 'sunset', atMs: c.atMs, hours: (c.atMs - tMs) / HOUR_MS };
+  }
+  return null;
+}
+
+/** Lit and dark periods across the whole window, in order. */
+export function litPeriods(data: HorizonResponse): Period[] {
+  const p = prepare(data);
+  const n = p.times.length;
+  if (n === 0) return [];
+  const out: Period[] = [];
+  let start = p.times[0];
+  let lit = p.startsAbove;
+  for (const c of p.crossings) {
+    out.push({ start, end: c.atMs, lit });
+    start = c.atMs;
+    lit = c.toAbove;
+  }
+  out.push({ start, end: p.times[n - 1], lit });
+  return out;
+}
+
+function niceStep(range: number): number {
+  for (const s of [1, 2, 5, 10, 15, 30]) if (range / s <= 6) return s;
+  return 30;
+}
+
+/** Spacing of the height grid lines for a height range. */
+export function elevationStep(range: number): number {
+  return niceStep(range);
+}
+
+/** The height range a plot of this data needs: terrain, the Sun's path and Earth's box. */
+export function naturalElRange(data: HorizonResponse): { min: number; max: number } {
+  const skyMin = Math.min(...data.skyline.map((p) => p.el));
+  const skyMax = Math.max(...data.skyline.map((p) => p.el));
+  const sunMax = data.sun_path.length ? Math.max(...data.sun_path.map((p) => p.el)) : 0;
+  const earthTop = data.earth_box ? data.earth_box.el_max : -90;
+  const min = Math.floor(Math.min(-2, skyMin - 0.5));
+  const rawMax = Math.max(skyMax + 2, earthTop + 1, Math.min(sunMax + 1, 90), 6);
+  const step = niceStep(rawMax - min);
+  return { min, max: Math.min(90, Math.ceil(rawMax / step) * step) };
+}

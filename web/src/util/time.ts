@@ -105,3 +105,52 @@ export function formatHours(hours: number): string {
 export function formatDays(days: number): string {
   return Number.isInteger(days) ? `${days}` : days.toFixed(2).replace(/0$/, '');
 }
+
+/** Mean length of the lunar day (new moon to new moon), in days. Standard astronomical value. */
+export const SYNODIC_MONTH_DAYS = 29.530589;
+
+export interface ClockParts {
+  /** "2027-02-15" */
+  date: string;
+  /** "15:00:00" */
+  time: string;
+  /** LTC only: the six digits after the seconds, "000056". Empty for UTC. */
+  fraction: string;
+}
+
+/** A UTC instant split for a running clock display. */
+export function utcClock(utcMs: number): ClockParts {
+  const [date, time] = ymdhms(new Date(utcMs)).split(' ');
+  return { date, time, fraction: '' };
+}
+
+/** The LTC (model value) reading at a UTC instant, split for a running clock display. */
+export function ltcClock(utcMs: number, landingUtcMs: number): ClockParts {
+  const micros = utcToLtcMicros(utcMs, landingUtcMs);
+  const wholeMs = Math.floor(micros / 1000);
+  const subMs = micros - wholeMs * 1000;
+  const d = new Date(wholeMs);
+  const [date, time] = ymdhms(d).split(' ');
+  return { date, time, fraction: pad(d.getUTCMilliseconds(), 3) + pad(subMs, 3) };
+}
+
+/** The LTC offset in microseconds with a sign and two decimals: "+182.07". */
+export function formatLtcOffsetMicros(utcMs: number, landingUtcMs: number): string {
+  const us = ltcOffsetMicros(utcMs, landingUtcMs);
+  const rounded = Math.round(us * 100) / 100;
+  const sign = rounded < 0 ? '−' : '+';
+  return `${sign}${Math.abs(rounded).toFixed(2)}`;
+}
+
+/** "2027-02-15 15:00" (UTC, to the minute) for dates shown beside a control. */
+export function formatUtcMinute(utcMs: number): string {
+  return ymdhms(new Date(Math.round(utcMs / 60_000) * 60_000)).slice(0, 16);
+}
+
+/** Time since (or before) the landing: "+3 d 06 h", "−0 d 12 h". */
+export function formatSinceLanding(utcMs: number, landingUtcMs: number): string {
+  const hours = (utcMs - landingUtcMs) / HOUR_MS;
+  const sign = hours < 0 ? '−' : '+';
+  const total = Math.floor(Math.abs(hours));
+  return `${sign}${Math.floor(total / 24)} d ${pad(total % 24)} h`;
+}

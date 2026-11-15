@@ -1,57 +1,82 @@
 /*
  * ALL colours used by the website live in this file, as CSS variables.
- * Brand colours are set later: change the values here and every screen follows,
- * including the 3D scenes (they read these variables at start-up).
- * Tailwind is limited to these colours on purpose (its default palette is switched off).
+ * Change a value here and every screen follows, including the 3D scenes (they read these
+ * variables at start-up). Tailwind is limited to these colours on purpose (its default palette
+ * is switched off).
+ *
+ * The look: near-black blue space, thin luminous line work in cyan to teal, amber-yellow for the
+ * Sun, blue for Earth, warm red-orange for alerts and failures. Glow is soft and layered.
+ *
+ * Text colours are checked against the glass panels by src/styles/contrast.test.ts (4.5 to 1 or
+ * better on the worst case: a glass panel floating over the sunlit Moon).
  */
 
 :root {
   color-scheme: dark;
 
-  /* Surfaces: dark and calm */
-  --ch-bg: #0a0d12;
-  --ch-space: #06080c;
-  --ch-surface: #11161e;
-  --ch-surface-2: #171e29;
-  --ch-surface-3: #1e2734;
-  --ch-glass: rgb(17 22 30 / 0.74);
-  /* The assistant's conversation panel: semi-opaque, a little denser than glass so text stays readable */
-  --ch-glass-strong: rgb(17 22 30 / 0.86);
-  --ch-scrim: rgb(4 6 9 / 0.62);
-  --ch-line: #232d3b;
-  --ch-line-strong: #34425a;
-  --ch-shadow: rgb(0 0 0 / 0.5);
+  /* Space and surfaces */
+  --ch-space: #02050b;
+  --ch-bg: #040810;
+  --ch-surface: #07131f;
+  --ch-surface-2: #0b1c2b;
+  --ch-surface-3: #112a3d;
+  /* Glass: a tint laid over the scene after the scene behind it is blurred and dimmed (see .glass). */
+  --ch-glass: rgb(7 18 30 / 0.58);
+  --ch-glass-strong: rgb(6 15 26 / 0.8);
+  /* How much the glass dims what is behind it (backdrop-filter brightness), 0..1. */
+  --ch-glass-dim: 0.55;
+  --ch-scrim: rgb(1 4 9 / 0.66);
+  --ch-shadow: rgb(0 0 0 / 0.62);
+
+  /* Line work: cyan to teal */
+  --ch-cyan: #5fe6f5;
+  --ch-teal: #2bc4b6;
+  --ch-line-faint: rgb(95 230 245 / 0.1);
+  --ch-line: rgb(95 230 245 / 0.22);
+  --ch-line-strong: rgb(95 230 245 / 0.5);
+  --ch-glow: rgb(95 230 245 / 0.28);
+  --ch-glow-soft: rgb(95 230 245 / 0.12);
 
   /* Text */
-  --ch-ink: #e7ecf2;
-  --ch-ink-2: #b9c3cf;
-  --ch-muted: #8693a4;
+  --ch-ink: #eaf7fb;
+  --ch-ink-2: #bcdbe5;
+  --ch-muted: #94bccb;
 
-  /* Interaction (placeholder until brand colours are chosen) */
-  --ch-accent: #84c7d8;
-  --ch-accent-ink: #062029;
-  --ch-accent-soft: rgb(132 199 216 / 0.14);
-  --ch-focus: #a9dcff;
+  /* Interaction */
+  --ch-accent: #5fe6f5;
+  --ch-accent-strong: #a5f3fc;
+  --ch-accent-ink: #021a20;
+  --ch-accent-soft: rgb(95 230 245 / 0.13);
+  --ch-focus: #c9f8ff;
 
   /* Meaning */
-  --ch-sun: #f7cc4a;
-  --ch-sun-soft: rgb(247 204 74 / 0.18);
-  --ch-earth: #4f9dff;
-  --ch-earth-soft: rgb(79 157 255 / 0.16);
-  --ch-good: #3fbf78;
-  --ch-warn: #e2b23f;
-  --ch-bad: #f0605d;
+  --ch-sun: #ffc23d;
+  --ch-sun-soft: rgb(255 194 61 / 0.16);
+  --ch-sun-glow: rgb(255 176 46 / 0.34);
+  --ch-earth: #5aa9ff;
+  /* Earth blue as a text colour: lighter, so it keeps 4.5 to 1 on glass. */
+  --ch-earth-text: #86c0ff;
+  --ch-earth-soft: rgb(90 169 255 / 0.16);
+  --ch-earth-glow: rgb(90 169 255 / 0.32);
+  --ch-good: #4fe3b4;
+  --ch-warn: #ffc23d;
+  --ch-bad: #ff6a3d;
+  /* The alert colour as a text colour: lighter, so it keeps 4.5 to 1 on glass. */
+  --ch-bad-text: #ff9872;
+  --ch-bad-soft: rgb(255 106 61 / 0.16);
+  --ch-bad-glow: rgb(255 106 61 / 0.34);
 
-  /* 3D placeholders and the horizon plot */
-  --ch-moon: #8e9095;
-  --ch-moon-dark: #2b2d31;
-  --ch-ground: #75777c;
-  --ch-terrain: #2c3644;
-  --ch-terrain-edge: #5d6b80;
-  --ch-dark-period: #1a2130;
-  --ch-marker: #e7ecf2;
-  --ch-marker-saved: #f7cc4a;
-  --ch-marker-active: #84c7d8;
+  /* 3D scenes and the horizon plot */
+  --ch-moon: #a2a6ad;
+  --ch-moon-dark: #1c2026;
+  --ch-ground: #8a8d92;
+  --ch-terrain: #0e2233;
+  --ch-terrain-edge: #3f7388;
+  --ch-dark-period: #0a1826;
+  --ch-marker: #dff8fc;
+  --ch-marker-saved: #ffc23d;
+  --ch-marker-active: #5fe6f5;
+  --ch-star: #cfe6f2;
 }
 
 /* Tailwind theme: names only, every value points at a variable above. */
@@ -63,23 +88,31 @@
   --color-surface-2: var(--ch-surface-2);
   --color-surface-3: var(--ch-surface-3);
   --color-glass: var(--ch-glass);
+  --color-glass-strong: var(--ch-glass-strong);
   --color-scrim: var(--ch-scrim);
+  --color-line-faint: var(--ch-line-faint);
   --color-line: var(--ch-line);
   --color-line-strong: var(--ch-line-strong);
+  --color-cyan: var(--ch-cyan);
+  --color-teal: var(--ch-teal);
   --color-ink: var(--ch-ink);
   --color-ink-2: var(--ch-ink-2);
   --color-muted: var(--ch-muted);
   --color-accent: var(--ch-accent);
+  --color-accent-strong: var(--ch-accent-strong);
   --color-accent-ink: var(--ch-accent-ink);
   --color-accent-soft: var(--ch-accent-soft);
   --color-focus: var(--ch-focus);
   --color-sun: var(--ch-sun);
   --color-sun-soft: var(--ch-sun-soft);
   --color-earth: var(--ch-earth);
+  --color-earth-text: var(--ch-earth-text);
   --color-earth-soft: var(--ch-earth-soft);
   --color-good: var(--ch-good);
   --color-warn: var(--ch-warn);
   --color-bad: var(--ch-bad);
+  --color-bad-text: var(--ch-bad-text);
+  --color-bad-soft: var(--ch-bad-soft);
   --color-transparent: transparent;
   --color-current: currentColor;
 }
