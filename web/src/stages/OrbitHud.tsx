@@ -107,7 +107,7 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
       <h2 className="sr-only">Orbit: the Moon with the Sun and Earth</h2>
 
       {/* The tall wing, on the side away from Earth: the Sun, the mission clock and the launch. */}
-      <div className="hud-layer" data-depth="0.9">
+      <div className="hud-layer">
         <div
           className={`absolute top-[4.75rem] flex w-[18rem] flex-col gap-3.5 max-md:left-3 max-md:right-auto max-md:top-[4.25rem] max-md:w-[calc(50%-1.125rem)] ${earthSide === 'right' ? 'wing-l left-5' : 'wing-r right-5'}`}
           data-enter={earthSide === 'right' ? 'left' : 'right'}
@@ -205,7 +205,7 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
       </div>
 
       {/* Earth's wing, low on Earth's side: the sky above it is where Earth stands. */}
-      <div className="hud-layer" data-depth="0.9">
+      <div className="hud-layer">
         <div
           className={`absolute bottom-5 flex w-[18rem] flex-col max-md:bottom-auto max-md:left-auto max-md:right-3 max-md:top-[4.25rem] max-md:w-[calc(50%-1.125rem)] ${earthSide === 'right' ? 'wing-r right-5' : 'wing-l left-5'}`}
           data-enter={earthSide === 'right' ? 'right' : 'left'}
@@ -245,7 +245,7 @@ export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?
       </div>
 
       {/* The one clear action, with the preview controls beside it. */}
-      <div className="hud-layer" data-depth="0.5">
+      <div className="hud-layer">
         {/* The row spans the screen only to centre its content: presses beside it go to what is behind. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-5 flex justify-center px-4 max-md:bottom-4">
         <div className="pointer-events-auto relative flex w-fit max-w-full flex-col items-center gap-2.5" data-enter="lead" data-keep-clear>

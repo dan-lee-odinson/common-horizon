@@ -186,12 +186,20 @@
   }
 
   /* ---------- the HUD space ---------- */
+  /* Stacking order, back to front: the 3D scene, then the HUD, then the landing card (z-[60]).
+     The labels the scene draws over its canvas (drei's Html, which sets its own z-index) stay inside
+     the scene's layer, so any panel covers a label that lands beneath it, on every stage. Neither
+     rule makes a backdrop root: the glass panels still blur and dim the scene behind them. */
+  [data-testid='world'] {
+    isolation: isolate;
+  }
   /* Panels sit in a shared 3D space and stay still. Wings tilt 6 degrees toward the viewer. The HUD
      itself lets presses through to the scene; only the panels and controls placed in its layers
      take them. */
   .hud {
     position: absolute;
     inset: 0;
+    z-index: 1;
     perspective: 1500px;
     perspective-origin: 50% 46%;
     pointer-events: none;
