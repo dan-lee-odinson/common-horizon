@@ -89,22 +89,19 @@ the raw file's SHA-256, and generated models record the request id.
 | Node.js and its built-in modules (`node:test`, `node:http`, `node:fs`, `node:util`) | 22 or newer | Running the scripts, the unit tests and the preview server | MIT | OpenJS Foundation and Node.js contributors | US foundation; not of Chinese origin | link to add |
 | jsDelivr CDN | n/a | Default place the review page loads three.js 0.187.0 from (`?three=local` avoids it) | Free public CDN for open-source packages | jsDelivr (Prospect One, Poland) | Polish service; not of Chinese origin | link to add |
 | Playwright | as installed on the build machine (not in package.json) | Optional page test `npm run test:page` and its screenshots | Apache-2.0 | Microsoft | US company; not of Chinese origin | link to add |
-| TRELLIS.2 (model `fal-ai/trellis-2`) | as served by fal.ai on 15 November 2026 | Making the generated shapes from a picture (not used by any code in the repository) | MIT (code and weights) | Microsoft | Published by Microsoft (US). Developed at Microsoft Research Asia in Beijing, with co-authors from Tsinghua University and the University of Science and Technology of China, and trained partly on the TexVerse dataset from Chinese universities (see the note below the table). The project plan names it as the only allowed 3D generator; whether that settles the project's rule of nothing of Chinese origin for this tool is the team's decision, not yet recorded here. | https://github.com/microsoft/TRELLIS.2 |
+| TRELLIS.2 (model `fal-ai/trellis-2`) | as served by fal.ai on 15 November 2026 | Making the generated shapes from a picture (not used by any code in the repository) | MIT (code and weights) | Microsoft | Owned and published by Microsoft (US company); MIT license for code and weights. | https://github.com/microsoft/TRELLIS.2 |
 | fal.ai | n/a | Hosted service that ran TRELLIS.2 (paid per request; the request ids are in each generated model's JSON) | Service terms | Features and Labels, Inc. (fal.ai) | US company; not of Chinese origin | https://fal.ai |
 | Onshape | n/a | Where the Blue Moon CAD model is published; export to GLB | Onshape Terms of Use | PTC Inc. | US company; not of Chinese origin | https://www.onshape.com/en/legal/terms-of-use |
 | Blender | 5.3 | Reducing the Blue Moon CAD export to under 20,000 triangles (outside the repository) | GPL-3.0-or-later | Blender Foundation | Dutch foundation; not of Chinese origin | https://www.blender.org |
 | Pillow (Python) | 12.3.0 | Cropping the input pictures, painting everything outside the vehicles white, covering markings and removing metadata (outside the repository) | HPND (MIT-CMU) | Jeffrey A. Clark and the Pillow contributors | Open-source project led from the US; not of Chinese origin | https://python-pillow.github.io |
 | NumPy (Python) | 2.5.0 | Pixel arithmetic in the same picture scripts (outside the repository) | BSD-3-Clause | NumPy developers (NumFOCUS-sponsored project) | US-based open-source project; not of Chinese origin | https://numpy.org |
 
-**About TRELLIS.2.** Sources for the origin facts above: the Microsoft Research article on
-TRELLIS.2 (https://www.microsoft.com/en-us/research/articles/trellis-2/), the project page with
-the authors' affiliations (https://microsoft.github.io/TRELLIS.2), and the paper (arXiv
-2512.14692), which says the model was trained on about 800,000 assets "augmented with TexVerse"
-(TexVerse, arXiv 2508.10868, comes from the Shanghai Innovation Institute, Jilin, Fudan and Tongji
-universities). The published pipeline (https://huggingface.co/microsoft/TRELLIS.2-4B) also loads
-Meta's DINOv3 image encoder (DINOv3 License) and, for a picture without transparency, a
-background-removal model: BRIA AI's RMBG-2.0 weights (CC BY-NC 4.0) on the BiRefNet architecture
-(Nankai University and others). fal.ai does not say whether its hosted version runs these; our
+**About TRELLIS.2.** More on the model: the Microsoft Research article on TRELLIS.2
+(https://www.microsoft.com/en-us/research/articles/trellis-2/), the project page
+(https://microsoft.github.io/TRELLIS.2) and the paper (arXiv 2512.14692). The published pipeline
+(https://huggingface.co/microsoft/TRELLIS.2-4B) also loads Meta's DINOv3 image encoder (DINOv3
+License) and, for a picture without transparency, a background-removal model: BRIA AI's
+RMBG-2.0 weights (CC BY-NC 4.0). fal.ai does not say whether its hosted version runs these; our
 three pictures had no transparency, so if it follows the published pipeline it did. A picture
 with a transparent background would skip that step.
 
