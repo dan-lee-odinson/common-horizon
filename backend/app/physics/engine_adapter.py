@@ -44,7 +44,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from app.models import limits
 from app.models.results import BodyTimeseries, ObstructionState, SiteInfo, TerrainSkyline, Timeseries
 from app.physics.horizon.geometry import MOON_RADIUS_M, unit_from_lat_lon
 from app.physics.horizon.profile import DEFAULT_PROFILE_DIR, HorizonProfile, load_profile
@@ -52,6 +51,7 @@ from app.physics.horizon.visibility import body_visibility
 from app.physics.interface import (
     EngineContractError,
     EngineInfo,
+    EvaluationCache,
     PhysicsEngineUnavailable,
     SimulationRequest,
     SimulationResult,
@@ -80,11 +80,6 @@ SITE_HEIGHT_MATCH_M = 0.5
 OBSERVER_HEIGHT_MATCH_M = 0.01
 
 PROFILE_FRAME = "MOON_ME"
-
-# Launch-delay runs reuse the per-timestamp disc fractions of earlier runs for the same site.
-# About 0.3 kB per entry. The cap is never below the per-evaluation work budget, so an accepted
-# request never has its shared samples evicted mid-sweep (20 000 entries: about 6 MB).
-_FRACTION_CACHE_MAX = max(60_000, limits.MAX_TOTAL_SAMPLES)
 
 # Transport rounding of the time series (metrics are computed before rounding): 1 m for
 # positions, 1e-9 for unit vectors, 1e-6 degree for angles. Visibility fractions are not rounded.
@@ -347,7 +342,10 @@ def _position_vector(position_km: Any) -> Any:
         isinstance(c, numbers.Real) and not isinstance(c, bool | np.bool_) for c in components
     ):
         raise EngineContractError("The ephemeris returned a position that is not three finite numbers.")
-    position = np.array([float(c) for c in components], dtype=float)
+    try:
+        position = np.array([float(c) for c in components], dtype=float)
+    except (OverflowError, ValueError, TypeError):  # e.g. an integer too large for a float
+        raise EngineContractError("The ephemeris returned a position that is not three finite numbers.") from None
     if not np.all(np.isfinite(position)):
         raise EngineContractError("The ephemeris returned a position that is not three finite numbers.")
     return position
@@ -386,6 +384,18 @@ def _observe(
     )
 
 
+def _geometry_key(request: SimulationRequest, terrain: Terrain) -> tuple[Any, ...]:
+    """Everything a cached disc fraction depends on besides the timestamp."""
+    return (
+        request.latitude_deg,
+        request.longitude_deg,
+        request.observer_height_m,
+        terrain.site_height_m,
+        terrain.profile.site_id,
+        terrain.stored,
+    )
+
+
 def _body_timeseries(samples: Sequence[BodySample]) -> BodyTimeseries:
     def azimuth(value: float) -> float:
         rounded = round(value, _ANGLE_DECIMALS) % 360.0
@@ -421,8 +431,6 @@ class PhysicsEngineAdapter:
         self._injected_positions = body_positions
         self._kernels_loaded = False
         self._profiles: ProfileIndex | None = None
-        self._cache_key: tuple[Any, ...] | None = None
-        self._fraction_cache: dict[datetime, tuple[float, float]] = {}
 
     # ----------------------------------------------------------------------------------- status
 
@@ -533,7 +541,10 @@ class PhysicsEngineAdapter:
 
             observer_radius_km = (MOON_RADIUS_M + terrain.site_height_m + request.observer_height_m) / 1000.0
             site_km = frames.get_site_position(request.latitude_deg, request.longitude_deg, observer_radius_km)
-            self._use_cache_for(request, terrain)
+            # Disc fractions per timestamp, shared only within the caller's evaluation (see EvaluationCache).
+            # (`is None`, not `or`: an empty cache has len 0 and is falsy.)
+            cache = request.sample_cache if request.sample_cache is not None else EvaluationCache()
+            fractions = cache.scope(_geometry_key(request, terrain))
 
             def observe(moment: datetime) -> tuple[BodySample, BodySample]:
                 positions = body_positions(moment)
@@ -543,7 +554,7 @@ class PhysicsEngineAdapter:
                 lat, lon, profile = request.latitude_deg, request.longitude_deg, terrain.profile
                 sun = _observe(sun_km, site_km, lat, lon, SUN_RADIUS_KM, profile)
                 earth = _observe(earth_km, site_km, lat, lon, EARTH_RADIUS_KM, profile)
-                self._remember(moment, sun.fraction, earth.fraction)
+                fractions[moment] = (sun.fraction, earth.fraction)
                 return sun, earth
 
             if request.include_timeseries:
@@ -553,7 +564,7 @@ class PhysicsEngineAdapter:
             else:
                 sun_fraction, earth_fraction = [], []
                 for moment in times:
-                    cached = self._fraction_cache.get(moment)
+                    cached = fractions.get(moment)
                     if cached is None:
                         sun, earth = observe(moment)
                         cached = (sun.fraction, earth.fraction)
@@ -592,23 +603,3 @@ class PhysicsEngineAdapter:
             warnings=warnings,
             sources=[*self._ephemeris_sources(), *terrain.sources],
         )
-
-    # ------------------------------------------------------------------------- fraction cache
-
-    def _use_cache_for(self, request: SimulationRequest, terrain: Terrain) -> None:
-        key = (
-            request.latitude_deg,
-            request.longitude_deg,
-            request.observer_height_m,
-            terrain.site_height_m,
-            terrain.profile.site_id,
-            terrain.stored,
-        )
-        if key != self._cache_key:
-            self._cache_key = key
-            self._fraction_cache = {}
-
-    def _remember(self, moment: datetime, sun_fraction: float, earth_fraction: float) -> None:
-        if len(self._fraction_cache) >= _FRACTION_CACHE_MAX:
-            self._fraction_cache = {}
-        self._fraction_cache[moment] = (sun_fraction, earth_fraction)

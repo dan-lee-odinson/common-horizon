@@ -45,7 +45,7 @@ def _positive_int_from_env(name: str, default: int) -> int:
 
 
 # Work budget of one evaluation: distinct Sun/Earth sample timestamps over the baseline and every
-# launch-delay case together (cases share timestamps when time_step_s divides a day). Sized for the
+# launch-delay case together (two cases share timestamps when the delay between them is a whole number of time steps). Sized for the
 # Lambda deployment (512 MB, 60 s timeout, about a third of a vCPU): about 7 s for the real engine on
 # a laptop at a polar site, leaving room for slower Lambda CPU. Not yet measured on Lambda.
 MAX_TOTAL_SAMPLES = _positive_int_from_env("CH_MAX_TOTAL_SAMPLES", 20_000)

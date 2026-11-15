@@ -8,9 +8,10 @@ Output is returned as a validated ``SimulationResult``, so any shape or range
 error in engine output is caught at this boundary instead of reaching the website.
 """
 
-from dataclasses import dataclass
+from collections.abc import Hashable
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -23,6 +24,28 @@ class EngineInfo:
     version: str
     is_synthetic: bool
     available: bool = True
+
+
+class EvaluationCache:
+    """Per-timestamp results shared by the runs of ONE mission evaluation (baseline + launch delays).
+
+    ``evaluate_mission`` creates one per evaluation and passes it with every request, so delayed runs
+    reuse samples the baseline (or an earlier delay) already computed. Nothing outlives the
+    evaluation: there is no eviction to defeat the request work budget, no entry from another HTTP
+    request, and concurrent evaluations never share one. Its size is bounded by the evaluation's
+    distinct timestamps, which ``MissionInput`` validation caps (``limits.MAX_TOTAL_SAMPLES``).
+    Engines may ignore it.
+    """
+
+    def __init__(self) -> None:
+        self._scopes: dict[Hashable, dict[Hashable, Any]] = {}
+
+    def scope(self, key: Hashable) -> dict[Hashable, Any]:
+        """The entries for one observing geometry (site, observer, terrain)."""
+        return self._scopes.setdefault(key, {})
+
+    def __len__(self) -> int:
+        return sum(len(entries) for entries in self._scopes.values())
 
 
 @dataclass(frozen=True)
@@ -41,6 +64,8 @@ class SimulationRequest:
     duration_s: float
     time_step_s: int
     include_timeseries: bool = True  # False for launch-delay cases, where only metrics are used
+    # Shared by all runs of one evaluation; None: the engine keeps nothing between calls.
+    sample_cache: EvaluationCache | None = field(default=None, compare=False, repr=False)
 
 
 class SimulationResult(BaseModel):

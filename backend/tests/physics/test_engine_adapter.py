@@ -407,7 +407,9 @@ def test_metrics_and_windows_come_from_the_computed_series(profile_dir):
     assert result.timeseries.earth.obstruction_state[4] == ObstructionState.BELOW_HORIZON
 
 
-def test_metric_only_runs_skip_the_series_and_reuse_overlapping_samples(profile_dir):
+def test_metric_only_runs_skip_the_series_and_reuse_samples_of_the_same_evaluation(profile_dir):
+    from app.physics.interface import EvaluationCache
+
     def track(moment):
         hours = (moment - START).total_seconds() / 3600
         return (90.0 if hours % 5 < 3 else 180.0, 5.0, AU_KM), (0.0, 5.0 - hours % 4, EARTH_DISTANCE_KM)
@@ -415,11 +417,12 @@ def test_metric_only_runs_skip_the_series_and_reuse_overlapping_samples(profile_
     sky = _sky_at_fixture(track)
     adapter = PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=sky)
     day = 86_400.0
-    full = adapter.simulate(_request(duration_s=2 * day))
+    cache = EvaluationCache()  # one evaluation: the baseline and a delayed case share it
+    full = adapter.simulate(_request(duration_s=2 * day, sample_cache=cache))
     calls_after_full = sky.calls
 
     shifted = adapter.simulate(
-        _request(start_utc=START + timedelta(days=1), duration_s=2 * day, include_timeseries=False)
+        _request(start_utc=START + timedelta(days=1), duration_s=2 * day, include_timeseries=False, sample_cache=cache)
     )
 
     assert shifted.timeseries is None
@@ -435,13 +438,230 @@ def test_metric_only_runs_skip_the_series_and_reuse_overlapping_samples(profile_
     assert full.metrics != shifted.metrics or full.communication_windows != shifted.communication_windows
 
 
-def test_cache_is_not_shared_between_sites(profile_dir):
+def test_without_a_shared_cache_nothing_is_kept_between_calls(profile_dir):
     sky = _sky_at_fixture(_fixed((90.0, 5.0, AU_KM), (0.0, 5.0, EARTH_DISTANCE_KM)))
     adapter = PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=sky)
     adapter.simulate(_request(include_timeseries=False))
-    calls = sky.calls
-    adapter.simulate(_request(latitude_deg=0.0, include_timeseries=False))
-    assert sky.calls - calls == 7  # every sample recomputed for the other site
+    adapter.simulate(_request(include_timeseries=False))
+    assert sky.calls == 2 * 7
+    assert not hasattr(adapter, "_fraction_cache")  # no state survives a call
+
+
+def test_one_cache_keeps_sites_apart(profile_dir):
+    from app.physics.interface import EvaluationCache
+
+    sky = _sky_at_fixture(_fixed((90.0, 5.0, AU_KM), (0.0, 5.0, EARTH_DISTANCE_KM)))
+    adapter = PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=sky)
+    cache = EvaluationCache()
+    adapter.simulate(_request(include_timeseries=False, sample_cache=cache))
+    adapter.simulate(_request(latitude_deg=0.0, include_timeseries=False, sample_cache=cache))
+    adapter.simulate(_request(observer_height_m=0.0, include_timeseries=False, sample_cache=cache))
+    assert sky.calls == 3 * 7  # every sample recomputed for another site or observer height
+    assert len(cache) == 3 * 7
+
+
+# ------------------------------------- per-evaluation cache (independent Codex re-review of 51c4cf0)
+
+
+def _mission(latitude, longitude, start, stay_days, step_s, delay_days=0, observer_height_m=2.0):
+    from app.models.mission import MissionInput
+
+    return MissionInput.model_validate(
+        {
+            "landing_site": {"latitude_deg": latitude, "longitude_deg": longitude},
+            "observer_height_m": observer_height_m,
+            "mission_start_utc": start,
+            "stay_duration_days": stay_days,
+            "time_step_s": step_s,
+            "launch_delay_days": delay_days,
+        }
+    )
+
+
+def _distinct(mission) -> int:
+    from app.timegrid import count_distinct_samples
+
+    offsets = [d * 86_400.0 for d in (mission.launch_delays() or [0])]
+    return count_distinct_samples(mission.stay_duration_s, mission.time_step_s, offsets)
+
+
+def _fast_sky() -> FakeSky:
+    """Bodies far above the fixture skyline: no strip integration, so large tests stay quick (MOCK)."""
+    return _sky_at_fixture(_fixed((90.0, 20.0, AU_KM), (0.0, 30.0, EARTH_DISTANCE_KM)))
+
+
+def test_warm_process_cannot_inflate_an_accepted_evaluation(profile_dir):
+    """The re-review case: five earlier 10 000-sample requests, then an accepted 20 000-sample sweep.
+
+    With the old adapter-wide cache the warm-up left 50 000 entries; the sweep then hit the cap,
+    the cache was cleared mid-sweep and 27 120 samples were computed for a request validated at 20 000.
+    """
+    from app.services.evaluation import evaluate_mission
+
+    lat, lon = SITE["latitude_deg"], SITE["longitude_deg"]
+    sky = _fast_sky()
+    adapter = PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=sky)
+    for month in range(1, 6):
+        evaluate_mission(_mission(lat, lon, f"2026-{month:02d}-01T00:00:00Z", 9999 * 60 / 86_400, 60), adapter)
+    assert sky.calls == 5 * 10_000
+
+    sweep = _mission(lat, lon, "2027-01-15T00:00:00Z", 9919 * 60 / 86_400, 60, delay_days=7)
+    assert _distinct(sweep) == 20_000
+    before = sky.calls
+    evaluation = evaluate_mission(sweep, adapter)
+
+    assert sky.calls - before == 20_000  # never more than validated
+    assert len(evaluation.timeseries.timestamps_utc) == 9920
+    assert [case.launch_delay_days for case in evaluation.launch_delay_results] == list(range(8))
+    assert evaluation.launch_delay_results[0].metrics == evaluation.metrics
+    # The same evaluation on a fresh engine gives identical results.
+    fresh = evaluate_mission(sweep, PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=_fast_sky()))
+    assert fresh.launch_delay_results == evaluation.launch_delay_results
+    assert fresh.metrics == evaluation.metrics
+
+
+def test_repeated_evaluations_each_compute_exactly_their_own_samples(profile_dir):
+    from app.services.evaluation import evaluate_mission
+
+    sky = _fast_sky()
+    adapter = PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=sky)
+    mission = _mission(SITE["latitude_deg"], SITE["longitude_deg"], "2027-01-15T00:00:00Z", 14, 3600, delay_days=30)
+    assert _distinct(mission) == 1057  # 14-day hourly stay with a 30-day sweep
+
+    results = []
+    for _ in range(3):
+        before = sky.calls
+        results.append(evaluate_mission(mission, adapter))
+        assert sky.calls - before == 1057
+    assert results[0].launch_delay_results == results[1].launch_delay_results == results[2].launch_delay_results
+
+
+@pytest.mark.parametrize(
+    "mission_args",
+    [
+        (SITE["latitude_deg"], SITE["longitude_deg"], "2027-01-15T00:00:00Z", 2, 3600, 3, 2.0),  # stored profile
+        (SITE["latitude_deg"], SITE["longitude_deg"], "2027-01-15T00:00:00Z", 2, 3600, 3, 0.0),  # other observer
+        (10.0, 20.0, "2027-01-15T00:00:00Z", 2, 3600, 3, 2.0),  # other site, smooth sphere
+    ],
+)
+def test_alternating_sites_and_observers_on_one_engine_match_fresh_engines(profile_dir, mission_args):
+    from app.services.evaluation import evaluate_mission
+
+    def track(moment):
+        hours = (moment - START).total_seconds() / 3600
+        return (hours * 15 % 360, 3 * math.sin(hours / 7), AU_KM), (hours * 13 % 360, 2.0, EARTH_DISTANCE_KM)
+
+    shared = PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=_sky_at_fixture(track))
+    other = _mission(0.0, 0.0, "2027-03-01T00:00:00Z", 2, 3600, delay_days=2)
+    evaluate_mission(other, shared)  # an unrelated evaluation first
+    mission = _mission(*mission_args[:5], delay_days=mission_args[5], observer_height_m=mission_args[6])
+
+    on_shared = evaluate_mission(mission, shared)
+    on_fresh = evaluate_mission(
+        mission, PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=_sky_at_fixture(track))
+    )
+    assert on_shared.launch_delay_results == on_fresh.launch_delay_results
+    assert on_shared.timeseries == on_fresh.timeseries
+    assert on_shared.site == on_fresh.site
+
+
+def test_an_evaluation_that_fails_leaves_nothing_behind(profile_dir):
+    from app.services.evaluation import evaluate_mission
+
+    good = _fast_sky()
+    failing_after = {"calls": 0}
+
+    def flaky(moment):
+        failing_after["calls"] += 1
+        if failing_after["calls"] > 60:  # fails inside the delayed cases
+            raise RuntimeError("ephemeris failure")
+        return good(moment)
+
+    adapter = PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=flaky)
+    mission = _mission(SITE["latitude_deg"], SITE["longitude_deg"], "2027-01-15T00:00:00Z", 2, 3600, delay_days=3)
+    with pytest.raises(RuntimeError, match="ephemeris failure"):
+        evaluate_mission(mission, adapter)
+
+    failing_after["calls"] = -10_000  # works again
+    good.calls = 0
+    evaluation = evaluate_mission(mission, adapter)
+    assert good.calls == _distinct(mission) == 121  # nothing reused from the failed evaluation
+    fresh = evaluate_mission(mission, PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=_fast_sky()))
+    assert evaluation.launch_delay_results == fresh.launch_delay_results
+
+
+def test_concurrent_evaluations_on_one_engine_do_not_interfere(profile_dir):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from app.services.evaluation import evaluate_mission
+
+    def track(moment):
+        hours = (moment - START).total_seconds() / 3600
+        return (hours * 15 % 360, 3 * math.sin(hours / 7), AU_KM), (hours * 13 % 360, 2.0, EARTH_DISTANCE_KM)
+
+    missions = [
+        _mission(SITE["latitude_deg"], SITE["longitude_deg"], "2027-01-15T00:00:00Z", 3, 3600, delay_days=5),
+        _mission(10.0, 20.0, "2027-01-16T00:00:00Z", 3, 1800, delay_days=4),
+        _mission(SITE["latitude_deg"], SITE["longitude_deg"], "2027-02-01T00:00:00Z", 2, 3600, 3, 0.0),
+    ] * 2
+    shared = PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=_sky_at_fixture(track))
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        concurrent = list(pool.map(lambda m: evaluate_mission(m, shared), missions))
+
+    for mission, result in zip(missions, concurrent, strict=True):
+        alone = evaluate_mission(
+            mission, PhysicsEngineAdapter(horizon_profile_dir=profile_dir, body_positions=_sky_at_fixture(track))
+        )
+        assert result.launch_delay_results == alone.launch_delay_results
+        assert result.metrics == alone.metrics
+
+
+@pytest.mark.parametrize(("stay_steps", "status"), [(9919, 200), (9920, 422)])
+def test_exactly_20000_samples_are_accepted_and_20001_rejected_before_physics(
+    app, client, mission_payload, profile_dir, stay_steps, status
+):
+    from app.models.mission import MissionInput
+
+    sky = _fast_sky()
+    app.dependency_overrides[get_physics_engine] = lambda: PhysicsEngineAdapter(
+        horizon_profile_dir=profile_dir, body_positions=sky
+    )
+    mission_payload.update(
+        landing_site={"latitude_deg": SITE["latitude_deg"], "longitude_deg": SITE["longitude_deg"]},
+        stay_duration_days=stay_steps * 60 / 86_400,
+        time_step_s=60,
+        launch_delay_days=7,
+        launch_delay_step_days=1,
+    )
+    if status == 200:
+        assert _distinct(MissionInput.model_validate(mission_payload)) == 20_000
+
+    response = client.post(URL, json=mission_payload)
+
+    assert response.status_code == status
+    if status == 200:
+        assert sky.calls == 20_000
+    else:
+        assert "needs 20001 distinct samples" in response.json()["detail"][0]["msg"]
+        assert sky.calls == 0  # rejected before any physics
+
+
+@pytest.mark.parametrize("huge", [10**1000, -(10**400)])
+def test_numbers_too_large_for_a_float_are_contract_errors(profile_dir, huge):
+    adapter = PhysicsEngineAdapter(
+        horizon_profile_dir=profile_dir, body_positions=lambda _: ([huge, 0, 0], [1e6, 0, 0])
+    )
+    with pytest.raises(EngineContractError, match="three finite numbers"):
+        adapter.simulate(_request())
+
+
+def test_overflowing_engine_output_is_502_not_500(app, server_client, mission_payload, profile_dir):
+    app.dependency_overrides[get_physics_engine] = lambda: PhysicsEngineAdapter(
+        horizon_profile_dir=profile_dir, body_positions=lambda _: ([10**1000, 0, 0], [1e6, 0, 0])
+    )
+    mission_payload["landing_site"] = {"latitude_deg": SITE["latitude_deg"], "longitude_deg": SITE["longitude_deg"]}
+    response = server_client.post(URL, json=mission_payload)
+    assert response.status_code == 502
 
 
 # ------------------------------------------------------------------------------- API level

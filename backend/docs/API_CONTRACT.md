@@ -53,8 +53,8 @@ full response under the 6 MB AWS Lambda synchronous payload limit; a test checks
 
 Work budget: with `launch_delay_days > 0`, the distinct sample timestamps over all cases together (the
 baseline and every delayed case, counting a timestamp shared by several cases once) must be ≤
-`MAX_TOTAL_SAMPLES` (20 000 by default, set by `CH_MAX_TOTAL_SAMPLES`). Cases share timestamps only when
-`time_step_s` divides 86 400. Over the budget: 422 naming `launch_delay_days`, `launch_delay_step_days`,
+`MAX_TOTAL_SAMPLES` (20 000 by default, set by `CH_MAX_TOTAL_SAMPLES`). Two cases share timestamps when the
+delay between them is a whole number of time steps (always when `time_step_s` divides 86 400). Over the budget: 422 naming `launch_delay_days`, `launch_delay_step_days`,
 `stay_duration_days` and `time_step_s`. Request and response shapes are unchanged, so `contract_version`
 stays 0.1.0, but requests accepted before (for example a 61 s step with a 30-day sweep) are now rejected.
 
@@ -131,7 +131,8 @@ elevation of a stored site within 50 m, even when its skyline does not fit the o
 with a warning that the elevation is UNKNOWN (the contract requires a number; clients should display it as
 unknown even though `provenance.is_synthetic` is false). With a
 profile, `sky_visibility_fraction` is the share of the upper hemisphere's solid angle above the skyline.
-Launch-delay (metric-only) runs skip the time series and reuse samples shared with earlier runs.
+Launch-delay (metric-only) runs skip the time series and reuse samples already computed by the same
+evaluation (`EvaluationCache`, one per evaluation; nothing is kept between requests).
 Time series are rounded for transport (positions 1 m, unit vectors 1e-9, angles 1e-6 degree); metrics
 are computed before rounding and visibility fractions are not rounded.
 

@@ -149,3 +149,19 @@ which 8 use the kernels; the ninth (the radius-text regression) does not.
 - During the work an over-broad `ruff format app/` reformatted 12 files, including the physics engine
   modules; they were restored from Git before any commit and are not part of this change.
 - Local timings are not Lambda measurements (see `backend/README.md`, "Work budget").
+
+### Fixes for the Codex re-review of `51c4cf0` (2026-11-15)
+
+Re-review by Codex by OpenAI posted on PR #14 at 11:44:56 UTC (GitHub timestamp): one remaining blocker
+(the adapter-wide sample cache, filled by earlier requests, was cleared mid-sweep, so an evaluation
+validated at 20 000 samples computed 27 120) and one minor defect (an integer too large for a float gave
+500). Fixes drafted by Claude Code (Claude Opus 5.5): one `EvaluationCache` per evaluation, passed
+explicitly with each `SimulationRequest`; no engine-wide cache; overflow mapped to the 502 contract error.
+While writing the fix, a new test caught that an empty cache is falsy (`cache or new_cache` silently
+discarded it); fixed with an explicit `is None` check before any commit. The warm-process regression
+reproduces 27 120 extra samples against `51c4cf0` and passes on the fix.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 11:44:56 | 13:44:56 | Codex re-review posted (GitHub timestamp) | 1 blocker, 1 minor defect |
+| by 11:59:20 | by 13:59:20 | Per-evaluation cache, overflow handling, regressions, real-kernel HTTP probe | 447 passed, 9 skipped with kernels (LOLA DEM tests only); warm exact-20 000 evaluation computes 20 000 samples (6.9 s locally, not Lambda) |

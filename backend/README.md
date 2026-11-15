@@ -128,9 +128,12 @@ in `spk/planets/aa_checksums.txt`, and it matches):
 
 **Work budget.** One evaluation may compute at most `CH_MAX_TOTAL_SAMPLES` (default 20 000)
 distinct sample timestamps over the baseline and all launch-delay cases together; larger requests
-get 422 before any engine work, naming the settings to reduce. Delayed cases share timestamps only
-when `time_step_s` divides 86 400 s, so a 61 s step with a 30-day sweep needs 310 000 samples while
-60 s needs 53 200 (both rejected). The count is exact: it equals the samples the adapter computes.
+get 422 before any engine work, naming the settings to reduce. Two cases share timestamps when the
+delay between them is a whole number of time steps (always when `time_step_s` divides 86 400 s;
+also, for example, 6 000 s steps with a 5-day delay step), so a 61 s step with a 30-day sweep needs 310 000 samples while
+60 s needs 53 200 (both rejected). The count is exact: it equals the samples the adapter computes, because each evaluation gets its
+own sample cache (shared by its baseline and delayed cases, dropped afterwards), so earlier requests
+can neither evict its samples nor add work.
 
 Measured with these kernels on a local laptop through the HTTP endpoint (**not on Lambda**): 14 days
 hourly 0.13 s, with a 30-day sweep 0.39 to 0.43 s; 365 days hourly with a 30-day sweep (9 481 samples)
