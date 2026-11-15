@@ -1,7 +1,7 @@
 # Website API: endpoints, contract changes and open decisions
 
 The backend now serves the endpoints the website's client (`web/src/api/client.ts`) calls, at the
-root path: `GET /sites`, `GET /catalog`, `POST /check` and `POST /evaluate`. `GET /health` and
+root path: `GET /sites`, `GET /catalog`, `POST /check`, `POST /evaluate` and `POST /horizon`. `GET /health` and
 `POST /api/v1/missions/evaluate` are unchanged, except for one added field on `/health`. The full
 schema is in `contract/openapi.json`.
 
@@ -90,6 +90,12 @@ These are differences from `web/src/api/types.ts`. All other fields match it by 
    - new fields: `fit_verdict`, `site_energy`, `provenance` and `warnings`;
    - `energy_added_kwh` is null.
 8. **HealthResponse:** `assistant_available` is now sent (always `false`). The backend's `status` is always `"ok"`, and the extra fields (`service`, `contract_version`, `physics_engine`) are additive.
+9. **HorizonResponse** (`POST /horizon`, see below):
+   - `sun_path[].state` is `"above"` when **any part of the Sun's disc** is visible above the terrain, the rule `/evaluate` uses for sunlight. The comment in `types.ts` says "the Sun's centre". The difference is deliberate: there is one definition of "lit" across the product.
+   - new fields: `provenance`, `warnings`, `time_step_s` and `skyline_source` (`stored_profile` or `smooth_sphere`).
+   - `skyline` comes at the stored profile's own spacing (0.5° for the stored profiles, 720 points), not every 10° as in the sample. A site without a stored profile gets the engine's smooth-sphere skyline (the same dip at every azimuth) and a warning.
+   - `earth_box` covers the Earth's sampled directions with elevation above 0°.
+   - **HorizonRequest:** `step_hours` is rounded to whole minutes and may be coarsened (see `time_step_s`).
 
 `contract_version` stays at `0.1.0`: the existing `/api/v1` shapes did not change.
 
@@ -127,6 +133,42 @@ These are differences from `web/src/api/types.ts`. All other fields match it by 
 - 17 presets × 14 days: 1.5–1.75 s;
 - 17 presets × 365 days: 5.2 s;
 - responses about 32 kB.
+
+## POST /horizon
+
+What the website's Site stage draws: the terrain skyline, the Sun's path against it and the part of the
+sky the Earth moves through. One physics run through the same `PhysicsEngine` interface as `/evaluate`
+(observer 2 m above the ground), so it works on the synthetic fixture and on the real engine. Code:
+`app/api/website_horizon.py`, `app/models/website_horizon.py`, `app/services/website_horizon.py`.
+
+**Request** (`HorizonRequest`):
+- `site` is `{id, name, lat, lon_east}`, with the same limits as `/evaluate` (`lon_east` normalised to 0–360).
+- `start_utc` and `end_utc` need an explicit timezone. `start_utc` must be before `end_utc`.
+- The window is at most 366 days, between 2000-01-01 and 2100-01-01.
+- `step_hours` runs from one minute to 24 hours and is rounded to whole minutes.
+
+**Response** (`HorizonResponse`):
+- `site_id`.
+- `skyline`: `{az, el}` in degrees, sorted by azimuth, evenly spaced.
+  - With a stored horizon profile it is that profile, at its own spacing (`skyline_source: "stored_profile"`).
+  - Otherwise it is the smooth sphere through the site that the engine uses: the geometric dip for a 2 m observer at every 0.5° (`skyline_source: "smooth_sphere"`). The engine's warning that local terrain is not included is passed on.
+  - Built by the engine's horizon model (`HorizonProfile.smooth_sphere`, the call the engine adapter makes), from the site elevation the engine reports. The interface returns no skyline for such sites.
+- `sun_path`: `{t, az, el, state}`, where `az` and `el` are the Sun's centre as the engine gives it.
+  - `state` is `"above"` when the engine's visible fraction of the disc is above 0, otherwise `"hidden"`. This is the rule `/evaluate` counts as sunlight, so the share of `"above"` points matches `sunlight_percent` to within one sample.
+- `earth_box`: `{az_min, az_max, el_min, el_max}` around the Earth's sampled directions with elevation above 0°.
+  - The azimuth range is the shortest arc holding them, so `az_min > az_max` when it wraps past north.
+  - It is `null` (with a warning) when the Earth never rises above level during the window.
+- Added beside the website's fields, as on `/evaluate`: `time_step_s` (the step used), `skyline_source`, `provenance` and `warnings`. The `X-Data-Source` header is set too.
+
+**Work bound:**
+- At most 2,000 Sun path samples per request.
+- A finer `step_hours` is coarsened in whole minutes, and `time_step_s` and a warning say so.
+- For example, 366 days get a 15,840 s step.
+
+**Errors:**
+- 422: invalid input, with the same error shape as `/evaluate`.
+- 503: physics engine unavailable.
+- 502: engine output that breaks the contract.
 
 
 ## Decisions for Dan and Isabella
@@ -179,5 +221,6 @@ The Docker image is built from `backend/` only, so it cannot read `planner/` or 
    - null `energy_added_kwh`;
    - `provenance` labelling.
 3. Use the response's `landing_utc` everywhere. Do not add a local transit time. Send `transit_days` once the team fixes one.
-4. `POST /horizon` is not implemented yet: the horizon plot and stage-3 scene still need it.
+4. ~~`POST /horizon` is not implemented yet: the horizon plot and stage-3 scene still need it.~~ Done: see
+   "POST /horizon" above. The website still has to read its added fields and the "any part of the disc" rule.
 5. `POST /assistant` is not implemented (out of scope; `assistant_available` is `false`).

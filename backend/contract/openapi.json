@@ -258,6 +258,68 @@
           }
         }
       }
+    },
+    "/horizon": {
+      "post": {
+        "tags": [
+          "website"
+        ],
+        "summary": "Terrain skyline, the Sun's path and the Earth's box for one site",
+        "description": "One physics run through the engine interface ``/evaluate`` uses. ``state`` is \"above\" when any part of\nthe Sun's disc is visible above the terrain. Check ``provenance.is_synthetic`` (also the ``X-Data-Source``\nheader): synthetic fixtures are not physics.",
+        "operationId": "horizon_horizon_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HorizonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HorizonResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Engine output violated the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Physics engine unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1305,6 +1367,109 @@
           "assistant_available"
         ],
         "title": "HealthResponse"
+      },
+      "HorizonRequest": {
+        "properties": {
+          "site": {
+            "$ref": "#/components/schemas/SiteRef"
+          },
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          },
+          "step_hours": {
+            "type": "number",
+            "maximum": 24.0,
+            "minimum": 0.016666666666666666,
+            "title": "Step Hours",
+            "description": "Wanted spacing of sun_path samples, hours (one minute to one day). Rounded to whole minutes, and coarsened when the window would need more than 2000 samples (see time_step_s)."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "site",
+          "start_utc",
+          "end_utc",
+          "step_hours"
+        ],
+        "title": "HorizonRequest"
+      },
+      "HorizonResponse": {
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "title": "Site Id"
+          },
+          "skyline": {
+            "items": {
+              "$ref": "#/components/schemas/SkyPoint"
+            },
+            "type": "array",
+            "title": "Skyline",
+            "description": "Skyline sorted by azimuth, evenly spaced, degrees."
+          },
+          "sun_path": {
+            "items": {
+              "$ref": "#/components/schemas/SunPathPoint"
+            },
+            "type": "array",
+            "title": "Sun Path"
+          },
+          "earth_box": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkyBox"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Box around the Earth's sampled directions above the local horizontal plane. Null when the Earth never rises above level during the window."
+          },
+          "skyline_source": {
+            "type": "string",
+            "enum": [
+              "stored_profile",
+              "smooth_sphere"
+            ],
+            "title": "Skyline Source",
+            "description": "stored_profile: the site's stored terrain horizon profile, at its own spacing. smooth_sphere: no terrain, only the geometric dip of a sphere through the site (see warnings)."
+          },
+          "time_step_s": {
+            "type": "integer",
+            "title": "Time Step S",
+            "description": "Spacing of sun_path actually used, seconds (whole minutes)."
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/DataProvenance"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "site_id",
+          "skyline",
+          "sun_path",
+          "earth_box",
+          "skyline_source",
+          "time_step_s",
+          "provenance",
+          "warnings"
+        ],
+        "title": "HorizonResponse"
       },
       "LandingSite": {
         "properties": {
@@ -2381,6 +2546,91 @@
         ],
         "title": "SiteRef",
         "description": "A site as the website sends it: a preset, a saved point or a typed coordinate."
+      },
+      "SkyBox": {
+        "properties": {
+          "az_min": {
+            "type": "number",
+            "title": "Az Min"
+          },
+          "az_max": {
+            "type": "number",
+            "title": "Az Max"
+          },
+          "el_min": {
+            "type": "number",
+            "title": "El Min"
+          },
+          "el_max": {
+            "type": "number",
+            "title": "El Max"
+          }
+        },
+        "type": "object",
+        "required": [
+          "az_min",
+          "az_max",
+          "el_min",
+          "el_max"
+        ],
+        "title": "SkyBox",
+        "description": "Part of the sky the Earth moves through. az_min greater than az_max means it wraps past north."
+      },
+      "SkyPoint": {
+        "properties": {
+          "az": {
+            "type": "number",
+            "title": "Az",
+            "description": "Azimuth, degrees clockwise from local north, 0..360."
+          },
+          "el": {
+            "type": "number",
+            "title": "El",
+            "description": "Elevation of the skyline above the local horizontal plane, degrees."
+          }
+        },
+        "type": "object",
+        "required": [
+          "az",
+          "el"
+        ],
+        "title": "SkyPoint"
+      },
+      "SunPathPoint": {
+        "properties": {
+          "t": {
+            "type": "string",
+            "format": "date-time",
+            "title": "T"
+          },
+          "az": {
+            "type": "number",
+            "title": "Az",
+            "description": "Azimuth of the Sun's centre, degrees clockwise from local north, 0..360."
+          },
+          "el": {
+            "type": "number",
+            "title": "El",
+            "description": "Elevation of the Sun's centre above the local horizontal plane, degrees."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "above",
+              "hidden"
+            ],
+            "title": "State",
+            "description": "'above' when the engine says any part of the Sun's disc is visible above the terrain (the rule /evaluate uses for sunlight), else 'hidden'."
+          }
+        },
+        "type": "object",
+        "required": [
+          "t",
+          "az",
+          "el",
+          "state"
+        ],
+        "title": "SunPathPoint"
       },
       "TerrainSkyline": {
         "properties": {

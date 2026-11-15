@@ -46,6 +46,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(missions.router)
     app.include_router(website.router)
+    app.include_router(__import__("app.api.website_horizon", fromlist=["router"]).router)
     return app
 
 
