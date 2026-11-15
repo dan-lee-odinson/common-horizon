@@ -8,8 +8,21 @@ the Sun and the Earth sit against that site's real horizon through the stay: how
 is lit, how long it can talk to Earth directly, and whether the hardware's power system makes it
 through the dark.
 
-- **Website:** <https://main.dkj8c33i0x98e.amplifyapp.com>
+- **Website:** <https://commonhorizon.study>
 - **API:** <https://d275qzzfmu3iunuwmksur2shpi0smkbc.lambda-url.us-east-1.on.aws/health>
+
+## Team
+
+- **Dan Lee-Odinson**, team owner: app design, the interface and its 3D views, the mission
+  planner, the AWS setup, the demo video and the submission.
+- **Isabella Lin**: the physics engine. SPICE positions of the Sun, Earth and Moon, the lunar
+  coordinate frames, the LOLA terrain lookup, and the horizon and ephemeris calculations.
+- **Murariu Alexandru-Stefan (@\~Shaganelul\~)**: the backend, AI-assisted and logged in
+  [backend/docs/AI_USE_LOG.md](backend/docs/AI_USE_LOG.md). The API contract and FastAPI
+  service, the integration of the physics engine, the website API and site ranking, reviews, and
+  AWS testing, including the Mission Assistant's model on Amazon Bedrock.
+- **Cam**: mission planning. The three reference missions, the research notes with a
+  published source for each figure, and the mission plan.
 
 ## The horizon decides the answer
 
@@ -107,6 +120,9 @@ The team used AI tools to help write and review software and text. No figure in 
 from an AI model: positions, skylines, sunlight and power results are computed by this
 repository's code from NASA data.
 
+- The Mission Assistant is the one place a language model runs in the app. It words its answers
+  with OpenAI's gpt-oss-120b on Amazon Bedrock from the engine's results for the mission on
+  screen, and produces no figure of its own.
 - Each commit message carries an `SI/AI:` line naming the tool and model that helped.
 - The tools and what each did are logged in [docs/AI_USE_LOG.md](docs/AI_USE_LOG.md) and
   [backend/docs/AI_USE_LOG.md](backend/docs/AI_USE_LOG.md).
@@ -129,7 +145,7 @@ Place all four files in:
 `backend/app/physics/data/datasets/spice/`
 
 ### 2. LOLA Elevation Models
-The physics engine uses these three LOLA DEM products for lunar terrain elevation and horizon calculations.: https://pgda.gsfc.nasa.gov/data/LOLA_20mpp/
+The physics engine uses these three LOLA DEM products for lunar terrain elevation and horizon calculations: https://pgda.gsfc.nasa.gov/data/LOLA_20mpp/
 `LDEM_80S_80MPP_ADJ.tiff` 80 m/pixel 80°S to south pole
 `LDEM_60S_240MPP_ADJ.tiff`  240 m/pixel 60°S to south pole
 `Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif` 118 m/pixel, global: https://astrogeology.usgs.gov/search/map/moon_lro_lola_dem_118m

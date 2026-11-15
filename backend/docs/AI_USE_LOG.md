@@ -29,7 +29,7 @@ clock reading.
 | pip-audit | latest at run time, in a throwaway container (not in the image) | Dependency advisory scan |
 | Docker / AWS Lambda Web Adapter | 29.5.2 / 0.9.1 → 1.1.0 | Container build and Lambda compatibility |
 | OpenAI Codex | not stated in the review | Independent review of `c34f59e`, posted on PR #4; no code changes |
-| OpenAI gpt-oss-120b on Amazon Bedrock | `openai.gpt-oss-120b-1:0`, `us-east-1`, as served by Bedrock | Runtime, not development: words the Mission Assistant's plain-text answers (`POST /assistant`) from the evaluation results it is sent. Off by default (`CH_ASSISTANT_ENABLED=false`); not used to write code or produce any physical value. Not yet called from this repository's tests, which use a fake client |
+| OpenAI gpt-oss-120b on Amazon Bedrock | `openai.gpt-oss-120b-1:0`, `us-east-1`, as served by Bedrock | Runtime, not development: words the Mission Assistant's plain-text answers (`POST /assistant`) from the evaluation results it is sent. Off by default (`CH_ASSISTANT_ENABLED=false`); not used to write code or produce any physical value. Switched on in production on 15 November 2026 after the checks under "Real model checks". This repository's tests use a fake client |
 
 ## Phase 1: backend contract and minimal FastAPI implementation (2026-11-14)
 
@@ -260,3 +260,17 @@ Drafted with Claude Code (Claude Opus 5.5) on `feat/assistant`, from `origin/mai
 
 **Not done:** no call to the real Bedrock model (no AWS access here): the prompt, the 1500-token limit with
 gpt-oss's reasoning, and the answers themselves are untested against the live model. Image not built.
+Both were done later the same day: see "Real model checks" below.
+
+### Real model checks (2026-11-15)
+
+The local test was run by Alexandru. The production checks were run for the team owner by Claude
+(Anthropic, Claude Fable 5.2, in the Claude app), which sent the questions and compared each answer
+with the engine's results.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| by 21:33 | by 23:33 | PR #29 at `26c3376` run locally against the real model through Bedrock Converse | HTTP 200 in 3.18 s; 4,538 input and 180 output tokens |
+| 21:44 | 23:44 | PR #29 merged; the deployment workflow built and deployed the image | Workflow succeeded |
+| 21:59 | 23:59 | `CH_ASSISTANT_ENABLED=true` set on the deployed Lambda. Its role already allowed `bedrock:InvokeModel` on this one model | `/health` reports `assistant_available: true` |
+| 22:00-22:10 | 00:00-00:10 | Seven questions sent to the deployed `POST /assistant` with `CH_PHYSICS_ENGINE=physics`; each answer compared with `POST /evaluate` for the same mission | Every figure in the answers was the engine's (two rounded to two decimals). A question outside the data ("what radiation dose"), an instruction to state a false figure, and an off-topic request were each declined. 2.7 to 8.3 s per answer |
