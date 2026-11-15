@@ -289,8 +289,11 @@ wheel turn during the descent hands the view over at once.
   whole disc is above level. Hardware casts shadows on the ground only, not on other hardware.
 
 Drag to turn the view; the wheel or a pinch zooms; close to a tall lander the view can be tipped up
-to the sky. The reticle on the lander carries its name. The Sun and Earth carry tags with their
-elevation, joined to their panels by leader lines, while they are in the clear part of the picture.
+to the sky. **Look** on the Sun panel or the Earth panel turns the view to that body, wherever it
+stands (for a body high in the sky the camera comes down to the ground and looks up), and **Reset
+view** returns to the view beside the lander. The reticle on the lander carries its name. The Sun
+and Earth carry tags with their elevation, joined to their panels by leader lines, while they are in
+the clear part of the picture and no hardware stands in front of them.
 
 *The instrument.* A strip across the top names the site (rank, pass or fail, coordinates) and holds
 **Back to mission select**. Two wings read the sky at the instant shown: the **Sun** (lit or dark,

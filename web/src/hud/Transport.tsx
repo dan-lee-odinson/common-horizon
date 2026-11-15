@@ -46,7 +46,7 @@ export function Transport({ playing, speed, speeds, onTogglePlay, onRestart, onS
 
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className}`} data-testid="transport">
-      <button type="button" className="btn btn-primary min-w-[6.25rem]" onClick={onTogglePlay} aria-pressed={playing} disabled={disabled} data-testid="site-play">
+      <button type="button" className="btn btn-primary min-w-[5.5rem]" onClick={onTogglePlay} aria-pressed={playing} disabled={disabled} data-testid="site-play">
         <Icon name={playing ? 'pause' : 'play'} size={14} />
         {playing ? 'Pause' : 'Play'}
       </button>

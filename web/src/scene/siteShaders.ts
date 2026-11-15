@@ -43,8 +43,11 @@ uniform float uAmbient;
 uniform float uRadius;    // radius of the ground disc, metres
 uniform vec3 uRings;      // spacing of the near rings, how far out they go, spacing of the far rings (metres)
 
+// A hash with no trigonometry in it: the ground covers most of the picture, so every pixel counts.
 float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  vec3 q = fract(vec3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
 }
 float valueNoise(vec2 p) {
   vec2 i = floor(p);

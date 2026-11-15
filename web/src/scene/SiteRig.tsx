@@ -28,6 +28,8 @@ import { arrivalAzimuth, arrivalPitch, clearUpDeg, descentPose, facePose, frameS
 /** Seconds: the descent, and the settle when the rest pose changes (a resize, a panel changing height). */
 const DESCENT_S = 1.6;
 const SETTLE_S = 0.4;
+/** The share of the descent after which the picture counts as at rest for the tags and names that point into it. */
+const SETTLED_AT = 0.99;
 /** Seconds to swing the view round to the Sun, to Earth or back to the lander. */
 const LOOK_S = 0.3;
 
@@ -136,6 +138,8 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
         place(pose);
         view.current.x = g.shiftX * pose.shiftShare;
         view.current.y = g.shiftY * pose.shiftShare;
+        // The last hundredth of the way is too slow to see: the tags and names need not wait for it.
+        if (proxy.u >= SETTLED_AT) siteArrival.settled = true;
       };
       step();
       tween.current = gsap.to(proxy, {

@@ -89,7 +89,7 @@ function SiteClock({
   const sunLight = useRef<THREE.DirectionalLight>(null);
   const bounce = useRef<THREE.HemisphereLight>(null);
   const update = useMemo(() => createSiteClock(now, uniforms), [now, uniforms]);
-  const colors = useMemo(() => ({ sky: cssColor('--ch-ink-2'), space: cssColor('--ch-space'), ground: cssColor('--ch-ground'), none: '#000000' }), []);
+  const colors = useMemo(() => ({ sky: cssColor('--ch-ink-2'), space: cssColor('--ch-space'), ground: cssColor('--ch-ground') }), []);
   useFrame((_, delta) => {
     if (!active) return;
     const d = dataRef.current;
@@ -106,7 +106,8 @@ function SiteClock({
     <>
       <directionalLight ref={sunLight} intensity={0} />
       <hemisphereLight args={[colors.sky, colors.space, SITE_VIEW.fillLight]} />
-      <hemisphereLight ref={bounce} args={[colors.none, colors.ground, 0]} />
+      {/* From below only: the sky above sends none of it (space is as good as black). */}
+      <hemisphereLight ref={bounce} args={[colors.space, colors.ground, 0]} />
     </>
   );
 }

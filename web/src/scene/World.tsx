@@ -19,7 +19,7 @@ import { Stars } from './Stars';
 const STAGE_LABEL = {
   orbit: 'The Moon with the Sun and Earth on their rings, in the directions the data gives. Sizes and distances are not to scale.',
   mission: 'The Moon with landing site markers. The selected site carries a reticle.',
-  site: 'The selected site: the terrain skyline from the data, the Sun and Earth at their true apparent size, and the mission’s hardware at true scale on level ground. The ground is an illustration.',
+  site: 'The selected site: the terrain skyline from the data, the Sun and Earth at their true apparent size, the Sun’s path over the stay as a thin line across the sky, and the mission’s hardware at true scale on level ground. The ground is an illustration.',
 } as const;
 
 export function World() {

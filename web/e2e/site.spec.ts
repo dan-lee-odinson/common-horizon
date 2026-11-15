@@ -28,6 +28,7 @@ async function spotlight(page: Page, name: string) {
   await page.getByTestId('preset').first().click();
   await expect(page.getByTestId('spotlight-name')).toHaveText(name);
   await page.keyboard.press('Escape');
+  await expect(page.getByTestId('site-drawer')).toHaveAttribute('data-open', 'false');
 }
 
 /** "Zoom in to this site", and wait for the stage and its data. */
@@ -98,7 +99,11 @@ function overlap(a: Omit<Box, 'id'>, b: Omit<Box, 'id'>): boolean {
   return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
 
-/** Where the spotlight site's marker is on screen in mission select, once the camera has come to rest. */
+/**
+ * Where the spotlight site's marker is on screen in mission select, once the camera has come to
+ * rest: the same place at five looks in a row, two seconds in all (the camera's turn to a new site
+ * and the picture's slide when a panel closes are both shorter than that).
+ */
 async function restingSiteMarker(page: Page): Promise<{ x: number; y: number }> {
   const read = () =>
     page.evaluate(() => {
@@ -117,7 +122,7 @@ async function restingSiteMarker(page: Page): Promise<{ x: number; y: number }> 
       },
       { timeout: 30_000, intervals: [400] },
     )
-    .toBeGreaterThanOrEqual(2);
+    .toBeGreaterThanOrEqual(4);
   const [x, y] = last.split(',').map(Number);
   return { x, y };
 }
@@ -396,6 +401,21 @@ test('site: the scrubber takes the keyboard and the pointer, and the readouts, t
   expect(await readout(page, 'shadow_per_metre')).toMatch(/^\d/);
   await expect(page.locator('[data-q="next_change"] [data-q-label]').first()).toHaveText(/^Sunset in/);
 
+  // "Jump to the next sunset": from the landing straight to just after the Sun goes behind the terrain.
+  await scrub.fill('0');
+  await expect.poll(() => hours(page)).toBe(0);
+  const jump = page.getByTestId('site-jump');
+  await expect(jump).toHaveAttribute('aria-label', 'Jump to the next sunset');
+  await jump.click();
+  await expect.poll(() => readout(page, 'sun_state')).toBe('dark');
+  const landed = await hours(page);
+  expect(landed).toBeGreaterThan(255);
+  expect(landed).toBeLessThan(275);
+  await expect(page.getByTestId('site-play')).toHaveAttribute('aria-pressed', 'false');
+  // No sunrise is left before the end of this stay: the control says so and is switched off.
+  await expect(jump).toBeDisabled();
+  await expect(jump).toHaveAttribute('aria-label', 'No sunrise or sunset ahead in the stay');
+
   // The pointer: a press anywhere on the lane moves the clock there, a drag carries it along, and
   // the keyboard carries on from where the pointer left it.
   const lane = (await page.getByTestId('stay-lane').boundingBox())!;
@@ -515,8 +535,10 @@ test('site: with a launch delay the timeline shows the planned landing, the dela
   await expect(reticleName).toHaveText('Starship lander');
 });
 
-test('site: down and back twice, to two different sites, then Orbit: one canvas throughout, and the camera returns to where it was', async ({ page }) => {
+test('site: down and back twice, to two different sites: one canvas throughout, and the camera returns to where it was', async ({ page }) => {
   test.skip(isPhone(page), 'the phone layout has its own test');
+  // Three flights down and two back, each watched to its end: longer than one ordinary test.
+  test.setTimeout(150_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
@@ -566,10 +588,20 @@ test('site: down and back twice, to two different sites, then Orbit: one canvas 
   expect(Math.abs(backAgain.x - secondAt.x)).toBeLessThanOrEqual(2);
   expect(Math.abs(backAgain.y - secondAt.y)).toBeLessThanOrEqual(2);
 
-  // A third visit starts paused at the landing; then Orbit, straight from the site.
+  // A third visit starts paused at the landing.
   await zoomIn(page);
   await expect(page.getByTestId('site-play')).toHaveAttribute('aria-pressed', 'false');
   expect(await hours(page)).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('site: Orbit opens straight from the site, with the camera back in the Moon’s world', async ({ page }) => {
+  test.skip(isPhone(page), 'the phone layout has its own test');
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await enterMission(page);
+  await zoomIn(page);
+  await expect(page.getByTestId('lander-reticle')).toHaveAttribute('data-visible', 'true');
   await page.getByTestId('stage-orbit').click();
   await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'orbit');
   await expect(page.getByTestId('orbit-hud')).toBeVisible();
@@ -586,8 +618,13 @@ test('site: down and back twice, to two different sites, then Orbit: one canvas 
       return x > 0 && x < view.width && y > 0 && y < view.height;
     })
     .toBe(true);
-  // The scene no longer speaks of the site's sky.
+  // The scene no longer speaks of the site's sky, and the reticle has let go.
   await expect(page.getByTestId('world')).not.toHaveAttribute('data-site-sun');
+  await expect(page.getByTestId('lander-reticle')).toHaveAttribute('data-visible', 'false');
+  // And down again from Orbit: mission select, then the site, as before.
+  await page.getByTestId('stage-mission').click();
+  await expect(page.getByTestId('mission-hud')).toBeVisible();
+  await restingSiteMarker(page);
   expect(errors).toEqual([]);
 });
 

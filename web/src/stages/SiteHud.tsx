@@ -65,7 +65,7 @@ const nextChangeAhead = createStore<{ kind: 'sunrise' | 'sunset' | null }>({ kin
 const JUMP_PAST_MS = 60_000;
 
 /** What of the hardware in the picture is true and what is an illustration. (Without 3D there is no picture: only what the heights are.) */
-const HARDWARE_NOTE = 'Drawn at true scale from its models; each height is the model’s. Where each piece stands is an illustration. An item with no model is listed, not drawn.';
+const HARDWARE_NOTE = 'Drawn at true scale from its models. Where each piece stands is an illustration. An item with no model is listed, not drawn.';
 const HARDWARE_NOTE_FLAT = 'Heights are those of the hardware models, in their descriptions’ own words.';
 
 export function SiteHud({ webgl }: { webgl: boolean }) {
@@ -488,7 +488,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
       {/* The console: sky and time. The plot sits directly above the timeline that scrubs it.
           This layer does not drift with the pointer: the needle stays under the hand that drags it. */}
       <div className="hud-layer">
-        <Glass as="section" strong className="absolute bottom-5 left-5 right-5 grid grid-cols-[24rem_minmax(0,1fr)] gap-x-5 px-4 py-3.5 short:py-3 max-xl:grid-cols-[22.5rem_minmax(0,1fr)] max-lg:grid-cols-[17rem_minmax(0,1fr)]" aria-label="Sky and time" data-enter="rise" data-site-zone="console" data-panel data-testid="site-console">
+        <Glass as="section" strong className="absolute bottom-5 left-5 right-5 grid grid-cols-[24rem_minmax(0,1fr)] gap-x-5 px-4 py-3.5 short:py-3 max-[1439px]:grid-cols-[22.5rem_minmax(0,1fr)] max-lg:grid-cols-[17rem_minmax(0,1fr)]" aria-label="Sky and time" data-enter="rise" data-site-zone="console" data-panel data-testid="site-console">
           <div className="flex min-w-0 flex-col gap-2.5 short:gap-2">
             <h3 className="sr-only">Sky and time</h3>
             {clockPanel({ bare: true, dense: true })}

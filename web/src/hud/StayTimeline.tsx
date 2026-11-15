@@ -118,8 +118,8 @@ export function StayTimeline({
         const px = f * laneWidth;
         // A label is shown when it is clear of the last one shown and of the lane's right end.
         const show = px - lastLabelPx >= 48 && laneWidth - px >= 20;
-        // The first label starts at its mark instead of being centred on it, so it reaches further right.
-        if (show) lastLabelPx = i === 0 ? px + 22 : px;
+        // The first label starts at its mark instead of being centred on it: its middle is half a label further right.
+        if (show) lastLabelPx = i === 0 ? px + 11 : px;
         return { q, f, show };
       });
   }, [ticks, landingMs, startMs, endMs, laneWidth]);
