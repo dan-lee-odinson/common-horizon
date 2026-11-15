@@ -286,6 +286,7 @@ def test_the_website_request_shapes_are_accepted(client, web_types):
         "stay_days": 14.25,  # the website's quarter-day steps
         "hardware": [{"id": "griffin", "count": 1}],
         "storage_kwh": 0,
+        "transit_days": 5,  # TRANSIT_DAYS in web/src/util/transit.ts, sent with every POST /evaluate
     }
     assert set(body) == _interface_fields(web_types, "EvaluateRequest")
     assert client.post(URL, json=body).status_code == 200

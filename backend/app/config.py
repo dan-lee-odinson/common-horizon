@@ -1,7 +1,7 @@
 """Runtime configuration read from environment variables.
 
-No secrets live in this module or anywhere in the repository. Later AWS work
-(Bedrock) must use the standard AWS credential chain: an IAM role inside Lambda,
+No secrets live in this module or anywhere in the repository. The assistant's Bedrock
+calls use the standard AWS credential chain: the Lambda's IAM role in production,
 a local profile during development.
 """
 
@@ -73,6 +73,12 @@ def parse_cors_origins(origins: str | None, extra_origins: str | None) -> tuple[
     return tuple(dict.fromkeys(base + extra))
 
 
+# The Mission Assistant (POST /assistant): a language model on Amazon Bedrock, off unless switched on.
+DEFAULT_ASSISTANT_MODEL_ID = "openai.gpt-oss-120b-1:0"
+DEFAULT_ASSISTANT_REGION = "us-east-1"
+DEFAULT_ASSISTANT_DAILY_CAP = 300
+
+
 @dataclass(frozen=True)
 class Settings:
     physics_engine: str
@@ -80,6 +86,12 @@ class Settings:
     # Data folders of the real engine. None: the engine's defaults (see app/physics/engine_adapter.py).
     spice_kernel_dir: str | None = None
     horizon_profile_dir: str | None = None
+    # POST /assistant. Off by default; /health reports assistant_available equal to assistant_enabled.
+    assistant_enabled: bool = False
+    assistant_model_id: str = DEFAULT_ASSISTANT_MODEL_ID
+    assistant_region: str = DEFAULT_ASSISTANT_REGION
+    # Model calls per UTC day, counted in memory by each running copy of the app (not across copies).
+    assistant_daily_cap: int = DEFAULT_ASSISTANT_DAILY_CAP
 
     def __post_init__(self) -> None:
         # Settings built in code (tests, create_app callers) get the same normalisation and wildcard ban.
@@ -88,6 +100,38 @@ class Settings:
 
 def _optional_path(raw: str | None) -> str | None:
     return raw.strip() if raw and raw.strip() else None
+
+
+_TRUE = frozenset({"1", "true", "yes", "on"})
+_FALSE = frozenset({"", "0", "false", "no", "off"})
+
+
+def parse_bool(name: str, raw: str | None, default: bool) -> bool:
+    """``true``/``false`` (also 1/0, yes/no, on/off, any case). Anything else fails at start-up."""
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if value in _TRUE:
+        return True
+    if value in _FALSE:
+        return False
+    raise ValueError(f"{name}={raw!r}: expected true or false")
+
+
+def parse_non_negative_int(name: str, raw: str | None, default: int) -> int:
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw.strip())
+    except ValueError:
+        raise ValueError(f"{name}={raw!r}: expected a whole number") from None
+    if value < 0:
+        raise ValueError(f"{name}={raw!r}: must be 0 or more")
+    return value
+
+
+def _text(raw: str | None, default: str) -> str:
+    return raw.strip() if raw and raw.strip() else default
 
 
 @lru_cache
@@ -100,4 +144,10 @@ def get_settings() -> Settings:
         # moon_de440_250416.tf) and folder of the stored horizon profiles (backend/data/horizon).
         spice_kernel_dir=_optional_path(os.getenv("CH_SPICE_KERNEL_DIR")),
         horizon_profile_dir=_optional_path(os.getenv("CH_HORIZON_PROFILE_DIR")),
+        assistant_enabled=parse_bool("CH_ASSISTANT_ENABLED", os.getenv("CH_ASSISTANT_ENABLED"), False),
+        assistant_model_id=_text(os.getenv("CH_ASSISTANT_MODEL_ID"), DEFAULT_ASSISTANT_MODEL_ID),
+        assistant_region=_text(os.getenv("CH_ASSISTANT_REGION"), DEFAULT_ASSISTANT_REGION),
+        assistant_daily_cap=parse_non_negative_int(
+            "CH_ASSISTANT_DAILY_CAP", os.getenv("CH_ASSISTANT_DAILY_CAP"), DEFAULT_ASSISTANT_DAILY_CAP
+        ),
     )

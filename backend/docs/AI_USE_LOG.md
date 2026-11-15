@@ -11,6 +11,9 @@ clock reading.
   the app comes from an AI model.
 - The synthetic fixture (`app/physics/synthetic.py`) is a deliberately labelled placeholder
   (`provenance.is_synthetic = true`), not a physics result.
+- The Mission Assistant (`POST /assistant`) is the one place a language model runs in the product. It
+  only words an answer from the engine's results and is told never to state a number that is not in
+  them. That is an instruction to the model, not a check: its answers are not verified number by number.
 - AI-drafted code is the backend owner's responsibility. It needs human review, and independent
   review by a teammate, before merging into `main`.
 
@@ -26,6 +29,7 @@ clock reading.
 | pip-audit | latest at run time, in a throwaway container (not in the image) | Dependency advisory scan |
 | Docker / AWS Lambda Web Adapter | 29.5.2 / 0.9.1 → 1.1.0 | Container build and Lambda compatibility |
 | OpenAI Codex | not stated in the review | Independent review of `c34f59e`, posted on PR #4; no code changes |
+| OpenAI gpt-oss-120b on Amazon Bedrock | `openai.gpt-oss-120b-1:0`, `us-east-1`, as served by Bedrock | Runtime, not development: words the Mission Assistant's plain-text answers (`POST /assistant`) from the evaluation results it is sent. Off by default (`CH_ASSISTANT_ENABLED=false`); not used to write code or produce any physical value. Not yet called from this repository's tests, which use a fake client |
 
 ## Phase 1: backend contract and minimal FastAPI implementation (2026-11-14)
 
@@ -232,3 +236,20 @@ merging `origin/main` at `86ee0b1` (PRs #14 and #15) rather than replacing the b
 
 **Not done:** Lambda invocation and timing (local Docker with CPU and memory limits is an approximation),
 OS-package vulnerability scan, production switch to `CH_PHYSICS_ENGINE=physics` (needs authorisation).
+
+## Mission Assistant route (2026-11-15)
+
+Drafted with Claude Code (Claude Opus 5.5) on `feat/assistant`, from `origin/main` at `185b15e`. Backend only;
+`web/`, the physics engine, the planner and the ranking are unchanged.
+
+| UTC | Europe/Bucharest (UTC+02:00) | Activity | Result |
+|---|---|---|---|
+| 20:01:24 | 22:01:24 | Read the website's `AskRequest`, `AskResponse`, `api.ask` error handling and `Assistant.tsx` | Shapes matchable as they are; `AskRequest` has no `transit_days`, and a custom site comes only as its id `custom:<lat>:<lon_east>` |
+| ~20:02-20:08 | ~22:02-22:08 | `POST /assistant`: settings, models, service (reuses `evaluate_sites`), Bedrock Converse call, daily cap, `/health` switch; tests with a fake Bedrock client | 28 assistant tests pass |
+| ~20:08 | ~22:08 | Broke the "only text blocks" rule on purpose (reasoning text let through) | 2 tests failed (`test_only_text_blocks_come_back`, `test_the_answer_shape_matches_the_website`); reverted, all pass |
+| ~20:08-20:09 | ~22:08-22:09 | Full suite; OpenAPI regenerated | Found a failure already on `main`: `test_the_website_request_shapes_are_accepted` did not send the website's `transit_days`; test body fixed. 754 passed, 23 skipped (no kernels) |
+| 20:09-20:10 | 22:09-22:10 | boto3 1.44.3 and its transitive set pinned; the image's install step (`--no-deps`, `pip check`, import) repeated in a fresh venv (Python 3.13, not the image's 3.12) | `pip check` clean; imports pass. No Docker daemon here, so the image was not built |
+| by 20:13:24 | by 22:13:24 | Bedrock timeouts cut to one attempt, 5 s connect and 20 s read (the Lambda's timeout is 60 s); a test that the client gets no keys; Ruff format on the new files; OpenAPI regenerated; full suite | 755 passed, 23 skipped (no kernels); Ruff clean on the changed files (repo-wide count unchanged) |
+
+**Not done:** no call to the real Bedrock model (no AWS access here): the prompt, the 500-token limit with
+gpt-oss's reasoning, and the answers themselves are untested against the live model. Image not built.

@@ -17,8 +17,9 @@ def test_schema_exposes_contract_endpoints_and_models(client):
     schema = client.get("/openapi.json").json()
 
     assert set(schema["paths"]) == {
-        "/health", "/api/v1/missions/evaluate", "/sites", "/catalog", "/check", "/evaluate", "/horizon"
+        "/health", "/api/v1/missions/evaluate", "/sites", "/catalog", "/check", "/evaluate", "/horizon", "/assistant"
     }
+    assert {"200", "422", "503"} <= set(schema["paths"]["/assistant"]["post"]["responses"])
     for path in ("/check", "/evaluate"):
         assert {"200", "422", "502", "503"} <= set(schema["paths"][path]["post"]["responses"])
     evaluate = schema["paths"]["/api/v1/missions/evaluate"]["post"]
