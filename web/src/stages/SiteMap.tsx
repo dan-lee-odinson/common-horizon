@@ -441,7 +441,7 @@ function QuickMapLink({ site }: { site: SiteRef }) {
   if (!href) return null;
   return (
     <a className="text-accent underline decoration-[rgb(95_230_245/0.5)] underline-offset-2" href={href} target="_blank" rel="noopener noreferrer" data-testid="site-map-quickmap">
-      Open in QuickMap
+      Open in QuickMap (LROC)
     </a>
   );
 }

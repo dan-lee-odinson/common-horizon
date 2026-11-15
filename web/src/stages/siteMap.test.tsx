@@ -44,7 +44,9 @@ describe('the Site map panel', () => {
     expect(html).toContain('LRO WAC Mosaic v2</span> · NASA Moon Trek · 167 m per pixel');
     expect(html).not.toContain('0° longitude is up');
     expect(html).toContain('href="https://trek.nasa.gov/moon/#v=0.1&amp;x=3.6333&amp;y=26.13239&amp;z=8&amp;p=urn%3Aogc%3Adef%3Acrs%3AEPSG%3A%3A104903&amp;d=&amp;locale=&amp;b=moon"');
-    expect(html).not.toContain('QuickMap');
+    expect(html).toContain(
+      'href="https://quickmap.lroc.im-ldi.com/?prjExtent=-39826%2C719422%2C260174%2C865422&amp;proj=16" target="_blank" rel="noopener noreferrer" data-testid="site-map-quickmap">Open in QuickMap (LROC)</a>',
+    );
   });
 
   it('says which way is up on the polar grid, and starts on the stored picture’s layer', () => {

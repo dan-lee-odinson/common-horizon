@@ -29,11 +29,9 @@ export const SP_M_PER_PX_Z0 = 8561.953125;
 /** How long the map waits for every tile before it keeps the stored picture. */
 export const TILE_TIMEOUT_MS = 6000;
 
-/**
- * The address of the same place in NASA's Lunar QuickMap, with {lat} and {lon} (east, -180 to
- * 180) put in. Empty until Planning sends the format: while it is empty, no QuickMap link is shown.
- */
-export const QUICKMAP_URL_FORMAT = '';
+/** Lunar QuickMap (LROC): the map is opened on a box this far either side of the site, metres. */
+export const QUICKMAP_HALF_W_M = 150_000;
+export const QUICKMAP_HALF_H_M = 73_000;
 
 const DEG = Math.PI / 180;
 
@@ -274,10 +272,24 @@ export function moonTrekLink(lat: number, lonEast: number): string {
   return `https://trek.nasa.gov/moon/#v=0.1&x=${coord(wrapLon(lonEast))}&y=${coord(lat)}&z=8&p=urn%3Aogc%3Adef%3Acrs%3AEPSG%3A%3A104903&d=&locale=&b=moon`;
 }
 
-/** The same place in Lunar QuickMap, or null while its format is not known (QUICKMAP_URL_FORMAT is empty). */
-export function quickMapLink(lat: number, lonEast: number, format: string = QUICKMAP_URL_FORMAT): string | null {
-  if (format.trim() === '') return null;
-  return format.replaceAll('{lat}', coord(lat)).replaceAll('{lon}', coord(wrapLon(lonEast)));
+/**
+ * The site in Lunar QuickMap's own map coordinates, metres on a 1,737,400 m sphere:
+ *  - south of 70° S, its south polar stereographic map (proj 27): the polar grid's x and y;
+ *  - from 70° S to 75° N, its equirectangular map (proj 16): x = R * longitude (-180..180), y = R * latitude, in radians;
+ *  - north of 75° N, none (no link).
+ */
+export function quickMapPoint(lat: number, lonEast: number): { proj: 16 | 27; x: number; y: number } | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lonEast) || lat > 75) return null;
+  if (lat < -70) return { proj: 27, ...polarXY(lat, lonEast) };
+  return { proj: 16, x: R_MOON_M * wrapLon(lonEast) * DEG, y: R_MOON_M * lat * DEG };
+}
+
+/** The same place in Lunar QuickMap (LROC), on a 300 x 146 km box around the site, or null north of 75° N. */
+export function quickMapLink(lat: number, lonEast: number): string | null {
+  const p = quickMapPoint(lat, lonEast);
+  if (!p) return null;
+  const box = [p.x - QUICKMAP_HALF_W_M, p.y - QUICKMAP_HALF_H_M, p.x + QUICKMAP_HALF_W_M, p.y + QUICKMAP_HALF_H_M].map((v) => Math.round(v));
+  return `https://quickmap.lroc.im-ldi.com/?prjExtent=${box.join('%2C')}&proj=${p.proj}`;
 }
 
 /** Moon Trek's own legend picture for a layer. */

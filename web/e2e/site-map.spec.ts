@@ -204,12 +204,16 @@ test('site map: the stored picture at once, the live tiles over it, the layers, 
   await layers.nth(1).click();
   await expect(page.getByTestId('site-map-legend')).toHaveCount(0);
 
-  // Out to Moon Trek itself; no QuickMap link until its address format is known.
+  // Out to Moon Trek itself, and to Lunar QuickMap on a 300 x 146 km box around the site (its equirectangular map), each in a new tab.
   const link = page.getByTestId('site-map-trek');
   await expect(link).toHaveText('Open in Moon Trek');
   await expect(link).toHaveAttribute('href', 'https://trek.nasa.gov/moon/#v=0.1&x=3.6333&y=26.13239&z=8&p=urn%3Aogc%3Adef%3Acrs%3AEPSG%3A%3A104903&d=&locale=&b=moon');
   await expect(link).toHaveAttribute('target', '_blank');
-  await expect(page.getByTestId('site-map-quickmap')).toHaveCount(0);
+  const quickMap = page.getByTestId('site-map-quickmap');
+  await expect(quickMap).toHaveText('Open in QuickMap (LROC)');
+  await expect(quickMap).toHaveAttribute('href', 'https://quickmap.lroc.im-ldi.com/?prjExtent=-39826%2C719422%2C260174%2C865422&proj=16');
+  await expect(quickMap).toHaveAttribute('target', '_blank');
+  await expect(quickMap).toHaveAttribute('rel', 'noopener noreferrer');
 
   // Escape closes it, and focus goes back to the button.
   await page.getByTestId('site-map-close').focus();

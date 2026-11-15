@@ -20,8 +20,8 @@ import {
   metersPerPixelAt,
   moonTrekLink,
   perPixelText,
-  QUICKMAP_URL_FORMAT,
   quickMapLink,
+  quickMapPoint,
   scaleBar,
   siteKinds,
   sitePixel,
@@ -270,10 +270,29 @@ describe('links out', () => {
     expect(moonTrekLink(26.13239, 3.6333)).toBe('https://trek.nasa.gov/moon/#v=0.1&x=3.6333&y=26.13239&z=8&p=urn%3Aogc%3Adef%3Acrs%3AEPSG%3A%3A104903&d=&locale=&b=moon');
   });
 
-  it('shows no QuickMap link until its format is set', () => {
-    expect(QUICKMAP_URL_FORMAT).toBe('');
-    expect(quickMapLink(26.13239, 3.6333)).toBeNull();
-    expect(quickMapLink(-3.0128, 336.5781, 'https://quickmap.lroc.asu.edu/?lat={lat}&lon={lon}')).toBe('https://quickmap.lroc.asu.edu/?lat=-3.0128&lon=-23.4219');
+  it.each([
+    ['blue-ghost-m2', -24.9, 177.4, 16, 5379362.4, -755051.4],
+    ['apollo-12', -3.0128, 336.5781, 16, -710230.5, -91358.2],
+    ['nobile', -85.42088, 31.6218, 27, 72841.4, 118301.2],
+  ] as const)('places %s in QuickMap’s own map coordinates (proj %i), to within 2 m', (_id, lat, lon, proj, x, y) => {
+    const p = quickMapPoint(lat, lon)!;
+    expect(p.proj).toBe(proj);
+    expect(Math.abs(p.x - x)).toBeLessThanOrEqual(2);
+    expect(Math.abs(p.y - y)).toBeLessThanOrEqual(2);
+  });
+
+  it('opens QuickMap on a 300 x 146 km box around the site', () => {
+    expect(quickMapLink(-24.9, 177.4)).toBe('https://quickmap.lroc.im-ldi.com/?prjExtent=5229362%2C-828051%2C5529362%2C-682051&proj=16');
+    expect(quickMapLink(-85.42088, 31.6218)).toBe('https://quickmap.lroc.im-ldi.com/?prjExtent=-77159%2C45301%2C222841%2C191301&proj=27');
+  });
+
+  it('chooses the map by latitude, and gives no link north of 75° N', () => {
+    expect(quickMapPoint(-70.0001, 0)?.proj).toBe(27);
+    expect(quickMapPoint(-70, 0)?.proj).toBe(16);
+    expect(quickMapPoint(75, 0)?.proj).toBe(16);
+    expect(quickMapPoint(75.0001, 0)).toBeNull();
+    expect(quickMapLink(80, 10)).toBeNull();
+    expect(quickMapLink(Number.NaN, 10)).toBeNull();
   });
 
   it('asks Moon Trek for a slope layer’s own legend', () => {
