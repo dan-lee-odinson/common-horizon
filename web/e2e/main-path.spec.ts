@@ -464,6 +464,69 @@ test('a short window (1280 x 720): the Data checks band is shown on request, so 
   await expect(show).toHaveAttribute('aria-expanded', 'false');
 });
 
+test('a short window (1280 x 720) with Data checks open: a label from the 3D scene never shows through the panel', async ({ page }) => {
+  test.setTimeout(150_000);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/');
+  await page.getByTestId('begin').click();
+  await page.getByTestId('enter-mission').click();
+  await expect(page.getByTestId('ranked-row').first()).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('zoom-to-site').click();
+  await expect(page.getByTestId('site-scrub')).toBeEnabled({ timeout: 60_000 });
+  await expect(page.getByTestId('lander-reticle')).toHaveAttribute('data-visible', 'true', { timeout: 60_000 });
+  await page.getByTestId('site-checks-show').click();
+  const band = page.getByTestId('site-checks-panel');
+  await expect(band.getByTestId('horizons-check')).toBeVisible();
+  /** The labels the scene draws over its canvas (the hardware markers' names): text inside the scene's own layer. */
+  const sceneLabels = () =>
+    page.evaluate(() => [...document.querySelectorAll<HTMLElement>('[data-testid="world"] *')].filter((e) => e.childElementCount === 0 && (e.textContent ?? '').trim() !== '').length);
+  await expect.poll(sceneLabels, { timeout: 30_000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(1500);
+  // The scene's labels let the pointer through, so the hit test would skip them whatever is on top.
+  // For this check only, they take the pointer: the hit test then follows the order things are drawn in.
+  await page.addStyleTag({ content: '[data-testid="world"] * { pointer-events: auto !important; }' });
+  const seen = await page.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>('[data-testid="site-checks-panel"]')!;
+    const p = panel.getBoundingClientRect();
+    const labels = [...document.querySelectorAll<HTMLElement>('[data-testid="world"] *')].filter((e) => e.childElementCount === 0 && (e.textContent ?? '').trim() !== '');
+    // Every line of the panel's text, as boxes.
+    const lines: DOMRect[] = [];
+    const walk = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (!(n.textContent ?? '').trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      lines.push(...range.getClientRects());
+    }
+    const cut = (a: DOMRect | { left: number; top: number; right: number; bottom: number }, b: typeof a) => {
+      const box = { left: Math.max(a.left, b.left), top: Math.max(a.top, b.top), right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom) };
+      return box.right - box.left > 1 && box.bottom - box.top > 1 ? box : null;
+    };
+    let underPanel = 0;
+    const throughText: string[] = [];
+    for (const label of labels) {
+      const l = label.getBoundingClientRect();
+      if (!cut(l, p)) continue;
+      underPanel++;
+      // Wherever the label and a line of the panel's text meet, the panel is what is drawn on top.
+      for (const line of lines) {
+        const both = cut(l, line);
+        if (!both) continue;
+        for (const fx of [0.2, 0.5, 0.8]) {
+          const x = both.left + (both.right - both.left) * fx;
+          const y = (both.top + both.bottom) / 2;
+          const top = document.elementFromPoint(x, y);
+          if (!top?.closest('[data-testid="site-checks-panel"]')) throughText.push(`${(label.textContent ?? '').trim()} at ${Math.round(x)}, ${Math.round(y)}`);
+        }
+      }
+    }
+    return { underPanel, throughText };
+  });
+  // The case this guards happens here: the habitat's marker lands under the open panel.
+  expect(seen.underPanel).toBeGreaterThan(0);
+  expect(seen.throughText).toEqual([]);
+});
+
 test('live mode: with no Moon Trek file there is no Moon Trek line', async ({ page }) => {
   test.skip(!isLive(), 'checked once, in live mode');
   test.setTimeout(120_000);

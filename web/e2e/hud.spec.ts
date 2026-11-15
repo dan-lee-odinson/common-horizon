@@ -57,6 +57,69 @@ test('the panels stay still while the pointer moves (no parallax), on the Orbit 
   expect(await layersWith(width - 300, height - 200)).toEqual(top);
 });
 
+for (const [width, height] of [
+  [1440, 900],
+  [1280, 720],
+] as const) {
+  test(`panels, the planner and the presets drawer still take clicks on all three stages at ${width} x ${height}`, async ({ page }) => {
+    test.skip(isPhone(page), 'the desktop layouts at two sizes');
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width, height });
+    // (Each click below is Playwright's: it fails if anything else would receive the press.)
+    await page.goto('/');
+    await page.getByTestId('begin').click();
+    // Orbit: a control on a panel, then the panel's main button.
+    const preview = page.getByTestId('preview-toggle');
+    const was = await preview.getAttribute('aria-pressed');
+    await preview.click();
+    await expect(preview).not.toHaveAttribute('aria-pressed', was ?? '');
+    await preview.click();
+    await expect(preview).toHaveAttribute('aria-pressed', was ?? '');
+    await page.getByTestId('enter-mission').click();
+    await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'mission');
+    await expect(page.getByTestId('ranked-row').first()).toBeVisible({ timeout: 60_000 });
+    // Mission select: the planner, one of its rows, and the presets drawer with one preset.
+    await page.getByTestId('edit-mission').click();
+    const planner = page.getByTestId('planner');
+    await expect(planner).toHaveAttribute('data-open', 'true');
+    const relay = planner.locator('[data-testid="hardware-row"][data-id="comms_relay"] input[type="checkbox"]');
+    await relay.click();
+    await expect(relay).toBeChecked();
+    await page.keyboard.press('Escape');
+    await expect(planner).toHaveAttribute('data-open', 'false');
+    await page.getByTestId('drawer-toggle').click();
+    await expect(page.getByTestId('site-drawer')).toHaveAttribute('data-open', 'true');
+    await page.getByTestId('preset-search').click();
+    await page.getByTestId('preset-search').fill('Apollo 14');
+    await page.getByTestId('preset').first().click();
+    await expect(page.getByTestId('spotlight-name')).toHaveText('Apollo 14');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('site-drawer')).toHaveAttribute('data-open', 'false');
+    await page.getByTestId('ranked-row').nth(1).click();
+    await page.getByTestId('zoom-to-site').click();
+    // Site: the console's play button, the Sun panel's Look, Reset view, and Data checks where it is a button.
+    await expect(page.getByTestId('site-scrub')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.getByTestId('lander-reticle')).toHaveAttribute('data-visible', 'true', { timeout: 60_000 });
+    const play = page.getByTestId('site-play');
+    await play.click();
+    await expect(play).toHaveAttribute('aria-pressed', 'true');
+    await play.click();
+    await expect(play).toHaveAttribute('aria-pressed', 'false');
+    await page.getByTestId('look-sun').click();
+    await page.getByTestId('look-earth').click();
+    await page.getByTestId('reset-view').click();
+    if (height <= 820) {
+      await page.getByTestId('site-checks-show').click();
+      await page.getByTestId('site-checks-hide').click();
+      await expect(page.getByTestId('site-checks-panel')).toHaveCount(0);
+    } else {
+      await expect(page.getByTestId('site-checks-panel')).toBeVisible();
+    }
+    await page.getByTestId('back-to-mission').click();
+    await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'mission');
+  });
+}
+
 test('orbit: a press on "Enter mission select" counts after the pointer has rested over the picture', async ({ page }) => {
   test.skip(isPhone(page), 'a resting pointer is a desktop matter');
   await page.goto('/');
