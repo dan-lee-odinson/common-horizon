@@ -45,7 +45,10 @@ export function LandingCard() {
           <h2 id="landing-title" className="title m-0 text-[clamp(2rem,5vw,2.9rem)] uppercase tracking-[0.07em] text-ink">
             Common Horizon
           </h2>
-          <p id="landing-line" className="m-0 font-display text-[clamp(1.05rem,2.1vw,1.3rem)] font-medium tracking-[0.02em] text-accent">
+          <p className="m-0 font-display text-[clamp(1.05rem,2.1vw,1.3rem)] font-medium tracking-[0.02em] text-accent" data-testid="tagline">
+            A Sunrise on Humanity’s Next Frontier
+          </p>
+          <p id="landing-line" className="m-0 text-[15px] leading-[1.5] text-ink-2">
             Where to land on the Moon, and when.
           </p>
         </div>
