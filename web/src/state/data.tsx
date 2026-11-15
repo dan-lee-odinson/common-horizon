@@ -20,6 +20,7 @@ import { DAY_MS, SYNODIC_MONTH_DAYS, toIsoUtc } from '../util/time';
 import type { GeometryTrack } from '../util/track';
 import { actions, appStore, hardwareChoices } from './app';
 import { loadTrack } from './geometry';
+import { loadHorizon } from './horizonLoad';
 import { useStore } from './store';
 import { useAsync, type AsyncResult } from './useAsync';
 
@@ -93,34 +94,18 @@ export function useData(): DataValue {
   return value;
 }
 
-/**
- * Horizon sample spacing: about 2400 points across the window, in quarter hours, never finer than
- * 15 minutes. That keeps the samples an hour apart or closer for windows up to about 112 days, so
- * a sunrise or sunset there can be shown to a tenth of an hour; the longest window (a 365.25-day
- * stay after a 30-day delay) gets samples 4 hours apart, and the readouts then show whole hours
- * (util/quantities.ts). The point count stays under the 4000 the mock model answers with.
- */
-export function horizonStepHours(startMs: number, endMs: number): number {
-  return Math.max(0.25, Math.round(((endMs - startMs) / 3_600_000 / 2400) * 4) / 4);
-}
-
 export function horizonKey(site: SiteRef | null, startMs: number | null, endMs: number | null): string | null {
   if (!site || startMs === null || endMs === null) return null;
   return JSON.stringify([site.id, site.lat, site.lon_east, startMs, endMs]);
 }
 
+/**
+ * A site's horizon answer for a window. Its samples are never more than an hour apart, however
+ * long the window: a long one is loaded in several requests and joined (state/horizonLoad.ts).
+ */
 export function useHorizonFor(site: SiteRef | null, startMs: number | null, endMs: number | null): AsyncResult<HorizonResponse> {
   const key = horizonKey(site, startMs, endMs);
-  return useAsync(
-    key,
-    (signal) =>
-      api.horizon(
-        { site: site!, start_utc: toIsoUtc(startMs!), end_utc: toIsoUtc(endMs!), step_hours: horizonStepHours(startMs!, endMs!) },
-        signal,
-      ),
-    isEmpty.horizon,
-    60,
-  );
+  return useAsync(key, (signal) => loadHorizon(site!, startMs!, endMs!, signal), isEmpty.horizon, 60);
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {

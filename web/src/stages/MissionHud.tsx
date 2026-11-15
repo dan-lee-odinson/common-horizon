@@ -12,6 +12,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { ComparePanel } from '../components/ComparePanel';
 import { Icon } from '../components/Icon';
+import { layoutBox } from '../hud/layoutBox';
 import { MISSION_VIEW, missionFrame, placeInFrame } from '../scene/missionView';
 import { actions, appStore } from '../state/app';
 import { useData } from '../state/data';
@@ -135,17 +136,6 @@ function useStripRows(wingRef: RefObject<HTMLDivElement | null>): number {
     };
   }, [wingRef]);
   return rows;
-}
-
-/** Where an element sits inside `root`, from layout alone: transforms (the entrance, the parallax, a sliding drawer) do not count. */
-function layoutBox(el: HTMLElement, root: HTMLElement): { left: number; top: number; right: number; bottom: number } {
-  let left = 0;
-  let top = 0;
-  for (let node: HTMLElement | null = el; node && node !== root; node = node.offsetParent as HTMLElement | null) {
-    left += node.offsetLeft;
-    top += node.offsetTop;
-  }
-  return { left, top, right: left + el.offsetWidth, bottom: top + el.offsetHeight };
 }
 
 /**

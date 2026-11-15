@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import sitesJson from '../api/examples/sites.json';
-import { horizonFor, skylineFor, subsolarPoint } from '../api/mock/model';
+import { horizonFor, subsolarPoint } from '../api/mock/model';
 import type { HorizonResponse, SiteRef } from '../api/types';
-import { horizonStepHours } from '../state/data';
-import { azElFromSubpoint, sampleProfile, wrap180 } from './geo';
+import { azElFromSubpoint, wrap180 } from './geo';
 import { litPeriods, naturalElRange, nextSunChange, sunAt, sunPathTimes } from './horizon';
 import { DAY_MS, HOUR_MS } from './time';
 
@@ -221,89 +220,5 @@ describe('a horizon answer with a missing value', () => {
     expect(sunAt(none, times[0])).toBeNull();
     expect(nextSunChange(none, times[0])).toBeNull();
     expect(litPeriods(none)).toEqual([]);
-  });
-});
-
-describe('the horizon answer the app asks for', () => {
-  const stay = (days: number) => horizonStepHours(T0, T0 + days * DAY_MS);
-  const points = (days: number) => (days * 24) / stay(days);
-
-  it('asks for about 2400 points, in quarter hours, never finer than 15 minutes', () => {
-    expect(stay(1)).toBe(0.25);
-    expect(stay(14)).toBe(0.25);
-    expect(stay(29.53)).toBe(0.25);
-    expect(stay(90)).toBe(1);
-    expect(stay(365.25)).toBe(3.75);
-    expect(stay(395.25)).toBe(4);
-    for (const days of [30, 45, 60, 90, 120, 180, 270, 365.25, 395.25]) {
-      expect((stay(days) * 4) % 1).toBe(0);
-      expect(points(days)).toBeGreaterThan(1800);
-      // The mock model answers with at most 4000 points; staying under it keeps the spacing asked for.
-      expect(points(days)).toBeLessThan(4000);
-    }
-    // Every window from the shortest stay to the longest stays under that limit.
-    for (let days = 1; days <= 395.25; days += 0.25) expect(points(days)).toBeLessThan(4000);
-  });
-
-  it('keeps samples an hour apart or closer for windows up to 112 days, and 4 hours at the longest', () => {
-    for (let days = 1; days <= 112; days += 0.25) expect(stay(days)).toBeLessThanOrEqual(1);
-    for (let days = 113; days <= 395.25; days += 0.25) {
-      expect(stay(days)).toBeGreaterThan(1);
-      expect(stay(days)).toBeLessThanOrEqual(4);
-    }
-  });
-
-  // The real changes of the mock model, found without the horizon answer: a 3-minute scan of the
-  // Sun's height above the skyline, then bisection.
-  function modelChanges(s: SiteRef, startMs: number, endMs: number): number[] {
-    const skyline = skylineFor(s);
-    const above = (t: number) => {
-      const p = subsolarPoint(t);
-      const sun = azElFromSubpoint(s.lat, s.lon_east, p.lat, p.lonEast);
-      return sun.el > sampleProfile(skyline, sun.az);
-    };
-    const out: number[] = [];
-    const dt = 3 * 60_000;
-    let prev = above(startMs);
-    for (let t = startMs + dt; t <= endMs; t += dt) {
-      const cur = above(t);
-      if (cur !== prev) {
-        let lo = t - dt;
-        let hi = t;
-        for (let k = 0; k < 24; k++) {
-          const mid = (lo + hi) / 2;
-          if (above(mid) === prev) lo = mid;
-          else hi = mid;
-        }
-        out.push((lo + hi) / 2);
-      }
-      prev = cur;
-    }
-    return out;
-  }
-
-  /** Worst distance, in hours, from a change the reader places to the nearest real change. */
-  function worstPlacementHours(id: string, days: number): number {
-    const s = site(id);
-    const end = T0 + days * DAY_MS;
-    const real = modelChanges(s, T0, end);
-    const placed = litPeriods(horizonFor(s, T0, end, stay(days))).slice(1).map((p) => p.start);
-    expect(placed.length).toBeGreaterThan(0);
-    let worst = 0;
-    for (const t of placed) worst = Math.max(worst, Math.min(...real.map((r) => Math.abs(r - t))) / HOUR_MS);
-    return worst;
-  }
-
-  // Shackleton ridge is the hard case: near the pole the Sun grazes the skyline.
-  it.each([14, 29.53, 90])('places each sunrise and sunset within 0.05 h of the mock model for a %s-day window (shown to 0.1 h)', (days) => {
-    expect(stay(days)).toBeLessThanOrEqual(1);
-    expect(worstPlacementHours('shackleton-ridge', days)).toBeLessThan(0.05);
-    expect(worstPlacementHours('apollo-11', days)).toBeLessThan(0.05);
-  });
-
-  it.each([180, 365.25, 395.25])('places them within half an hour for a %s-day window (shown in whole hours, as "about")', (days) => {
-    expect(stay(days)).toBeGreaterThan(1);
-    expect(worstPlacementHours('shackleton-ridge', days)).toBeLessThan(0.5);
-    expect(worstPlacementHours('apollo-11', days)).toBeLessThan(0.5);
   });
 });

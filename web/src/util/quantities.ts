@@ -9,13 +9,27 @@
 // samples hours apart is shown in whole hours and labelled "about". src/util/quantities.test.ts
 // and src/hud/readouts.test.tsx hold this in place.
 
-import type { CheckResponse, EarthLink, Geometry, HorizonResponse, SiteEvaluation, SiteRef } from '../api/types';
+import type { CatalogItem, CheckResponse, EarthLink, Geometry, HardwareChoice, HorizonResponse, SiteEvaluation, SiteRef } from '../api/types';
+import { earthWidthDeg, sunWidthDeg } from './bodies';
 import { azElFromSubpoint, normalizeLon360 } from './geo';
-import { nextSunChange, sunAt, type SunChange } from './horizon';
+import { nextSunChange, sunAt, type Period, type SunChange } from './horizon';
 import { formatMargin, levelFromStatus, type PowerLevel } from './power';
 import { southPoleSeason, type PoleSeason } from './season';
+import { compassWord, roundSig, shadowFigures, type ShadowFigures } from './shadow';
 import { discLitFromEarth, earthSwing, trackCovers, type GeometryTrack } from './track';
-import { DAY_MS, formatLtcOffsetMicros, formatSinceLanding, formatUtcMinute, ltcClock, ltcOffsetMicros, utcClock, type ClockParts } from './time';
+import {
+  DAY_MS,
+  formatDays,
+  formatHours,
+  formatLtcOffsetMicros,
+  formatSinceLanding,
+  formatUtcMinute,
+  HOUR_MS,
+  ltcClock,
+  ltcOffsetMicros,
+  utcClock,
+  type ClockParts,
+} from './time';
 
 export type Tone = 'ink' | 'sun' | 'earth' | 'good' | 'warn' | 'bad' | 'muted';
 
@@ -77,18 +91,18 @@ export function fixed(value: number, digits: number): string {
   return rounded < 0 ? `${MINUS}${text}` : text;
 }
 
-function latitude(key: string, label: string, lat: number | null, tone?: Tone): Quantity {
+function latitude(key: string, label: string, lat: number | null, tone?: Tone, digits = 2): Quantity {
   if (lat === null || !Number.isFinite(lat)) return missing(key, label, tone);
-  const text = Math.abs(lat).toFixed(2);
+  const text = Math.abs(lat).toFixed(digits);
   // A latitude that rounds to zero is on the equator: no hemisphere letter to flicker between.
-  return quantity(key, label, lat, text, text === '0.00' ? '°' : lat < 0 ? '° S' : '° N', tone);
+  return quantity(key, label, lat, text, Number(text) === 0 ? '°' : lat < 0 ? '° S' : '° N', tone);
 }
 
-function longitude(key: string, label: string, lonEast: number | null, tone?: Tone): Quantity {
+function longitude(key: string, label: string, lonEast: number | null, tone?: Tone, digits = 2): Quantity {
   if (lonEast === null || !Number.isFinite(lonEast)) return missing(key, label, tone);
   const lon = normalizeLon360(lonEast);
-  const text = lon.toFixed(2);
-  return quantity(key, label, lon, text === '360.00' ? '0.00' : text, '° E', tone);
+  const text = lon.toFixed(digits);
+  return quantity(key, label, lon, Number(text) === 360 ? (0).toFixed(digits) : text, '° E', tone);
 }
 
 function azimuth(key: string, label: string, az: number | null, tone?: Tone): Quantity {
@@ -164,12 +178,30 @@ function nextChangeQuantity(change: SunChange | null, horizon: HorizonResponse |
   return missing('next_change', 'Next sunrise or sunset');
 }
 
-/** Every sky readout for one instant. Pure: the same inputs always give the same quantities. */
-export function skyQuantities(input: SkyInput): SkyQuantities {
+/** The sky over a site at one instant, as plain values: what the readouts, the plot and the scene all read. */
+export interface SkyNow {
+  /** Where the Sun and Earth are overhead on the Moon; null outside the track. */
+  geometry: Geometry | null;
+  /** The Sun's direction at the site. */
+  sun: { az: number; el: number } | null;
+  /** Earth's direction at the site (parallax ignored: good to about 1 degree). */
+  earth: { az: number; el: number } | null;
+  /** The horizon answer's word: true lit, false dark (the terrain hides the Sun), null with no answer for this site at this instant. */
+  lit: boolean | null;
+  /** The next sunrise or sunset inside the answer's window. */
+  change: SunChange | null;
+  /** The site's horizon answer, when it covers the instant. */
+  horizon: HorizonResponse | null;
+}
+
+/**
+ * The sky over a site at one instant. One function serves the readouts, the horizon plot, the
+ * timeline and the 3D scene, so they cannot disagree about where the Sun is or whether the site
+ * is lit. Pure: the same inputs always give the same answer.
+ */
+export function skyAt(input: SkyInput): SkyNow {
   const { track, tMs, site } = input;
   const hasT = isInstant(tMs);
-  // A landing time that is missing or unreadable (NaN from a broken answer) is no landing time.
-  const landingMs = isInstant(input.landingMs) ? input.landingMs : null;
   // Read from the track only inside the window it was loaded for, never from its spare ends.
   const geometry = track !== null && hasT && trackCovers(track, tMs) ? wholeGeometry(track.at(tMs)) : null;
   const horizon = hasT && horizonCovers(input.horizon, site, tMs) ? input.horizon : null;
@@ -182,13 +214,32 @@ export function skyQuantities(input: SkyInput): SkyQuantities {
   // its own samples show the straight line to be good for the tenth of a degree shown.
   const sunFromTrack = site && geometry ? azElFromSubpoint(site.lat, site.lon_east, geometry.subsolar_lat, geometry.subsolar_lon_east) : null;
   const sunFromHorizon = track === null && sunInHorizon && sunInHorizon.uncertaintyDeg <= DIRECTION_TOLERANCE_DEG ? sunInHorizon : null;
-  const sun = sunFromTrack ?? sunFromHorizon;
+  const picked = sunFromTrack ?? sunFromHorizon;
   // Earth's direction at the site, from Earth's overhead point (parallax ignored: good to about 1°).
   const earth = site && geometry ? azElFromSubpoint(site.lat, site.lon_east, geometry.subearth_lat, geometry.subearth_lon_east) : null;
 
   // Lit or dark, and the next sunrise or sunset, need the terrain: they come from the horizon answer.
-  const change = horizon ? nextSunChange(horizon, tMs) : null;
-  const lit = sunInHorizon ? sunInHorizon.above : null;
+  return {
+    geometry,
+    sun: picked ? { az: picked.az, el: picked.el } : null,
+    earth,
+    lit: sunInHorizon ? sunInHorizon.above : null,
+    change: horizon ? nextSunChange(horizon, tMs) : null,
+    horizon,
+  };
+}
+
+/** Every sky readout for one instant. Pure: the same inputs always give the same quantities. */
+export function skyQuantities(input: SkyInput): SkyQuantities {
+  return skyReadouts(input, skyAt(input));
+}
+
+function skyReadouts(input: SkyInput, sky: SkyNow): SkyQuantities {
+  const { tMs } = input;
+  const hasT = isInstant(tMs);
+  // A landing time that is missing or unreadable (NaN from a broken answer) is no landing time.
+  const landingMs = isInstant(input.landingMs) ? input.landingMs : null;
+  const { geometry, sun, earth, lit, change, horizon } = sky;
   const discLit = geometry ? discLitFromEarth(geometry) * 100 : Number.NaN;
 
   const utc = hasT ? utcClock(tMs) : null;
@@ -342,5 +393,242 @@ export function siteQuantities(rank: number | null, e: SiteEvaluation | null, ch
     energy: quantity('energy', 'Energy over the stay', e.energy_added_kwh, `${energySign}${Math.round(Math.abs(e.energy_added_kwh)).toLocaleString('en-US')}`, 'kWh', LEVEL_TONE[level]),
     verdict: quantity('verdict', 'Result', null, fail ? `fail: ${e.verdict.requirement ?? 'requirement not met'}` : 'pass', '', fail ? 'bad' : 'good'),
     passes: !fail,
+  };
+}
+
+// ---------- the site stage ----------
+
+/** A length rounded to a number of significant figures, as text: "50", "3", "1.7", "0.18". */
+function significant(value: number, figures: number): string {
+  const r = roundSig(value, figures);
+  if (!Number.isFinite(r) || r === 0) return '0';
+  const decimals = Math.max(0, figures - 1 - Math.floor(Math.log10(Math.abs(r))));
+  return r.toFixed(decimals);
+}
+
+/** A shadow length on level ground. One figure is labelled "about"; from a kilometre up the unit is km. */
+function shadowLength(key: string, label: string, metres: number, figures: 1 | 2): Quantity {
+  const name = figures === 1 ? `${label}, about` : label;
+  const rounded = roundSig(metres, figures);
+  return rounded >= 1000 ? quantity(key, name, metres, significant(metres / 1000, figures), 'km') : quantity(key, name, metres, significant(metres, figures), 'm');
+}
+
+export interface SiteLiveInput extends SkyInput {
+  /**
+   * The lander standing at the landing point: its catalog name, and the height of its model in
+   * metres (null when it has no model or the model's description has not been read yet). Null when
+   * the mission has no lander.
+   */
+  lander: { name: string; heightM: number | null } | null;
+}
+
+export interface SiteLiveQuantities extends SkyQuantities {
+  /** The plain values behind the readouts: the plot's markers and the scene read these. */
+  sky: SkyNow;
+  /** What can be said about shadows at this instant (see util/shadow.ts). */
+  shadow: ShadowFigures;
+  /** True when the instant is before the landing (inside the launch delay): no hardware stands there yet. */
+  beforeLanding: boolean;
+  /** "before landing" or "landed". */
+  phase: Quantity;
+  /** Time to the landing, while the instant is before it. */
+  toLanding: Quantity;
+  earthWidth: Quantity;
+  shadowPerMetre: Quantity;
+  shadowLander: Quantity;
+  shadowBearing: Quantity;
+}
+
+/**
+ * Every readout of the site stage that changes with the clock: the sky readouts, Earth's apparent
+ * width, the shadow figures and whether the instant is before the landing. Pure.
+ */
+export function liveSiteQuantities(input: SiteLiveInput): SiteLiveQuantities {
+  const sky = skyAt(input);
+  const base = skyReadouts(input, sky);
+  const landingMs = isInstant(input.landingMs) ? input.landingMs : null;
+  const hasT = isInstant(input.tMs);
+  const beforeLanding = hasT && landingMs !== null && input.tMs < landingMs;
+  const hoursToLanding = beforeLanding ? (landingMs - input.tMs) / HOUR_MS : null;
+
+  const width = sky.earth ? earthWidthDeg(sky.earth.el) : Number.NaN;
+  const shadow = shadowFigures(sky.sun, sky.lit);
+  const landerName = input.lander?.name ?? 'Lander';
+  const perMetreLabel = 'Shadow per metre of height';
+  const landerLabel = `${landerName} shadow`;
+
+  let shadowPerMetre: Quantity;
+  let shadowLander: Quantity;
+  let shadowBearing: Quantity;
+  if (shadow.kind === 'unknown') {
+    shadowPerMetre = missing('shadow_per_metre', perMetreLabel);
+    shadowLander = missing('shadow_lander', landerLabel);
+    shadowBearing = missing('shadow_bearing', 'Shadows point');
+  } else if (shadow.kind === 'dark') {
+    // The terrain hides the Sun: nothing casts a shadow, and there is no direction to give.
+    shadowPerMetre = quantity('shadow_per_metre', perMetreLabel, null, 'none', '', 'muted');
+    shadowLander = quantity('shadow_lander', landerLabel, null, 'none', '', 'muted');
+    shadowBearing = missing('shadow_bearing', 'Shadows point');
+  } else {
+    const bearing = Math.round(shadow.bearingDeg) % 360;
+    shadowBearing = quantity('shadow_bearing', 'Shadows point', shadow.bearingDeg, String(bearing), `° ${compassWord(shadow.bearingDeg)}`);
+    if (shadow.kind === 'grazing') {
+      // The Sun's disc touches the level plane: a shadow has no far end to measure.
+      shadowPerMetre = quantity('shadow_per_metre', perMetreLabel, null, 'past the horizon', '');
+      shadowLander = quantity('shadow_lander', landerLabel, null, 'past the horizon', '');
+    } else {
+      shadowPerMetre = shadowLength('shadow_per_metre', perMetreLabel, shadow.perMetre, shadow.figures);
+      const height = input.lander?.heightM;
+      shadowLander =
+        typeof height === 'number' && Number.isFinite(height) && height > 0
+          ? shadowLength('shadow_lander', landerLabel, height * shadow.perMetre, shadow.figures)
+          : missing('shadow_lander', landerLabel);
+    }
+  }
+  // Before the landing nothing stands at the landing point, whatever the Sun does.
+  if (beforeLanding && input.lander) shadowLander = quantity('shadow_lander', landerLabel, null, 'not landed', '', 'muted');
+
+  return {
+    ...base,
+    sky,
+    shadow,
+    beforeLanding,
+    phase: !hasT || landingMs === null ? missing('phase', 'Mission') : quantity('phase', 'Mission', null, beforeLanding ? 'before landing' : 'landed', '', beforeLanding ? 'warn' : 'ink'),
+    toLanding: hoursToLanding === null ? missing('to_landing', 'Landing in') : quantity('to_landing', 'Landing in', hoursToLanding, formatHours(hoursToLanding), ''),
+    earthWidth: Number.isFinite(width) ? quantity('earth_width', 'Earth, apparent width', width, width.toFixed(2), '°', 'earth') : missing('earth_width', 'Earth, apparent width', 'earth'),
+    shadowPerMetre,
+    shadowLander,
+    shadowBearing,
+  };
+}
+
+export interface SiteStageInput {
+  site: SiteRef | null;
+  landingMs: number | null;
+  /** The landing as planned, before any launch delay. */
+  plannedLandingMs: number | null;
+  stayEndMs: number | null;
+  stayDays: number;
+  /** The site's result in the ranking, when it has one. */
+  evaluation: SiteEvaluation | null;
+  /** The planner's check for this site and mission, when it has answered. */
+  check: CheckResponse | null;
+}
+
+export interface SiteStageQuantities {
+  /** The Sun's apparent width at mean distance: the same from every site. */
+  sunWidth: Quantity;
+  siteLat: Quantity;
+  siteLon: Quantity;
+  landing: Quantity;
+  plannedLanding: Quantity;
+  stayEnd: Quantity;
+  stayLength: Quantity;
+  longestDark: Quantity;
+  /** The Earth link over the whole stay (not at one instant). */
+  earthLink: Quantity;
+}
+
+/** The site stage's readouts that do not change with the clock. */
+export function siteStageQuantities(input: SiteStageInput): SiteStageQuantities {
+  const { site, landingMs, plannedLandingMs, stayEndMs, stayDays, evaluation, check } = input;
+  const sunWidth = sunWidthDeg();
+  const dark = check ? check.night.longest_darkness_h : null;
+  const hasStay = Number.isFinite(stayDays);
+  return {
+    sunWidth: quantity('sun_width', 'Sun, apparent width', sunWidth, sunWidth.toFixed(2), '°', 'sun'),
+    siteLat: latitude('site_lat', 'Latitude', site ? site.lat : null, undefined, 3),
+    siteLon: longitude('site_lon', 'Longitude', site ? site.lon_east : null, undefined, 3),
+    landing: isInstant(landingMs) ? quantity('landing', 'Landing', landingMs, formatUtcMinute(landingMs), 'UTC') : missing('landing', 'Landing'),
+    plannedLanding: isInstant(plannedLandingMs)
+      ? quantity('planned_landing', 'Planned landing', plannedLandingMs, formatUtcMinute(plannedLandingMs), 'UTC')
+      : missing('planned_landing', 'Planned landing'),
+    stayEnd: isInstant(stayEndMs) ? quantity('stay_end', 'End of stay', stayEndMs, formatUtcMinute(stayEndMs), 'UTC') : missing('stay_end', 'End of stay'),
+    stayLength: hasStay ? quantity('stay_length', 'Stay', stayDays, formatDays(stayDays), stayDays === 1 ? 'day' : 'days') : missing('stay_length', 'Stay'),
+    longestDark:
+      typeof dark === 'number' && Number.isFinite(dark)
+        ? dark > 0
+          ? quantity('longest_dark', 'Longest darkness, stay', dark, formatHours(dark), '')
+          : quantity('longest_dark', 'Longest darkness, stay', 0, 'none', '', 'muted')
+        : missing('longest_dark', 'Longest darkness, stay'),
+    earthLink: evaluation
+      ? quantity('earth_link', 'Earth link, stay', null, EARTH_LINK_WORD[evaluation.earth_link], '', EARTH_LINK_TONE[evaluation.earth_link])
+      : missing('earth_link', 'Earth link, stay'),
+  };
+}
+
+/** A whole number with a true minus sign. */
+function signedWhole(value: number): string {
+  const n = Math.round(value);
+  return n < 0 ? `${MINUS}${-n}` : String(n);
+}
+
+/** The play speeds, in simulated days for each second of play. */
+export function speedQuantities(speeds: readonly number[]): Quantity[] {
+  return speeds.map((v) => quantity(`speed:${v}`, 'Speed', v, String(v), 'd/s'));
+}
+
+/** Day marks under the stay timeline: whole days after the landing (negative before it). */
+export function stayTickQuantities(days: readonly number[]): Quantity[] {
+  return days.map((d) => quantity(`tick_day:${d}`, 'Days after landing', d, signedWhole(d), 'd'));
+}
+
+/** Labels of the horizon plot's height lines: whole degrees above (+) or below (−) level. */
+export function horizonAxisQuantities(values: readonly number[]): Quantity[] {
+  return values.map((v) => {
+    const text = signedWhole(v);
+    return quantity(`axis_el:${v}`, 'Height above level', v, v > 0 ? `+${text}` : text, '°');
+  });
+}
+
+/** The lit and dark periods of a timeline, each from when to when, counted from the landing. */
+export function stayPeriodQuantities(periods: readonly Period[], landingMs: number | null): Quantity[] {
+  if (!isInstant(landingMs)) return [];
+  return periods
+    .filter((p) => isInstant(p.start) && isInstant(p.end))
+    .map((p, i) =>
+      quantity(`period:${i}`, p.lit ? 'Lit' : 'Dark', (p.end - p.start) / HOUR_MS, `${formatSinceLanding(p.start, landingMs)} to ${formatSinceLanding(p.end, landingMs)}`, '', p.lit ? 'sun' : 'muted'),
+    );
+}
+
+/** What the hardware list needs of a model's description (see state/models.ts). */
+export interface ModelSize {
+  status: string;
+  dimensions: { height: number };
+}
+
+export interface HardwareRow {
+  id: string;
+  /** The catalog's name for the item. */
+  name: string;
+  count: Quantity;
+  /** The model's height, the words "no model", or a dash while the description is being read. */
+  height: Quantity;
+  /** How well founded the model's size is, in its description's own words; null with no model. */
+  status: string | null;
+}
+
+/**
+ * One row for each item of the mission. `models` holds each item's model description by catalog
+ * id: null when the item has no model, undefined while it is still being read.
+ */
+export function hardwareQuantities(choices: readonly HardwareChoice[], catalog: readonly CatalogItem[], models: Readonly<Record<string, ModelSize | null | undefined>>): HardwareRow[] {
+  return choices.map((choice) => {
+    const name = catalog.find((c) => c.id === choice.id)?.name ?? choice.id;
+    const model = Object.hasOwn(models, choice.id) ? models[choice.id] : undefined;
+    const count = Number.isFinite(choice.count) ? quantity(`hw_count:${choice.id}`, 'Count', choice.count, `× ${choice.count}`, '') : missing(`hw_count:${choice.id}`, 'Count');
+    let height: Quantity;
+    if (model === undefined) height = missing(`hw_height:${choice.id}`, name);
+    else if (model === null || !Number.isFinite(model.dimensions.height)) height = quantity(`hw_height:${choice.id}`, name, null, 'no model', '', 'muted');
+    else height = quantity(`hw_height:${choice.id}`, name, model.dimensions.height, String(model.dimensions.height), 'm tall');
+    return { id: choice.id, name, count, height, status: model ? model.status : null };
+  });
+}
+
+/** Spacing of the range rings drawn on the ground around the landing point, in metres. */
+export function groundRingQuantities(minorM: number, majorM: number): { minor: Quantity; major: Quantity } {
+  return {
+    minor: quantity('ground_ring_minor', 'Range rings', minorM, String(minorM), 'm'),
+    major: quantity('ground_ring_major', 'Range rings', majorM, String(majorM), 'm'),
   };
 }

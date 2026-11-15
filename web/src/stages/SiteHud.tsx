@@ -1,96 +1,521 @@
-// Stage 3, SITE. A bridge for now: the site scene and horizon plot as they were, behind the new
-// way in and out. The terrain, the Sun's path with its light and shadows, the hardware models and
-// the full HUD arrive with the rebuilt stage.
+// Stage 3, SITE: the instrument around the site's terrain.
+//
+// Time runs through the stay here. A strip across the top names the site; two wings read the sky
+// (the Sun and the mission clock on the left, Earth and the hardware on the right); a console along
+// the bottom holds the horizon plot directly above the stay timeline, which is the scrubber, with
+// play, pause and the speed beside it. On a phone the same parts become a status card, a dock along
+// the bottom and a sheet that rises above the dock.
+//
+// One function gives the sky at the instant shown (util/quantities.ts: liveSiteQuantities), and
+// every part reads it: the readouts, the plot's Sun dot, the timeline's state and the scene. So the
+// picture and the numbers cannot disagree. Nothing here re-renders while time runs: the readouts
+// are rewritten in place once per frame, and only when the instant has changed.
 
-import { lazy, Suspense, useEffect } from 'react';
-import gsap from 'gsap';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
+import type { SiteRef } from '../api/types';
 import { AsyncView } from '../components/AsyncView';
-import { HorizonPlot } from '../components/HorizonPlot';
 import { Icon } from '../components/Icon';
+import { AnchorReticle } from '../hud/AnchorReticle';
+import { Drawer } from '../hud/Drawer';
 import { Glass } from '../hud/Glass';
-import { actions, appStore, simClock } from '../state/app';
+import { HorizonPanel, SkyLegend, type SunMark } from '../hud/HorizonPanel';
+import { layoutBox } from '../hud/layoutBox';
+import { Leaders, type LeaderSpec } from '../hud/Leaders';
+import { patchQuantities, Readout } from '../hud/Readout';
+import { StayTimeline, type StayState } from '../hud/StayTimeline';
+import { Transport } from '../hud/Transport';
+import { useTicker } from '../hud/useTicker';
+import { hideAnchors } from '../scene/anchors';
+import { siteFrame } from '../scene/siteView';
+import { actions, appStore, simClock, SPEEDS } from '../state/app';
 import { useData } from '../state/data';
+import { primaryLanderId, useModelMetas } from '../state/models';
 import { useStore } from '../state/store';
-import { DAY_MS } from '../util/time';
+import { useIsPhone, useShortWindow } from '../state/useMedia';
+import { litPeriods } from '../util/horizon';
+import {
+  DASH,
+  hardwareQuantities,
+  horizonAxisQuantities,
+  liveSiteQuantities,
+  missionDates,
+  siteQuantities,
+  siteStageQuantities,
+  speedQuantities,
+  stayPeriodQuantities,
+  stayTickQuantities,
+  type SiteLiveQuantities,
+} from '../util/quantities';
+import { BAND_BREAK_DEG, LINEAR_MAX_DEG } from '../util/horizonPlot';
+import { naturalElRange } from '../util/horizon';
+import { clipPeriods, dayTicks } from '../util/stay';
+import { AnchorTag } from './AnchorTag';
+import { ClockPanel, EarthPanel, HardwarePanel, Inline, SunPanel } from './SitePanels';
+import { useEntrance } from './useEntrance';
 
+// The site scene as it was, behind the new HUD: replaced by the terrain inside the one canvas.
 const SiteScene = lazy(() => import('../scene/SiteScene').then((m) => ({ default: m.SiteScene })));
 
+const LEADERS: LeaderSpec[] = [
+  { anchor: 'sun', to: '[data-leader-target="sun"]', color: 'var(--ch-sun)' },
+  { anchor: 'earth', to: '[data-leader-target="earth"]', color: 'var(--ch-earth)' },
+];
+
+/** What in the picture is drawn from the data and what is an illustration, in one sentence. */
+const HARDWARE_NOTE = 'Heights are those of the hardware models, in their descriptions’ own words. The hardware is listed here, not drawn in the view.';
+const HARDWARE_NOTE_FLAT = 'Heights are those of the hardware models, in their descriptions’ own words.';
+
 export function SiteHud({ webgl }: { webgl: boolean }) {
-  const { focus, horizon, focusRow, landingMs, plannedLandingMs, windowStartMs, windowEndMs } = useData();
+  const d = useData();
+  const { focus, focusRow, focusCheck, horizon, track, catalog, hardwareChosen, landingMs, plannedLandingMs, windowStartMs, windowEndMs, landingGeometry } = d;
   const playing = useStore(appStore, (s) => s.playing);
-  const timeScale = useStore(appStore, (s) => s.timeScale);
-  const nowMs = useStore(simClock, (s) => s.nowMs);
+  const speed = useStore(appStore, (s) => s.speed);
+  const stayDays = useStore(appStore, (s) => s.stayDays);
+  const slipDays = useStore(appStore, (s) => s.slipDays);
+  const launchUtcMs = useStore(appStore, (s) => s.launchUtcMs);
+  const sheetOpen = useStore(appStore, (s) => s.horizonOpen);
+  const isPhone = useIsPhone();
+  const short = useShortWindow();
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  // Play: the simulated clock runs through the stay, half a second per simulated day.
-  useEffect(() => {
-    if (!playing || windowStartMs === null || windowEndMs === null || landingMs === null) return;
-    let from = simClock.get().nowMs ?? landingMs;
-    if (from >= windowEndMs - 1000) from = windowStartMs;
-    const proxy = { t: from };
-    const tween = gsap.to(proxy, {
-      t: windowEndMs,
-      duration: Math.max(1.5, ((windowEndMs - from) / DAY_MS) * 0.5),
-      ease: 'none',
-      onUpdate: () => simClock.set({ nowMs: proxy.t }),
-      onComplete: () => actions.setPlaying(false),
-    });
-    return () => {
-      tween.kill();
+  const site = useMemo<SiteRef | null>(() => (focus ? { id: focus.id, name: focus.name, lat: focus.lat, lon_east: focus.lon_east } : null), [focus]);
+  // The answer on hand can still be the previous site's while the new one loads: it is not this site's sky.
+  const horizonData = horizon.data && site && horizon.data.site_id === site.id ? horizon.data : null;
+  const trackData = track.data;
+
+  // The hardware, and the lander that stands at the landing point (its height gives the shadow figure).
+  const chosenIds = useMemo(() => hardwareChosen.map((h) => h.id), [hardwareChosen]);
+  const models = useModelMetas(chosenIds);
+  const catalogItems = catalog.data?.items;
+  const landerId = primaryLanderId(chosenIds);
+  const landerName = landerId ? (catalogItems?.find((c) => c.id === landerId)?.name ?? landerId) : null;
+  const landerHeight = landerId ? (models[landerId]?.dimensions.height ?? null) : null;
+
+  // The sky at the instant shown. Worked out once for each instant and shared by every reader.
+  const readLive = useMemo(() => {
+    let at = Number.NaN;
+    let last: SiteLiveQuantities | null = null;
+    return (tMs: number): SiteLiveQuantities => {
+      if (last === null || !Object.is(tMs, at)) {
+        at = tMs;
+        last = liveSiteQuantities({ track: trackData, tMs, landingMs, site, horizon: horizonData, lander: landerName === null ? null : { name: landerName, heightM: landerHeight } });
+      }
+      return last;
     };
-  }, [playing, windowStartMs, windowEndMs, landingMs]);
+  }, [trackData, landingMs, site, horizonData, landerName, landerHeight]);
+  const now = () => simClock.get().nowMs ?? landingMs ?? Number.NaN;
+  const live = () => readLive(now());
 
-  return (
-    <div className="absolute inset-0" data-testid="site-hud">
-      <h2 className="sr-only">Site: {focus?.name ?? 'no site'}</h2>
-      {webgl && focus && landingMs !== null ? (
-        <div className="hud-layer">
-          <div className="absolute inset-0">
-            <Suspense fallback={null}>
-              <SiteScene site={focus} horizon={horizon.data} landingMs={landingMs} />
-            </Suspense>
+  // Once per frame: when the instant (or the data) has changed, rewrite the readouts in place.
+  const patched = useRef<SiteLiveQuantities | null>(null);
+  useTicker(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const q = live();
+    if (q === patched.current) return;
+    patched.current = q;
+    patchQuantities(root, q);
+    const lit = litWord(q);
+    if (root.dataset.lit !== lit) root.dataset.lit = lit;
+    const phase = q.beforeLanding ? 'before-landing' : 'stay';
+    if (root.dataset.phase !== phase) root.dataset.phase = phase;
+  });
+
+  useEntrance(rootRef, true, 0.35);
+  useSiteFrame(rootRef, isPhone);
+  // The Moon stages' markers are not part of this stage's picture.
+  useEffect(() => {
+    hideAnchors();
+    return () => hideAnchors('sun', 'earth', 'lander');
+  }, []);
+  // Time stops when the stage is left by any way out.
+  useEffect(() => () => actions.setPlaying(false), []);
+
+  const q = live();
+  const fixed = siteStageQuantities({ site, landingMs, plannedLandingMs, stayEndMs: windowEndMs, stayDays, evaluation: focusRow?.evaluation ?? null, check: focusCheck });
+  const result = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck);
+  const dates = missionDates(launchUtcMs, slipDays, landingMs, landingGeometry);
+  const hardware = hardwareQuantities(hardwareChosen, catalogItems ?? [], models);
+  const speeds = useMemo(() => speedQuantities(SPEEDS), []);
+
+  // The scrub range: the planned landing (the landing itself with no delay) to the end of the stay.
+  const ranged = landingMs !== null && windowStartMs !== null && windowEndMs !== null && windowEndMs > windowStartMs;
+  const startMs = ranged ? Math.min(windowStartMs, landingMs) : 0;
+  const endMs = ranged ? windowEndMs : 0;
+  const periods = useMemo(() => (horizonData && ranged ? clipPeriods(litPeriods(horizonData), startMs, endMs) : []), [horizonData, ranged, startMs, endMs]);
+  const ticks = useMemo(() => (ranged ? stayTickQuantities(dayTicks(startMs, endMs, landingMs)) : []), [ranged, startMs, endMs, landingMs]);
+  const periodList = useMemo(() => stayPeriodQuantities(periods, landingMs), [periods, landingMs]);
+  const ready = ranged && horizonData !== null;
+
+  function scrubTo(ms: number) {
+    actions.setPlaying(false);
+    simClock.set({ nowMs: ms });
+  }
+  const togglePlay = () => actions.setPlaying(!appStore.get().playing);
+  function restart() {
+    actions.setPlaying(false);
+    simClock.set({ nowMs: null });
+  }
+
+  // What the plot's markers and the timeline read each frame. Each answer is kept for the instant.
+  const marks = useMemo(() => {
+    let from: SiteLiveQuantities | null = null;
+    let sun: SunMark | null = null;
+    return {
+      sun: (): SunMark | null => {
+        const l = live();
+        if (l !== from) {
+          from = l;
+          sun = l.sky.sun ? { az: l.sky.sun.az, el: l.sky.sun.el, lit: l.sky.lit, azText: l.sunAz.text, elText: l.sunEl.text } : null;
+        }
+        return sun;
+      },
+      earth: () => live().sky.earth,
+      state: (): StayState => litState(live()),
+      nextChange: () => live().sky.change?.atMs ?? null,
+      valueText: () => {
+        const l = live();
+        const state = l.sunState.text === DASH ? 'lit or dark not known' : l.sunState.text;
+        return `${l.sinceLanding.text} from the landing, ${l.utcClock.text} ${l.utcClock.unit}, ${state}`;
+      },
+    };
+    // `live` reads through `readLive`, which is made again whenever the data changes.
+  }, [readLive]);
+
+  const name = focus?.name ?? 'No site';
+  const passTag = result.passes === null ? 'tag' : result.passes ? 'tag tag-good' : 'tag tag-bad';
+  const plotLabel = `Horizon plot for ${name}: compass direction across, height above level upward. It shows the terrain skyline, the Sun’s path from ${slipDays > 0 ? 'the planned landing' : 'the landing'} to the end of the stay (solid where the Sun is above the skyline, dashed where the terrain hides it) and the part of the sky Earth moves through. The running figures are in the Sun and Earth panels.`;
+  // The legend names the height where the plot's scale changes, when this site's plot has two bands.
+  const scaleBreak = useMemo(() => {
+    if (!horizonData || horizonData.skyline.length === 0) return null;
+    const range = naturalElRange(horizonData);
+    return range.max > LINEAR_MAX_DEG && range.min < BAND_BREAK_DEG ? horizonAxisQuantities([BAND_BREAK_DEG])[0] : null;
+  }, [horizonData]);
+
+  const plot = (height: number, variant: 'console' | 'hero', compassStep: 45 | 90) => (
+    <AsyncView result={horizon} what="the horizon" waiting={<div className="skeleton w-full" style={{ height }} />} empty="No horizon data for this point.">
+      {() =>
+        ready ? (
+          <HorizonPanel
+            data={horizonData}
+            fromMs={startMs}
+            toMs={endMs}
+            label={plotLabel}
+            getSun={marks.sun}
+            getEarth={marks.earth}
+            variant={variant}
+            height={height}
+            compassStep={compassStep}
+            testId="horizon-panel"
+          />
+        ) : (
+          <div className="skeleton w-full" style={{ height }} role="status">
+            <span className="sr-only">Loading the horizon…</span>
+          </div>
+        )
+      }
+    </AsyncView>
+  );
+
+  const timeline = (
+    <StayTimeline
+      periods={periods}
+      startMs={startMs}
+      endMs={endMs}
+      landingMs={landingMs ?? 0}
+      getNow={now}
+      getState={marks.state}
+      getValueText={marks.valueText}
+      getNextChange={marks.nextChange}
+      onScrub={scrubTo}
+      onTogglePlay={togglePlay}
+      ticks={ticks}
+      periodList={periodList}
+      stayLength={fixed.stayLength}
+      flag={q.sinceLanding}
+      delay={slipDays > 0 ? dates.delay : undefined}
+      label="Time in the stay"
+      disabled={!ready}
+    />
+  );
+
+  const transport = <Transport playing={playing} speed={speed} speeds={speeds} onTogglePlay={togglePlay} onRestart={restart} onSpeed={actions.setSpeed} disabled={!ranged} />;
+
+  const beforeLanding = (
+    <p className="tag tag-warn site-before m-0 min-h-9 shrink-0 px-3 normal-case tracking-[0.04em]" role="status" data-testid="before-landing">
+      <span className="uppercase tracking-[0.1em]" data-q={q.phase.key}>
+        <span data-q-text>{q.phase.text}</span>
+      </span>
+      <span className="text-ink-2">
+        landing in <Inline q={q.toLanding} className="text-ink" />
+      </span>
+    </p>
+  );
+
+  const sunPanel = (extra: { dense?: boolean; bare?: boolean } = {}) => (
+    <SunPanel
+      sunState={q.sunState}
+      nextChange={q.nextChange}
+      sunAz={q.sunAz}
+      sunEl={q.sunEl}
+      sunWidth={fixed.sunWidth}
+      shadowPerMetre={q.shadowPerMetre}
+      shadowLander={q.shadowLander}
+      shadowBearing={q.shadowBearing}
+      sunlightPercent={result.sunlightPercent}
+      sunlightHours={result.sunlightHours}
+      {...extra}
+    />
+  );
+  const clockPanel = (extra: { dense?: boolean; bare?: boolean } = {}) => <ClockPanel utc={q.utcClock} ltc={q.ltcClock} ltcOffset={q.ltcOffset} sinceLanding={q.sinceLanding} stayEnd={fixed.stayEnd} {...extra} />;
+  const earthPanel = (extra: { dense?: boolean; bare?: boolean } = {}) => <EarthPanel earthAz={q.earthAz} earthEl={q.earthEl} earthWidth={q.earthWidth} earthLink={fixed.earthLink} clearSky={result.clearSky} {...extra} />;
+  const hardwarePanel = (extra: { bare?: boolean; className?: string } = {}) => <HardwarePanel rows={hardware} longestDark={fixed.longestDark} note={webgl ? HARDWARE_NOTE : HARDWARE_NOTE_FLAT} {...extra} />;
+
+  const trueSize = (
+    <p className="m-0 text-[13px] leading-snug text-ink-2" data-testid="true-size">
+      Sun <Inline q={fixed.sunWidth} /> and Earth <Inline q={q.earthWidth} /> wide: drawn at their true apparent size from this site, at mean distances. The skyline is from the data and has no distance. <span data-testid="site-illustration-ground">The ground is an illustration.</span>
+    </p>
+  );
+
+  const scene =
+    webgl && focus && landingMs !== null ? (
+      <div className="absolute inset-0">
+        <Suspense fallback={null}>
+          <SiteScene site={focus} horizon={horizonData} track={trackData} landingMs={landingMs} isPhone={isPhone} />
+        </Suspense>
+      </div>
+    ) : null;
+
+  const rootProps = {
+    ref: rootRef,
+    className: 'site-hud absolute inset-0',
+    'data-testid': 'site-hud',
+    'data-lit': litWord(q),
+    'data-phase': q.beforeLanding ? 'before-landing' : 'stay',
+    'data-layout': isPhone ? 'phone' : 'wide',
+  } as const;
+
+  if (isPhone) {
+    return (
+      <div {...rootProps}>
+        <h2 className="sr-only">Site: {name}</h2>
+        {scene}
+        {webgl ? <AnchorReticle anchor="lander" label="Landing point" size={56} /> : null}
+
+        <div className="hud-layer" data-depth="0.5">
+          <div className="absolute left-3 right-3 top-[4.25rem] flex flex-col gap-2" data-enter="lead" data-site-zone="top">
+            <div className="flex items-center gap-2">
+              <button type="button" className="btn btn-glass btn-icon shrink-0" onClick={actions.backToMission} aria-label="Back to mission select" data-testid="back-to-mission">
+                <Icon name="back" size={16} />
+              </button>
+              <span className="tag min-h-11 min-w-0 flex-1 bg-glass-strong px-3 text-[13px] text-ink">
+                <span className="truncate" data-testid="scene-title">
+                  {name}
+                </span>
+              </span>
+              {result.verdict.text === DASH ? null : (
+                <span className={`${passTag} min-h-11 shrink-0 px-2.5`} data-q={result.verdict.key} title={result.verdict.text}>
+                  {result.passes ? 'pass' : 'fail'}
+                </span>
+              )}
+            </div>
+            <Glass as="section" tone="sun" className="grid grid-cols-2 gap-x-3 gap-y-2 p-3" aria-label="Sun, now" data-panel data-testid="site-status">
+              <Readout q={q.sunState} />
+              <Readout q={q.nextChange} size="sm" />
+              <Readout q={q.sunAz} size="sm" />
+              <Readout q={q.sunEl} size="sm" />
+              <div className="col-span-2 flex">{beforeLanding}</div>
+            </Glass>
           </div>
         </div>
-      ) : null}
-      <div className="hud-layer">
-        <div className="absolute left-5 top-[4.75rem] flex max-w-[calc(100%-2.5rem)] flex-wrap items-center gap-2">
-          <button type="button" className="btn btn-primary" onClick={actions.backToMission} data-testid="back-to-mission">
-            <Icon name="back" size={14} />
-            Back to mission select
-          </button>
-          <span className="tag min-h-9 bg-glass-strong px-3 text-[13px]" data-testid="scene-title">
-            {focus?.name ?? 'No site'}
-          </span>
-          <button type="button" className="btn" onClick={() => actions.setPlaying(!playing)} aria-pressed={playing} data-testid="play">
-            <Icon name={playing ? 'pause' : 'play'} size={14} />
-            {playing ? 'Pause' : 'Play'}
-          </button>
+
+        <Drawer open={sheetOpen} onClose={() => actions.setHorizonOpen(false)} title="Horizon and readouts" side="bottom" testId="site-sheet" className="site-sheet">
+          <div className="flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 py-3">
+            {plot(180, 'console', 90)}
+            <SkyLegend scaleBreak={scaleBreak} />
+            {clockPanel({ bare: true })}
+            {sunPanel({ bare: true })}
+            {earthPanel({ bare: true })}
+            {hardwarePanel({ bare: true })}
+          </div>
+        </Drawer>
+
+        {/* Above the sheet, which stops where the dock begins. */}
+        <div className="hud-layer z-[45]">
+          <section className="site-dock glass glass-strong absolute inset-x-0 bottom-0 flex flex-col gap-2 rounded-b-none border-x-0 border-b-0 px-3 pt-2.5" aria-label="Time through the stay" data-enter="rise" data-site-zone="dock" data-panel data-testid="site-dock">
+            {timeline}
+            <div className="flex items-center justify-between gap-2">
+              {transport}
+              <button
+                type="button"
+                className="btn shrink-0 px-3"
+                aria-expanded={sheetOpen}
+                aria-controls="site-sheet"
+                onClick={() => actions.setHorizonOpen(!sheetOpen)}
+                data-testid="site-horizon-toggle"
+              >
+                <Icon name="horizon" size={15} />
+                Horizon
+              </button>
+            </div>
+            {webgl ? (
+              <p className="m-0 text-[12px] leading-snug text-ink-2" data-testid="true-size">
+                Sun <Inline q={fixed.sunWidth} />, Earth <Inline q={q.earthWidth} />: true apparent size (mean distances). <span data-testid="site-illustration-ground">The ground is an illustration.</span>
+              </p>
+            ) : null}
+          </section>
         </div>
       </div>
-      <div className="hud-layer">
-        <Glass as="section" className="absolute bottom-5 left-5 w-[min(40rem,calc(100%-2.5rem))] p-4" aria-label="Horizon plot" data-testid="horizon-panel">
-          <AsyncView result={horizon} what="the horizon" waiting={<div className="skeleton h-40 w-full" />} empty="No horizon data for this point.">
-            {(h) =>
-              focus && landingMs !== null && windowStartMs !== null && windowEndMs !== null ? (
-                <HorizonPlot
-                  data={h}
-                  siteName={focus.name}
-                  nowMs={nowMs ?? landingMs}
-                  windowStartMs={windowStartMs}
-                  windowEndMs={windowEndMs}
-                  landingMs={landingMs}
-                  plannedLandingMs={plannedLandingMs}
-                  readouts={focusRow?.evaluation ?? null}
-                  timeScale={timeScale}
-                  onScrub={(ms) => {
-                    actions.setPlaying(false);
-                    simClock.set({ nowMs: ms });
-                  }}
-                />
-              ) : null
-            }
-          </AsyncView>
+    );
+  }
+
+  const plotHeight = short ? 84 : 112;
+  return (
+    <div {...rootProps}>
+      <h2 className="sr-only">Site: {name}</h2>
+      {scene}
+      {webgl ? (
+        <>
+          <Leaders items={LEADERS} />
+          <AnchorTag anchor="sun" label="Sun" tone="sun" toward={0} gap={8} q={q.sunEl} />
+          <AnchorTag anchor="earth" label="Earth" tone="earth" toward={0} gap={8} q={q.earthEl} />
+          <AnchorReticle anchor="lander" label="Landing point" />
+        </>
+      ) : null}
+
+      {/* Across the top: the way back, and which site this is. */}
+      <div className="hud-layer" data-depth="0.6">
+        <div className="absolute left-5 right-[22.5rem] top-[4.75rem] flex items-center gap-2 max-lg:right-[18.5rem]" data-enter="lead" data-site-zone="top">
+          <button type="button" className="btn btn-glass shrink-0" onClick={actions.backToMission} aria-label="Back to mission select" data-testid="back-to-mission">
+            <Icon name="back" size={14} />
+            <span>
+              <span className="max-[1379px]:hidden">Back to </span>mission select
+            </span>
+          </button>
+          <span className="tag min-h-9 min-w-0 shrink bg-glass-strong px-3 text-[13px] text-ink">
+            <span className="truncate" data-testid="scene-title">
+              {name}
+            </span>
+          </span>
+          {result.rank.text === DASH ? null : (
+            <span className="tag min-h-9 shrink-0 bg-glass-strong px-2.5" data-q={result.rank.key} data-testid="site-rank">
+              <span data-q-label>{result.rank.label}</span>
+              <span className="num text-[13px] tracking-normal text-ink" data-q-text>
+                {result.rank.text}
+              </span>
+            </span>
+          )}
+          {result.verdict.text === DASH ? null : (
+            <span className={`${passTag} min-h-9 min-w-0 shrink px-2.5`} data-q={result.verdict.key} data-testid="site-verdict">
+              <span className="truncate" data-q-text>
+                {result.verdict.text}
+              </span>
+            </span>
+          )}
+          <span className="num flex shrink-0 items-center gap-3 rounded-[3px] bg-glass-strong px-2.5 py-2 text-[13px] leading-none text-ink-2 max-xl:hidden" data-testid="site-coordinates">
+            <Inline q={fixed.siteLat} />
+            <Inline q={fixed.siteLon} />
+          </span>
+          {beforeLanding}
+        </div>
+      </div>
+
+      {/* Left wing: the Sun now and the shadows it casts; the mission clock. */}
+      <div className="hud-layer" data-depth="0.9">
+        <div className="site-wing wing-l absolute left-5 top-[8rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="left" data-site-zone="left">
+          {sunPanel()}
+          {clockPanel()}
+        </div>
+      </div>
+
+      {/* Right wing: Earth in this sky; the mission's hardware. */}
+      <div className="hud-layer" data-depth="0.9">
+        <div className="site-wing site-wing-r wing-r absolute right-5 top-[4.75rem] flex w-[20rem] flex-col gap-3 max-lg:w-[16rem]" data-enter="right" data-site-zone="right">
+          {earthPanel()}
+          {hardwarePanel({ className: 'max-lg:hidden [@media(max-height:759px)]:hidden' })}
+        </div>
+      </div>
+
+      {/* Without 3D the plot takes the scene's place, in the middle. */}
+      {webgl ? null : (
+        <div className="hud-layer" data-depth="0.5">
+          <Glass as="section" className="absolute left-[22.5rem] right-[22.5rem] top-[11.5rem] flex flex-col gap-3 p-4 max-lg:left-[18.5rem] max-lg:right-[18.5rem]" aria-label="Horizon" data-enter="fade" data-panel data-testid="site-flat">
+            <h3 className="panel-title m-0">Horizon</h3>
+            {plot(short ? 180 : 260, 'hero', 45)}
+            <SkyLegend scaleBreak={scaleBreak} />
+          </Glass>
+        </div>
+      )}
+
+      {/* The console: sky and time. The plot sits directly above the timeline that scrubs it. */}
+      <div className="hud-layer" data-depth="0.4">
+        <Glass as="section" strong className="absolute bottom-5 left-5 right-5 grid grid-cols-[17rem_minmax(0,1fr)] gap-x-5 px-4 py-3.5 short:py-3" aria-label="Sky and time" data-enter="rise" data-site-zone="console" data-panel data-testid="site-console">
+          <div className="flex min-w-0 flex-col gap-2.5">
+            <h3 className="panel-title m-0">Sky and time</h3>
+            {transport}
+            {webgl ? trueSize : null}
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            {webgl ? (
+              <>
+                <SkyLegend scaleBreak={scaleBreak} />
+                {plot(plotHeight, 'console', 45)}
+              </>
+            ) : null}
+            {timeline}
+          </div>
         </Glass>
       </div>
     </div>
   );
+}
+
+/** The lit word for the stage's root attribute: "true", "false" or "unknown". */
+function litWord(q: SiteLiveQuantities): 'true' | 'false' | 'unknown' {
+  return q.sky.lit === null ? 'unknown' : q.sky.lit ? 'true' : 'false';
+}
+
+function litState(q: SiteLiveQuantities): StayState {
+  return q.sky.lit === null ? 'unknown' : q.sky.lit ? 'lit' : 'dark';
+}
+
+/**
+ * Measures what the panels leave of the window and writes it to `siteFrame` for the scene: right of
+ * the left wing, left of the right wing, below the top strip and above the console (on a phone:
+ * below the status card and above the dock). The console's top and the dock's height also go to
+ * the page as lengths, so the wings and the phone sheet stop where the console and the dock begin.
+ */
+function useSiteFrame(rootRef: RefObject<HTMLDivElement | null>, isPhone: boolean): void {
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const zone = (name: string) => root.querySelector<HTMLElement>(`[data-site-zone="${name}"]`);
+    const measure = () => {
+      const width = root.offsetWidth;
+      const height = root.offsetHeight;
+      const top = zone('top');
+      const left = zone('left');
+      const right = zone('right');
+      const base = zone(isPhone ? 'dock' : 'console');
+      const baseTop = base ? layoutBox(base, root).top : height;
+      siteFrame.set({
+        measured: width > 0 && height > 0,
+        width,
+        height,
+        left: left ? layoutBox(left, root).right : 0,
+        right: right ? layoutBox(right, root).left : width,
+        top: top ? layoutBox(top, root).bottom : 0,
+        bottom: baseTop,
+      });
+      root.style.setProperty('--site-console-top', `${baseTop}px`);
+      root.style.setProperty('--site-dock', `${Math.max(0, height - baseTop)}px`);
+    };
+    measure();
+    // Sizes change with the window, when a panel's rows change and when the fonts arrive.
+    const observer = new ResizeObserver(measure);
+    for (const el of [root, zone('top'), zone('left'), zone('right'), zone('console'), zone('dock')]) if (el) observer.observe(el);
+    return () => observer.disconnect();
+  }, [rootRef, isPhone]);
+  // Leaving the stage: nothing is measured any more.
+  useEffect(() => () => siteFrame.set({ measured: false }), []);
 }

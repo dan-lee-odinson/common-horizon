@@ -6,7 +6,7 @@ import { AssistantSheet } from './stages/Assistant';
 import { LandingCard } from './stages/LandingCard';
 import { MissionHud } from './stages/MissionHud';
 import { OrbitHud } from './stages/OrbitHud';
-import { OrbitPreview } from './stages/Playback';
+import { OrbitPreview, SitePlayback } from './stages/Playback';
 import { SiteHud } from './stages/SiteHud';
 import { TopBar } from './stages/TopBar';
 import { actions, appStore } from './state/app';
@@ -32,6 +32,7 @@ export function App() {
     <DataProvider>
       <Shell />
       <OrbitPreview />
+      <SitePlayback />
     </DataProvider>
   );
 }
@@ -84,9 +85,10 @@ function FlatWorld() {
   const savedIds = useMemo(() => new Set(saved.map((s) => s.id)), [saved]);
   if (stage === 'site') {
     return (
-      <div className="absolute inset-0 grid place-items-center p-6 text-center text-[14px] text-ink-2" data-testid="site-scene-fallback">
+      // Above the horizon plot, which takes the scene's place in the middle of the stage.
+      <p className="absolute inset-x-0 top-[8.5rem] m-0 px-[23rem] text-center text-[14px] leading-snug text-ink-2 max-lg:px-[19rem] max-md:top-[15.5rem] max-md:px-6" data-testid="site-scene-fallback">
         3D is not available in this browser. The horizon plot shows this site’s sky.
-      </div>
+      </p>
     );
   }
   return (

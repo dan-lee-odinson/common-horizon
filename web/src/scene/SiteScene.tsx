@@ -1,93 +1,90 @@
-// View 3: the site scene. For now the ground is a placeholder (gentle invented bumps, starting
-// bare: no hardware placed). The terrain skyline ring, the Sun and Earth come from the horizon
-// data, and the Sun moves when Play runs. Drag to rotate, wheel or the +/- buttons to zoom.
+// The site scene as it was before the terrain moved into the one canvas, kept behind the new HUD
+// with the changes that make its sky true: the Sun's and Earth's directions and the lit / dark word
+// come from the same function as the readouts (skyAt), both discs are drawn at their true apparent
+// size, the skyline is the horizon answer's own and rides with the camera (it has no distance), and
+// the placeholder ground never rises above level. Drag to turn, wheel or pinch to zoom.
 
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import gsap from 'gsap';
 import * as THREE from 'three';
 import type { HorizonResponse, SiteRef } from '../api/types';
 import { simClock } from '../state/app';
-import { prefersReducedMotion } from '../state/useMedia';
-import { azElToLocal, normalizeLon360 } from '../util/geo';
-import { sunAt } from '../components/HorizonPlot';
+import { EARTH_MOON_DISTANCE_KM, EARTH_RADIUS_KM, earthDistanceFromSiteKm, SUN_DISTANCE_KM, SUN_RADIUS_KM } from '../util/bodies';
+import { azElToLocal, sampleProfile } from '../util/geo';
+import { skyAt } from '../util/quantities';
+import type { GeometryTrack } from '../util/track';
+import { anchors } from './anchors';
 import { cssColor } from './colors';
-
-export interface SiteSceneHandle {
-  zoom: (factor: number) => void;
-}
+import { EARTH_FRAGMENT, EARTH_VERTEX } from './shaders';
+import { arrivalAzimuth, frameShift, insideFrame, siteFrame } from './siteView';
+import { Stars } from './Stars';
 
 interface Props {
   site: SiteRef;
+  /** This site's horizon answer; null until it arrives. */
   horizon: HorizonResponse | null;
+  track: GeometryTrack | null;
   landingMs: number;
+  isPhone: boolean;
 }
 
-const SKY_RADIUS = 70;
+/** The skyline band rides on a sphere of this radius around the camera; the Sun and Earth sit behind it. */
+const SKYLINE_RADIUS = 70;
+const BODY_RADIUS = 90;
+/** The band reaches this far below level, so the ground's far edge is always in front of it. */
+const BAND_FLOOR_DEG = -12;
+/** The camera looks at a point this high over the landing point, from this far away on arrival. */
+const TARGET_HEIGHT = 1.6;
+const ARRIVAL_DISTANCE = 15;
 
-interface ControlsLike {
-  target: THREE.Vector3;
-  update: () => void;
-  minDistance: number;
-  maxDistance: number;
-}
-
-export const SiteScene = forwardRef<SiteSceneHandle, Props>(function SiteScene({ site, horizon, landingMs }, ref) {
-  const zoomRef = useRef<(factor: number) => void>(() => undefined);
-  useImperativeHandle(ref, () => ({ zoom: (f) => zoomRef.current(f) }), []);
-  const earthCenter = useMemo(() => earthBoxCenter(horizon), [horizon]);
-  // Start the camera looking towards Earth (or north when Earth is not in the sky).
-  const lookAz = earthCenter?.az ?? 0;
-  const camStart = azElToLocal(lookAz + 180, 9, 15);
+export function SiteScene({ site, horizon, track, landingMs, isPhone }: Props) {
+  // Where the camera stands on arrival: worked out once, at the landing time.
+  const start = useMemo(() => {
+    const sky = skyAt({ track, tMs: landingMs, landingMs, site, horizon });
+    const facing = (arrivalAzimuth(sky.sun, sky.earth) * Math.PI) / 180;
+    const up = (9 * Math.PI) / 180;
+    return [-Math.sin(facing) * Math.cos(up) * ARRIVAL_DISTANCE, TARGET_HEIGHT + Math.sin(up) * ARRIVAL_DISTANCE, Math.cos(facing) * Math.cos(up) * ARRIVAL_DISTANCE] as const;
+    // Worked out for the site and the landing only: when later answers arrive the visitor may
+    // already be turning the view, and the camera is not taken out of their hands.
+  }, [site.id, landingMs]);
 
   return (
     <div className="absolute inset-0" data-testid="site-scene">
-      <Canvas camera={{ position: [camStart.x, camStart.y + 1.6, camStart.z], fov: 50, near: 0.1, far: 400 }} dpr={[1, 2]} aria-label={`Site scene for ${site.name}`}>
+      <Canvas flat camera={{ position: [start[0], start[1], start[2]], fov: isPhone ? 62 : 50, near: 0.1, far: 400 }} dpr={[1, 2]} aria-label={`The view from ${site.name}`} role="img">
         <color attach="background" args={[cssColor('--ch-space')]} />
-        <SkyStars />
-        <ambientLight intensity={0.12} />
-        {/* soft fill so the placeholder ground stays readable when the Sun grazes the horizon */}
-        <hemisphereLight args={[cssColor('--ch-ink-2'), cssColor('--ch-space'), 0.35]} />
         <Ground seed={`${site.lat},${site.lon_east}`} />
-        {horizon ? <SkylineRing horizon={horizon} /> : null}
-        {horizon ? <SunLight horizon={horizon} landingMs={landingMs} /> : null}
-        {earthCenter ? <EarthInSky az={earthCenter.az} el={earthCenter.el} /> : null}
-        <OrbitControls makeDefault target={[0, 1.6, 0]} enablePan={false} minDistance={3} maxDistance={60} maxPolarAngle={Math.PI / 2 - 0.04} enableDamping dampingFactor={0.08} />
-        <ZoomBridge zoomRef={zoomRef} />
+        <Sky site={site} horizon={horizon} track={track} landingMs={landingMs} />
+        <OrbitControls
+          makeDefault
+          target={[0, TARGET_HEIGHT, 0]}
+          enablePan={false}
+          minDistance={4}
+          maxDistance={40}
+          minPolarAngle={Math.PI / 3}
+          maxPolarAngle={Math.PI / 2 - 0.04}
+          enableDamping
+          dampingFactor={0.08}
+        />
+        <FrameShift />
       </Canvas>
     </div>
   );
-});
-
-function earthBoxCenter(h: HorizonResponse | null): { az: number; el: number } | null {
-  const box = h?.earth_box;
-  if (!box) return null;
-  const span = normalizeLon360(box.az_max - box.az_min);
-  return { az: normalizeLon360(box.az_min + span / 2), el: (box.el_min + box.el_max) / 2 };
 }
 
-function ZoomBridge({ zoomRef }: { zoomRef: { current: (factor: number) => void } }) {
-  const camera = useThree((s) => s.camera);
-  const controls = useThree((s) => s.controls) as unknown as ControlsLike | null;
-  const tween = useRef<gsap.core.Tween | null>(null);
-  zoomRef.current = (factor: number) => {
-    if (!controls) return;
-    tween.current?.kill(); // rapid clicks retarget from where the camera is now
-    const offset = camera.position.clone().sub(controls.target);
-    const target = Math.min(controls.maxDistance, Math.max(controls.minDistance, offset.length() * factor));
-    const proxy = { d: offset.length() };
-    const dir = offset.normalize();
-    tween.current = gsap.to(proxy, {
-      d: target,
-      duration: prefersReducedMotion() ? 0 : 0.3,
-      ease: 'power4.out',
-      onUpdate: () => {
-        camera.position.copy(controls.target).addScaledVector(dir, proxy.d);
-        controls.update();
-      },
-    });
-  };
+/** Keeps the middle of the picture in the middle of the part of the window the panels leave free. */
+function FrameShift() {
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  const size = useThree((s) => s.size);
+  const applied = useRef('');
+  useFrame(() => {
+    const shift = frameShift(siteFrame.get(), size.width, size.height);
+    const key = `${size.width}x${size.height}:${shift.x},${shift.y}`;
+    if (key === applied.current) return;
+    applied.current = key;
+    if (shift.x === 0 && shift.y === 0) camera.clearViewOffset();
+    else camera.setViewOffset(size.width, size.height, -shift.x, shift.y, size.width, size.height);
+  });
   return null;
 }
 
@@ -97,133 +94,191 @@ function hash(text: string): number {
   return h >>> 0;
 }
 
-/** Placeholder ground: a wide plane with a few soft bumps and craters, flat in the middle. */
+/**
+ * Placeholder ground: a wide plane with a few soft hollows near the landing point. It is an
+ * illustration (the screen says so) and never rises above level, so it cannot hide sky that the
+ * data says is open; beyond 45 units it is level all the way out.
+ */
 function Ground({ seed }: { seed: string }) {
   const geometry = useMemo(() => {
-    const g = new THREE.PlaneGeometry(170, 170, 160, 160);
+    const g = new THREE.PlaneGeometry(320, 320, 200, 200);
     g.rotateX(-Math.PI / 2);
     let s = hash(seed) || 1;
     const rand = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-    const features = Array.from({ length: 60 }, () => ({
-      x: (rand() * 2 - 1) * 70,
-      z: (rand() * 2 - 1) * 70,
-      r: 1.5 + rand() * rand() * 12,
-      h: (rand() < 0.7 ? -1 : 1) * (0.15 + rand() * 0.8),
+    const hollows = Array.from({ length: 40 }, () => ({
+      x: (rand() * 2 - 1) * 42,
+      z: (rand() * 2 - 1) * 42,
+      r: 2.5 + rand() * rand() * 11,
+      depth: 0.15 + rand() * 0.7,
     }));
     const pos = g.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
+      const r = Math.hypot(x, z);
+      if (r >= 45) continue;
       let y = 0;
-      for (const f of features) {
+      for (const f of hollows) {
         const d = Math.hypot(x - f.x, z - f.z) / f.r;
-        if (f.h < 0) y += f.h * Math.exp(-d * d * 1.6) + -f.h * 0.35 * Math.exp(-((d - 1.1) ** 2) * 5);
-        else y += f.h * Math.exp(-d * d);
+        y -= f.depth * Math.exp(-d * d * 1.6);
       }
-      const flat = Math.min(1, Math.hypot(x, z) / 12);
-      pos.setY(i, y * flat);
+      // Level under the landing point, and fading back to level between 30 and 45 units out.
+      const near = Math.min(1, r / 12);
+      const far = 1 - Math.min(1, Math.max(0, (r - 30) / 15));
+      pos.setY(i, Math.min(0, y * near * far));
     }
     g.computeVertexNormals();
     return g;
   }, [seed]);
   const color = useMemo(() => cssColor('--ch-ground'), []);
   return (
-    <mesh geometry={geometry} receiveShadow>
+    <mesh geometry={geometry}>
       <meshStandardMaterial color={color} roughness={1} metalness={0} />
     </mesh>
   );
 }
 
-/** The terrain skyline from the horizon data, drawn as a ring of distant hills. */
-function SkylineRing({ horizon }: { horizon: HorizonResponse }) {
-  const geometry = useMemo(() => {
-    const pts = horizon.skyline;
-    const n = pts.length;
-    const positions: number[] = [];
-    const index: number[] = [];
-    for (let i = 0; i <= n; i++) {
-      const p = pts[i % n];
-      const base = azElToLocal(p.az, 0, SKY_RADIUS);
-      const top = azElToLocal(p.az, Math.max(p.el, -0.5), SKY_RADIUS);
-      positions.push(base.x, -6, base.z, top.x, top.y, top.z);
-      if (i < n) {
-        const a = i * 2;
-        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-      }
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    g.setIndex(index);
-    g.computeVertexNormals();
-    return g;
-  }, [horizon]);
-  const color = useMemo(() => cssColor('--ch-terrain-edge'), []);
-  return (
-    <mesh geometry={geometry}>
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.3} side={THREE.DoubleSide} roughness={1} flatShading />
-    </mesh>
-  );
-}
-
-/** Sun disc and sunlight that follow the simulated clock. */
-function SunLight({ horizon, landingMs }: { horizon: HorizonResponse; landingMs: number }) {
+/**
+ * The sky: stars, Earth, the Sun and the skyline band, all on spheres centred on the camera, with
+ * the light that goes with them. The band is the only thing in the sky that hides anything.
+ */
+function Sky({ site, horizon, track, landingMs }: Omit<Props, 'isPhone'>) {
+  const group = useRef<THREE.Group>(null);
+  const sun = useRef<THREE.Mesh>(null);
+  const earth = useRef<THREE.Mesh>(null);
   const light = useRef<THREE.DirectionalLight>(null);
-  const disc = useRef<THREE.Mesh>(null);
-  const times = useMemo(() => horizon.sun_path.map((p) => Date.parse(p.t)), [horizon]);
-  const color = useMemo(() => cssColor('--ch-sun'), []);
-  useFrame(() => {
-    const now = simClock.get().nowMs ?? landingMs;
-    const sun = sunAt(horizon, times, now);
-    if (!sun || !light.current || !disc.current) return;
-    const dir = azElToLocal(sun.az, sun.el, SKY_RADIUS - 2);
-    disc.current.position.set(dir.x, dir.y, dir.z);
-    light.current.position.set(dir.x, dir.y, dir.z);
-    light.current.intensity = sun.above ? 1.8 : 0;
-    disc.current.visible = sun.el > -3;
+  const ambient = useRef<THREE.AmbientLight>(null);
+  const fill = useRef<THREE.HemisphereLight>(null);
+  const colors = useMemo(
+    () => ({ sun: cssColor('--ch-sun'), earth: new THREE.Color(cssColor('--ch-earth')), sky: cssColor('--ch-ink-2'), space: cssColor('--ch-space') }),
+    [],
+  );
+  const earthUniforms = useMemo(() => ({ uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uColor: { value: colors.earth } }), [colors]);
+  // True apparent sizes: a ball of the body's radius at the body's distance, shrunk onto the sphere it is drawn on.
+  const sunRadius = (BODY_RADIUS * SUN_RADIUS_KM) / SUN_DISTANCE_KM;
+  const earthBaseRadius = (BODY_RADIUS * EARTH_RADIUS_KM) / EARTH_MOON_DISTANCE_KM;
+  const input = useRef({ site, horizon, track, landingMs });
+  useLayoutEffect(() => {
+    input.current = { site, horizon, track, landingMs };
   });
+  const scratch = useMemo(() => ({ v: new THREE.Vector3(), toPoint: new THREE.Vector3(), forward: new THREE.Vector3() }), []);
+  const size = useThree((s) => s.size);
+
+  useFrame(({ camera }) => {
+    const { site: s, horizon: h, track: t, landingMs: landing } = input.current;
+    group.current?.position.copy(camera.position);
+    const sky = skyAt({ track: t, tMs: simClock.get().nowMs ?? landing, landingMs: landing, site: s, horizon: h });
+    const lit = sky.lit === true;
+    const frame = siteFrame.get();
+    /** Writes where a point of the sky is on screen; returns whether it is in view. */
+    const { v, toPoint, forward } = scratch;
+    camera.getWorldDirection(forward);
+    const focal = size.height / 2 / Math.tan(((camera as THREE.PerspectiveCamera).fov * Math.PI) / 360);
+    const project = (name: 'sun' | 'earth' | 'lander', radiusUnits: number, distance: number): boolean => {
+      const depth = toPoint.copy(v).sub(camera.position).dot(forward);
+      v.project(camera);
+      const x = (v.x * 0.5 + 0.5) * size.width;
+      const y = (-v.y * 0.5 + 0.5) * size.height;
+      const a = anchors[name];
+      a.x = x;
+      a.y = y;
+      a.r = distance > 0 ? Math.max(4, (radiusUnits / distance) * focal) : 0;
+      return depth > 0 && x >= 0 && x <= size.width && y >= 0 && y <= size.height;
+    };
+
+    if (sun.current) {
+      sun.current.visible = sky.sun !== null;
+      if (sky.sun) {
+        const d = azElToLocal(sky.sun.az, sky.sun.el, 1);
+        sun.current.position.set(d.x * BODY_RADIUS, d.y * BODY_RADIUS, d.z * BODY_RADIUS);
+        earthUniforms.uSunDir.value.set(d.x, d.y, d.z);
+        light.current?.position.set(d.x, d.y, d.z);
+        v.set(d.x, d.y, d.z).multiplyScalar(BODY_RADIUS).add(camera.position);
+        const seen = project('sun', sunRadius, BODY_RADIUS);
+        // The tag points at the Sun only while the answer says it is above the terrain.
+        anchors.sun.visible = lit && seen && insideFrame(frame, anchors.sun.x, anchors.sun.y, 24);
+      } else anchors.sun.visible = false;
+    }
+    // The light follows the horizon answer's word: with the Sun behind the terrain only a dim fill is left.
+    if (light.current) light.current.intensity = lit ? 1.8 : 0;
+    if (ambient.current) ambient.current.intensity = lit ? 0.12 : 0.04;
+    if (fill.current) fill.current.intensity = lit ? 0.35 : 0.1;
+
+    if (earth.current) {
+      earth.current.visible = sky.earth !== null;
+      if (sky.earth) {
+        const d = azElToLocal(sky.earth.az, sky.earth.el, 1);
+        earth.current.position.set(d.x * BODY_RADIUS, d.y * BODY_RADIUS, d.z * BODY_RADIUS);
+        // The site's own place on the Moon changes its distance to Earth by up to a Moon radius.
+        const scale = EARTH_MOON_DISTANCE_KM / earthDistanceFromSiteKm(sky.earth.el);
+        earth.current.scale.setScalar(scale);
+        v.set(d.x, d.y, d.z).multiplyScalar(BODY_RADIUS).add(camera.position);
+        const seen = project('earth', earthBaseRadius * scale, BODY_RADIUS);
+        const skylineThere = h && h.skyline.length ? sampleProfile(h.skyline, sky.earth.az) : 0;
+        anchors.earth.visible = seen && sky.earth.el > skylineThere && insideFrame(frame, anchors.earth.x, anchors.earth.y, 24);
+      } else anchors.earth.visible = false;
+    }
+
+    // The landing point: the middle of the ground.
+    v.set(0, 0, 0);
+    const distance = camera.position.length();
+    anchors.lander.visible = project('lander', 0, distance);
+    anchors.lander.r = 0;
+  });
+
   return (
     <>
-      <directionalLight ref={light} intensity={2.6} />
-      <mesh ref={disc}>
-        <sphereGeometry args={[1.6, 24, 16]} />
-        <meshBasicMaterial color={color} toneMapped={false} />
-      </mesh>
+      <ambientLight ref={ambient} intensity={0.12} />
+      <hemisphereLight ref={fill} args={[colors.sky, colors.space, 0.35]} />
+      <directionalLight ref={light} intensity={0} />
+      <group ref={group}>
+        <Stars radius={150} count={700} upperOnly />
+        <mesh ref={earth} visible={false}>
+          <sphereGeometry args={[earthBaseRadius, 32, 20]} />
+          <shaderMaterial vertexShader={EARTH_VERTEX} fragmentShader={EARTH_FRAGMENT} uniforms={earthUniforms} />
+        </mesh>
+        <mesh ref={sun} visible={false}>
+          <sphereGeometry args={[sunRadius, 20, 12]} />
+          <meshBasicMaterial color={colors.sun} toneMapped={false} />
+        </mesh>
+        {horizon && horizon.skyline.length > 0 ? <SkylineBand horizon={horizon} /> : null}
+      </group>
     </>
   );
 }
 
-function EarthInSky({ az, el }: { az: number; el: number }) {
-  const pos = azElToLocal(az, el, SKY_RADIUS - 4);
-  const color = useMemo(() => cssColor('--ch-earth'), []);
-  return (
-    <mesh position={[pos.x, pos.y, pos.z]}>
-      <sphereGeometry args={[2.6, 32, 24]} />
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.25} roughness={0.6} />
-    </mesh>
-  );
-}
-
-function SkyStars() {
-  const geometry = useMemo(() => {
-    const n = 700;
-    const arr = new Float32Array(n * 3);
-    let s = 11;
-    const rand = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-    for (let i = 0; i < n; i++) {
-      const u = rand() * 0.95 + 0.03; // upper hemisphere only
-      const t = rand() * Math.PI * 2;
-      const r = 150;
-      const c = Math.sqrt(1 - u * u);
-      arr.set([r * c * Math.cos(t), r * u, r * c * Math.sin(t)], i * 3);
+/** The terrain skyline from the horizon answer, as a band from well below level up to the skyline, with its edge drawn. */
+function SkylineBand({ horizon }: { horizon: HorizonResponse }) {
+  const { band, edge } = useMemo(() => {
+    const positions: number[] = [];
+    const index: number[] = [];
+    const top: number[] = [];
+    for (let az = 0; az <= 360; az++) {
+      const el = sampleProfile(horizon.skyline, az);
+      const base = azElToLocal(az, BAND_FLOOR_DEG, SKYLINE_RADIUS);
+      const up = azElToLocal(az, el, SKYLINE_RADIUS);
+      positions.push(base.x, base.y, base.z, up.x, up.y, up.z);
+      top.push(up.x, up.y, up.z);
+      if (az < 360) {
+        const a = az * 2;
+        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
-    return g;
-  }, []);
-  const color = useMemo(() => cssColor('--ch-ink-2'), []);
+    const b = new THREE.BufferGeometry();
+    b.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    b.setIndex(index);
+    const e = new THREE.BufferGeometry();
+    e.setAttribute('position', new THREE.Float32BufferAttribute(top, 3));
+    return { band: b, edge: e };
+  }, [horizon]);
+  const colors = useMemo(() => ({ fill: cssColor('--ch-terrain'), edge: cssColor('--ch-cyan') }), []);
+  const line = useMemo(() => new THREE.Line(edge, new THREE.LineBasicMaterial({ color: colors.edge, toneMapped: false })), [edge, colors]);
   return (
-    <points geometry={geometry}>
-      <pointsMaterial color={color} size={0.5} sizeAttenuation transparent opacity={0.5} depthWrite={false} />
-    </points>
+    <>
+      <mesh geometry={band} frustumCulled={false}>
+        <meshBasicMaterial color={colors.fill} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      <primitive object={line} frustumCulled={false} />
+    </>
   );
 }

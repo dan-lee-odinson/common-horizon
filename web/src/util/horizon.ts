@@ -2,8 +2,9 @@
 // behind the terrain, and the lit and dark periods of the window.
 //
 // The answer's own "above" / "hidden" words are the authority. Between two samples whose words
-// differ, the moment of change is placed where the Sun's height crosses the terrain skyline
-// (a straight line between the two samples), so a sunrise is not snapped to the sample grid.
+// differ, the moment of change is placed where the Sun's height crosses the terrain skyline (the
+// Sun followed along a straight line between the two samples, over the skyline as the answer
+// gives it), so a sunrise is not snapped to the sample grid.
 //
 // How finely anything here is known depends on the samples, so each reading says so. A sunrise or
 // sunset gives the spacing of the two samples it falls between (`sampleGapHours`), and the Sun's
@@ -80,6 +81,42 @@ function heightAboveSkyline(data: HorizonResponse, p: SunPathPoint): number {
   return Number.isFinite(p.az) && Number.isFinite(p.el) ? p.el - sampleProfile(data.skyline, p.az) : Number.NaN;
 }
 
+/**
+ * Where between two samples the Sun's height above the skyline passes zero, as a share of the way
+ * from the first (0) to the second (1). The heights at the two samples have opposite signs.
+ *
+ * The Sun is followed along the straight line between the two samples and the skyline is read
+ * under it all the way: the answer carries the skyline in full, so its shape between the two
+ * samples is known. That places a sunrise behind a peak where the peak is, not where a straight
+ * line between the two end heights would put it. When the height passes zero more than once on the
+ * way, the first passing is taken.
+ */
+function crossingFraction(data: HorizonResponse, a: SunPathPoint, b: SunPathPoint, ma: number, mb: number): number {
+  const turn = wrap180(b.az - a.az);
+  const rise = b.el - a.el;
+  const height = (f: number) => a.el + rise * f - sampleProfile(data.skyline, a.az + turn * f);
+  // One look at least every half degree of azimuth, so no skyline point is stepped over.
+  const steps = Math.min(64, Math.max(8, Math.ceil(Math.abs(turn) * 2)));
+  const above = ma > 0;
+  let lo = 0;
+  for (let k = 1; k <= steps; k++) {
+    const f = k / steps;
+    const m = k === steps ? mb : height(f);
+    if (m > 0 !== above) {
+      let hi = f;
+      for (let n = 0; n < 24; n++) {
+        const mid = (lo + hi) / 2;
+        if (height(mid) > 0 === above) lo = mid;
+        else hi = mid;
+      }
+      return (lo + hi) / 2;
+    }
+    lo = f;
+  }
+  // Not reached while the two end heights have opposite signs; the straight-line value is the fallback.
+  return ma / (ma - mb);
+}
+
 function prepare(data: HorizonResponse): Prepared {
   const hit = prepared.get(data);
   if (hit) return hit;
@@ -103,7 +140,7 @@ function prepare(data: HorizonResponse): Prepared {
     // Opposite signs: the height above the skyline passes zero between the samples. Never so when
     // either height is missing: the change is then placed mid-way, like any other without a crossing.
     const interpolated = ma * mb < 0;
-    const f = interpolated ? ma / (ma - mb) : 0.5;
+    const f = interpolated ? crossingFraction(data, a, b, ma, mb) : 0.5;
     const gapMs = times[i + 1] - times[i];
     crossings.push({ atMs: times[i] + f * gapMs, toAbove: b.state === 'above', gapMs, interpolated });
   }
