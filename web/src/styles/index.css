@@ -186,9 +186,9 @@
   }
 
   /* ---------- the HUD space ---------- */
-  /* Panels float in a shared 3D space. Wings tilt toward the viewer (never more than 8 degrees in
-     total: 6 here plus at most 1.5 from the pointer parallax). The HUD itself lets presses through
-     to the scene; only the panels and controls placed in its layers take them. */
+  /* Panels sit in a shared 3D space and stay still. Wings tilt 6 degrees toward the viewer. The HUD
+     itself lets presses through to the scene; only the panels and controls placed in its layers
+     take them. */
   .hud {
     position: absolute;
     inset: 0;
@@ -196,8 +196,7 @@
     perspective-origin: 50% 46%;
     pointer-events: none;
   }
-  /* A layer is one flat plane: it leans with the pointer and its wings tilt inside it, and the
-     result is drawn flat. A layer must never keep its children in 3D (transform-style:
+  /* A layer is one flat plane: its wings tilt inside it, and the result is drawn flat. A layer must never keep its children in 3D (transform-style:
      preserve-3d). A tilted wing would then be drawn apart from the scene, so the glass inside it
      would find nothing behind it to blur and dim and its text would lose its contrast over a
      bright scene; and a button that shrinks when pressed could end up behind its holder for the

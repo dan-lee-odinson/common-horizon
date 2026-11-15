@@ -299,12 +299,13 @@ export const actions = {
     if (selected && landerIds.includes(id)) {
       for (const other of landerIds) if (other !== id && next[other]?.selected) next[other] = { ...next[other], selected: false, userSet: true };
     }
-    appStore.set({ hardware: next });
+    // A linked row (the reactor's mass and its power) is ticked and unticked with its partner.
+    appStore.set({ hardware: linkHardware(next, id) });
   },
   setHardwareCount(id: string, count: number, max: number) {
     const hw = appStore.get().hardware;
     const pick = hw[id] ?? { selected: true, count: 1, userSet: false };
-    appStore.set({ hardware: { ...hw, [id]: { ...pick, count: clamp(Math.round(count), 1, max), userSet: true } } });
+    appStore.set({ hardware: linkHardware({ ...hw, [id]: { ...pick, count: clamp(Math.round(count), 1, max), userSet: true } }, id) });
   },
   /** A lander's payload figure, by its capacity option key. */
   pickCapacity(landerId: string, option: string) {
@@ -383,6 +384,45 @@ export const actions = {
     appStore.set({ speed });
   },
 };
+
+/**
+ * Catalog rows the website keeps as one choice. The reactor is two rows in the planner's catalog:
+ * its mass under Payload (`fsp_40kwe`) and its 40 kW under Power sources (`fission_40kwe`). Ticking,
+ * unticking or counting either row does the same to the other; both still go to the backend as
+ * rows of their own. The catalog, the request and the ranking are unchanged.
+ */
+export const LINKED_HARDWARE: readonly { readonly ids: readonly [string, string]; readonly note: string }[] = [
+  { ids: ['fsp_40kwe', 'fission_40kwe'], note: 'Linked: its mass counts under Payload and its 40 kW under Power sources.' },
+];
+
+/** The row linked to `id`, with the line both rows show; null for a row with no link. */
+export function hardwareLink(id: string): { partner: string; note: string } | null {
+  for (const l of LINKED_HARDWARE) {
+    if (l.ids[0] === id) return { partner: l.ids[1], note: l.note };
+    if (l.ids[1] === id) return { partner: l.ids[0], note: l.note };
+  }
+  return null;
+}
+
+/**
+ * Makes every linked pair agree after a change to row `changed`: the changed row's choice wins. A
+ * pair the change did not touch, loaded with one row set (an older mission, a site's defaults),
+ * takes the set row's choice, so it becomes linked on the visitor's next change.
+ */
+export function linkHardware(hw: Record<string, HardwarePick>, changed: string): Record<string, HardwarePick> {
+  let next = hw;
+  for (const { ids } of LINKED_HARDWARE) {
+    const [a, b] = ids;
+    if (!next[a] || !next[b]) continue;
+    const source = changed === a || changed === b ? changed : next[a].selected ? a : next[b].selected ? b : null;
+    if (source === null) continue;
+    const other = source === a ? b : a;
+    const from = next[source];
+    if (next[other].selected === from.selected && next[other].count === from.count) continue;
+    next = { ...next, [other]: { ...next[other], selected: from.selected, count: from.count, userSet: true } };
+  }
+  return next;
+}
 
 export function customId(lat: number, lonEast: number): string {
   return `custom:${lat.toFixed(4)}:${normalizeLon360(lonEast).toFixed(4)}`;

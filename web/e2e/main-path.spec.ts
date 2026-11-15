@@ -273,6 +273,52 @@ test('main path: hardware, ranking, launch delay, a site and its horizon chart',
   expect(errors).toEqual([]);
 });
 
+test('the planner: the reactor is one choice, its two rows linked, and both rows still go to the backend', async ({ page }) => {
+  test.setTimeout(120_000);
+  const live = isLive();
+  const evaluateBodies: { hardware: { id: string; count: number }[] }[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && r.url().endsWith('/evaluate')) evaluateBodies.push(r.postDataJSON());
+  });
+  await page.goto('/');
+  await page.getByTestId('begin').click();
+  await page.getByTestId('enter-mission').click();
+  await expect(page.getByTestId('ranked-row').first()).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('edit-mission').click();
+  const planner = page.getByTestId('planner');
+  const payload = planner.locator('[data-testid="hardware-row"][data-id="fsp_40kwe"]');
+  const power = planner.locator('[data-testid="hardware-row"][data-id="fission_40kwe"]');
+  await expect(payload).toBeVisible({ timeout: 30_000 });
+  // The Payload heading says what its rows count for; both reactor rows say they are linked.
+  await expect(planner.getByTestId('payload-heading-note')).toHaveText('Mass for the fit check only. Power is set under Power sources and Loads.');
+  for (const row of [payload, power]) await expect(row.getByTestId('linked-note')).toHaveText('Linked: its mass counts under Payload and its 40 kW under Power sources.');
+  const box = (row: typeof payload) => row.locator('input[type="checkbox"]');
+  await expect(box(payload)).not.toBeChecked();
+  await expect(box(power)).not.toBeChecked();
+  // Ticking the payload row ticks the power row; counting either counts both.
+  await box(payload).check();
+  await expect(box(power)).toBeChecked();
+  await payload.getByRole('button', { name: /^More / }).click();
+  await expect(payload.getByTestId('hardware-count')).toHaveText('2');
+  await expect(power.getByTestId('hardware-count')).toHaveText('2');
+  await power.getByRole('button', { name: /^Fewer / }).click();
+  await expect(payload.getByTestId('hardware-count')).toHaveText('1');
+  await expect(power.getByTestId('hardware-count')).toHaveText('1');
+  if (live) {
+    // The request is unchanged in shape: both catalog rows, each with the same count.
+    await expect
+      .poll(() => evaluateBodies.at(-1)?.hardware.filter((h) => h.id === 'fsp_40kwe' || h.id === 'fission_40kwe'), { timeout: 30_000 })
+      .toEqual([
+        { id: 'fission_40kwe', count: 1 },
+        { id: 'fsp_40kwe', count: 1 },
+      ]);
+  }
+  // Unticking either row clears both.
+  await box(power).uncheck();
+  await expect(box(payload)).not.toBeChecked();
+  await expect(box(power)).not.toBeChecked();
+});
+
 test('live mode: Compare now shows both directions and the angle between them', async ({ page }) => {
   test.skip(!isLive(), 'live mode only: example mode has no engine to compare');
   test.setTimeout(120_000);
