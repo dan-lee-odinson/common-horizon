@@ -24,7 +24,7 @@ class HorizonConfig:
     coarse_start_m: float = 30_000.0
     coarse_sample_step_m: float = 1_000.0
     max_distance_m: float = 250_000.0
-    observer_height_m: float = 1.5
+    observer_height_m: float = 2.0
     moon_radius_m: float = MOON_RADIUS_M
 
     def __post_init__(self):
@@ -92,7 +92,7 @@ def destination_point(
 def calculate_elevation_angle(
     surface_distance_m: float,
     terrain_elevation_m: float,
-    observer_height_m: float = 1.5,
+    observer_height_m: float = 2.0,
     moon_radius_m: float = MOON_RADIUS_M,
     observer_terrain_elevation_m: float = 0.0,
 ) -> float:

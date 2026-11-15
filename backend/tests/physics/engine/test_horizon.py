@@ -17,6 +17,7 @@ def test_default_horizon_config():
     assert config.coarse_start_m == 30_000.0
     assert config.coarse_sample_step_m == 1_000.0
     assert config.max_distance_m == 250_000.0
+    assert config.observer_height_m == 2.0
 
 def test_horizon_sampling_distances():
     config = HorizonConfig()
@@ -123,3 +124,11 @@ def test_invalid_distance():
 def test_destination_rejects_invalid_latitude():
     with pytest.raises(ValueError):
         destination_point(95.0, 30.0, 0.0, 1000.0)
+
+def test_elevation_angle_defaults_to_two_metre_observer():
+    default = calculate_elevation_angle(1000.0, 0.0)
+    explicit = calculate_elevation_angle(
+        1000.0, 0.0, observer_height_m=2.0
+    )
+
+    assert default == pytest.approx(explicit)
