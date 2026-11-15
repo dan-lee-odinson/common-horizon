@@ -49,6 +49,11 @@ export const SITE_VIEW = {
    */
   pitchDeg: 9,
   pitchMinDeg: 3,
+  /**
+   * Lower still, down to this, but only when that brings a low Sun into the clear part of the
+   * window (a panel across the bottom, such as the Data checks band, leaves the picture less height).
+   */
+  pitchLowDeg: 1,
   /** How near and how far the visitor may zoom, metres from the point looked at. */
   minDistance: 8,
   maxDistance: 400,
@@ -246,7 +251,10 @@ export function orbitPosition(target: Vec3, distance: number, azDeg: number, pol
  */
 export function arrivalPitch(sun: { az: number; el: number } | null, clearUpDeg: number): number {
   if (!sun || !Number.isFinite(sun.el) || sun.el < -5 || sun.el >= 25 || !Number.isFinite(clearUpDeg)) return SITE_VIEW.pitchDeg;
-  return clampTo(clearUpDeg - sun.el, SITE_VIEW.pitchMinDeg, SITE_VIEW.pitchDeg);
+  const fit = clearUpDeg - sun.el;
+  // Below the usual least pitch only where the Sun then fits; a Sun too high to fit keeps the usual view.
+  if (fit < SITE_VIEW.pitchMinDeg && fit >= SITE_VIEW.pitchLowDeg) return fit;
+  return clampTo(fit, SITE_VIEW.pitchMinDeg, SITE_VIEW.pitchDeg);
 }
 
 /**
@@ -307,7 +315,7 @@ export function restPose(input: RestInput): SitePose {
   const span = Math.max(H / 0.72, 0.9 * Math.max(0, input.layoutRadius));
   const distance = clampTo(span / (2 * Math.tan((input.fovDeg * DEG) / 2) * share), 14, 260);
   const target = { x: 0, y: targetH, z: 0 };
-  const polarDeg = 90 - clampTo(input.pitchDeg ?? SITE_VIEW.pitchDeg, SITE_VIEW.pitchMinDeg, SITE_VIEW.pitchDeg);
+  const polarDeg = 90 - clampTo(input.pitchDeg ?? SITE_VIEW.pitchDeg, SITE_VIEW.pitchLowDeg, SITE_VIEW.pitchDeg);
   return { target, position: orbitPosition(target, distance, input.viewAzDeg, polarDeg), distance, azDeg: input.viewAzDeg, polarDeg };
 }
 

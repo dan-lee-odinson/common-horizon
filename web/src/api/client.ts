@@ -11,7 +11,8 @@
 //   GET  /health      GET /sites      GET /catalog
 //   POST /evaluate    POST /horizon   POST /check    POST /assistant
 //   GET  /api/v1/horizons/compare     (live mode only: the physics engine against NASA JPL Horizons)
-// And one static file served with the website itself, in both modes: data/horizons-check.json.
+// And two static files served with the website itself, in both modes: data/horizons-check.json and
+// data/moon-trek-sun-check.json (either may be missing: its line is then not shown).
 //
 // Every POST /evaluate carries transit_days (util/transit.ts). Errors: a 422 shows the backend's
 // own message, a 503 says the physics engine is unavailable (the assistant's 503 says it is).
@@ -29,6 +30,7 @@ import type {
   HorizonResponse,
   HorizonsCheckFile,
   HorizonsCompareResponse,
+  MoonTrekCheckFile,
   SiteListResponse,
 } from './types';
 import { ApiError, isAbortError } from './errors';
@@ -120,6 +122,19 @@ export async function backendMessage(res: Response): Promise<string | null> {
   return null;
 }
 
+/** A stored check file served with the website: its `sites` table, or null when it is missing or unreadable. */
+async function siteCheckFile<T extends { sites: object }>(path: string, signal?: AbortSignal): Promise<T | null> {
+  try {
+    const res = await fetch(path, { headers: { Accept: 'application/json' }, signal });
+    if (!res.ok) return null;
+    const body = (await res.json()) as T;
+    return body && typeof body === 'object' && body.sites && typeof body.sites === 'object' ? body : null;
+  } catch (err) {
+    if (isAbortError(err)) throw err;
+    return null;
+  }
+}
+
 export const api = {
   health(signal?: AbortSignal): Promise<HealthResponse> {
     return isMockMode() ? mock().then((m) => m.health(signal)) : http('GET', '/health', undefined, signal);
@@ -163,16 +178,13 @@ export const api = {
    * The stored check against NASA JPL Horizons: a static file served with the website (in both
    * modes), read at run time. Resolves to null when the file is not there or cannot be read.
    */
-  async horizonsCheck(signal?: AbortSignal): Promise<HorizonsCheckFile | null> {
-    try {
-      const res = await fetch('data/horizons-check.json', { headers: { Accept: 'application/json' }, signal });
-      if (!res.ok) return null;
-      const body = (await res.json()) as HorizonsCheckFile;
-      return body && typeof body === 'object' && body.sites && typeof body.sites === 'object' ? body : null;
-    } catch (err) {
-      if (isAbortError(err)) throw err;
-      return null;
-    }
+  horizonsCheck(signal?: AbortSignal): Promise<HorizonsCheckFile | null> {
+    return siteCheckFile<HorizonsCheckFile>('data/horizons-check.json', signal);
+  },
+
+  /** The stored Sun check against NASA Moon Trek, the same way: null when the file is not there. */
+  moonTrekCheck(signal?: AbortSignal): Promise<MoonTrekCheckFile | null> {
+    return siteCheckFile<MoonTrekCheckFile>('data/moon-trek-sun-check.json', signal);
   },
 
   /** The assistant answers in text only. It never changes the interface. */

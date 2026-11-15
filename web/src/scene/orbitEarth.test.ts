@@ -39,17 +39,20 @@ describe('Earth at 2027-02-17 12:09:21 UTC, the standard Orbit view', () => {
   const seen = earthSeen(INSTANT, 6, 900);
   const onScreen = seen.points.filter((p) => p.onScreen);
 
-  it('is the instant of the report: Sun overhead at 45.91 E, Earth at 352.92 E, camera near 136 E', () => {
-    expect(seen.g.subsolar_lon_east).toBeCloseTo(45.91, 2);
-    expect(seen.g.subearth_lon_east).toBeCloseTo(352.92, 2);
-    expect(seen.cameraLon).toBeCloseTo(135.92, 2);
+  // The example model's Sun and Earth were fitted to the physics engine's for February 2027
+  // (web/live-data): the report's instant read Sun 45.91 E and Earth 352.92 E before that; the
+  // engine has 45.14 E and 357.38 E. The fault is the same at either: the night side faces the camera.
+  it('is the instant of the report: Sun overhead at 45.19 E, Earth at 357.22 E, camera near 140 E', () => {
+    expect(seen.g.subsolar_lon_east).toBeCloseTo(45.194, 2);
+    expect(seen.g.subearth_lon_east).toBeCloseTo(357.225, 2);
+    expect(seen.cameraLon).toBeCloseTo(140.225, 2);
   });
 
-  it('shows about 30 percent of Earth lit, as a crescent on its left edge', () => {
+  it('shows about a quarter of Earth lit, as a crescent on its left edge', () => {
     const lit = seen.points.filter((p) => p.cosSun > 0);
     const share = lit.length / seen.points.length;
-    expect(share).toBeGreaterThan(0.25);
-    expect(share).toBeLessThan(0.35);
+    expect(share).toBeGreaterThan(0.2);
+    expect(share).toBeLessThan(0.3);
     // Every lit point is left of the middle of the disc.
     for (const p of lit) expect(p.x).toBeLessThan(seen.disc.x);
   });

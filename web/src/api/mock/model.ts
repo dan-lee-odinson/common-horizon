@@ -66,6 +66,9 @@ export const MOCK_PROVENANCE: DataProvenance = {
   sources: [],
 };
 
+/** What the example model's slopes are, said the way the backend says what its slope is (`slope_source`). */
+export const MOCK_SLOPE_SOURCE = 'example model: an invented slope, not a measured one';
+
 const TAU = Math.PI * 2;
 /** Half the Sun's apparent width: "above" means any part of the disc shows over the skyline. */
 const SUN_RADIUS_DEG = sunWidthDeg() / 2;
@@ -459,18 +462,18 @@ export function evaluateSite(
     { requirement: 'hardware fit', passed: fit.fits, detail: fit.verdict },
     { requirement: 'night power', passed: power.night.passes, detail: `night status ${power.night.status}` },
     { requirement: 'day power', passed: power.day.passes, detail: `day status ${power.day.status}` },
-    // The backend's checks and words, in its order: lander, then its limit, then the site's slope.
+    // The backend's checks and words (as in its Moon Trek slope change), in its order: lander, then
+    // its limit, then the site's slope. The sentence names the slope and what it is.
     {
       requirement: 'landing slope',
       passed: lander === null || slopeLimit === null || slope === null ? null : slope <= slopeLimit,
-      detail:
+      detail: `${slope === null ? 'Site slope is unknown' : `Slope ${slope} deg (${MOCK_SLOPE_SOURCE})`}; ${
         lander === null
-          ? 'No lander chosen: no slope limit.'
+          ? 'no lander chosen, so no slope limit.'
           : slopeLimit === null
-            ? `No published slope limit for ${lander.name}.`
-            : slope === null
-              ? `Site slope is unknown; ${lander.name} accepts up to ${slopeLimit} deg.`
-              : `Slope ${slope} deg; ${lander.name} accepts up to ${slopeLimit} deg.`,
+            ? `no published slope limit for ${lander.name}, so no pass or fail.`
+            : `${lander.name} accepts up to ${slopeLimit} deg.`
+      }`,
     },
     { requirement: 'Earth contact', passed: earthLink !== 'none', detail: `Earth link ${earthLink}` },
   ];
@@ -503,6 +506,8 @@ export function evaluateSite(
     earth_visible_percent: round(earthShare * 100, 1),
     clear_sky_percent: round(clearSkyPercent(skyline), 1),
     slope_deg: slope,
+    // What the slope is, as the backend says it; null with no slope (a custom point).
+    slope_source: slope === null ? null : MOCK_SLOPE_SOURCE,
     earth_link: earthLink,
     hardware_fits: fit.fits,
     energy_added_kwh: null,

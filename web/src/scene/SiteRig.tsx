@@ -184,14 +184,32 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
     // Arrival happens once for each visit to the stage; what changes during the visit is handled below.
   }, [active, controls, camera, gl]);
 
-  /** Bring the point looked at, the distance and the picture shift to the rest values, keeping the visitor's own direction. */
+  /**
+   * Bring the point looked at, the distance and the picture shift to the rest values, keeping the
+   * visitor's own direction. A view nobody has turned also takes the rest pitch: a panel measured
+   * after arrival (the Data checks band) leaves less height, and a low Sun then needs a lower camera.
+   */
   function settle() {
     if (!controls || mode.current !== 'rest') return;
     const g = goal.current;
-    const from = { y: controls.target.y, d: camera.position.distanceTo(controls.target), sx: view.current.x, sy: view.current.y };
+    const d0 = camera.position.distanceTo(controls.target);
+    const polar0 = Math.acos(THREE.MathUtils.clamp((camera.position.y - controls.target.y) / Math.max(d0, 1e-6), -1, 1)) * RAD;
+    const from = { y: controls.target.y, d: d0, sx: view.current.x, sy: view.current.y, polar: polar0 };
     // A visitor who has zoomed keeps their distance.
     const distance = moved.current ? from.d : g.rest.distance;
+    const turned = moved.current;
     const apply = () => {
+      if (!turned) {
+        scratch.copy(camera.position).sub(controls.target);
+        const az = Math.atan2(-scratch.x, scratch.z) * RAD;
+        controls.target.y = from.y;
+        const pose = orbitPosition({ x: 0, y: from.y, z: 0 }, from.d, az, from.polar);
+        camera.position.set(pose.x, Math.max(pose.y, SITE_VIEW.minCameraHeight), pose.z);
+        controls.maxPolarAngle = lookUpLimit(controls.target.y, from.d);
+        view.current.x = from.sx;
+        view.current.y = from.sy;
+        return;
+      }
       scratch.copy(camera.position).sub(controls.target).normalize();
       controls.target.y = from.y;
       camera.position.copy(controls.target).addScaledVector(scratch, from.d);
@@ -207,6 +225,7 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
       d: distance,
       sx: g.shiftX,
       sy: g.shiftY,
+      polar: turned ? from.polar : g.rest.polarDeg,
       duration: dataRef.current.reducedMotion ? 0 : SETTLE_S,
       ease: 'power3.out',
       onUpdate: apply,
@@ -220,7 +239,7 @@ export function SiteRig({ active, data, heightM, layoutRadius }: { active: boole
 
   // At rest: when the hardware's size arrives, the window changes or a panel changes height, the
   // view settles to the new rest values. (A descent under way heads for them by itself.)
-  const restKey = `${goal.current.rest.target.y.toFixed(2)}|${goal.current.rest.distance.toFixed(1)}|${shift.x}|${shift.y}`;
+  const restKey = `${goal.current.rest.target.y.toFixed(2)}|${goal.current.rest.distance.toFixed(1)}|${goal.current.rest.polarDeg.toFixed(2)}|${shift.x}|${shift.y}`;
   useLayoutEffect(() => {
     if (!active || mode.current !== 'rest') return;
     settle();

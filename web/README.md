@@ -172,8 +172,24 @@ for field, and both modes use them. Sample answers of the example model are in
   slope is the only requirement left unchecked, it shows as PASS with the reason beside it ("Slope
   not checked: no published slope limit for this lander", or "... no slope data for this point" for
   a custom point, or wherever the answer has no slope for a lander that publishes a limit). The site
-  keeps the backend's place in the order. `slope_deg`, when the answer has it, is shown under the
-  backend's name for its requirement ("Landing slope"), with the backend's sentence for it.
+  keeps the backend's place in the order. `slope_deg`, when the answer has it, is shown with what it
+  is: the answer's `slope_source` when it gives one ("slope of the best-fit plane to LOLA heights
+  within 500 m (NASA Moon Trek)"), else the backend's name for its requirement ("Landing slope"); the
+  backend's sentence for it is its hover title, and in the Site stage's Data checks when no "not
+  checked" note stands in its place. Long labels and sentences wrap; a score range is set one size
+  smaller than a score so its "/ 100" stays inside the spotlight. In the spotlight the slope has a
+  line of its own; in a short window (820 px tall or less) it takes the score's second line instead,
+  cut to one line with the whole of it in the tooltip, so the ranked strip below keeps its rows.
+* **Data checks** (Site stage): the stored checks first ("Checked against NASA JPL Horizons", then
+  "Checked against NASA Moon Trek: Sun within ..." when `data/moon-trek-sun-check.json` is served and
+  has the site), "Compare now" in live mode, then the slope and terrain notes; the horizon answer's
+  warnings are listed on request. On a wide screen it is a band between the side panels, resting on
+  the console, and the 3D picture is framed above it; at 1440 x 900 all of it is in view. With less
+  height for the picture, the camera may arrive as low as 1° above level (3° before), but only when
+  that keeps a low Sun inside the clear part of the window, and it settles to that pitch when the
+  band is measured after arrival, unless the visitor has turned or zoomed the view. In a short
+  window the band would take too much of the picture: it is shown on request ("Data checks" beside
+  "Reset view") and put away with "Hide".
 * **Transit.** Every `POST /evaluate` carries `transit_days: 5` (our estimate, `src/util/transit.ts`),
   shown as "Transit 5 days (our estimate)" beside the landing. The landing is always the answer's
   own `landing_utc`.
@@ -197,6 +213,7 @@ for field, and both modes use them. Sample answers of the example model are in
 | ask the assistant | `POST /assistant` | Text answer only. The assistant never controls the interface. |
 | compare with JPL Horizons | `GET /api/v1/horizons/compare` | Live mode, Site stage, on "Compare now" only: the engine's and NASA JPL Horizons' directions to the Sun and Earth for the site and the clock's time. |
 | stored Horizons check | `data/horizons-check.json` (a file served with the website) | "Checked against NASA JPL Horizons" with the stored figures for the site; the line is hidden when the file or the site is not there. |
+| stored Moon Trek check | `data/moon-trek-sun-check.json` (a file served with the website, from the backend's Moon Trek work) | "Checked against NASA Moon Trek: Sun within ..." for the site; nothing is shown when the file or the site is not there. |
 
 Every call shows four states in the interface — waiting, answer, empty, error — and the assistant
 has a fifth: unavailable (the backend answers HTTP 503, or `/health` says so).

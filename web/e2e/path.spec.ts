@@ -405,14 +405,21 @@ test('mission select: one site in the spotlight, a short strip, and the delay re
   await expect(page.getByTestId('spotlight-name')).toHaveText(before[1]);
   await page.keyboard.press('ArrowUp');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('01');
-  // Further down, the strip moves its window to keep the spotlight in the middle.
+  // Further down, the strip moves its window to keep the spotlight in the middle. How many rows it
+  // shows depends on the room under the spotlight (four or five at 1440 x 900: the spotlight's slope
+  // line takes one when it has a line of its own).
+  const shown = await rows.count();
+  expect(shown).toBeGreaterThanOrEqual(4);
+  expect(shown).toBeLessThanOrEqual(5);
+  const two = (n: number) => String(n).padStart(2, '0');
   for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('04');
-  await expect(page.getByTestId('strip-range')).toHaveText('02 to 06 of 17');
+  const from = 4 - Math.floor(shown / 2);
+  await expect(page.getByTestId('strip-range')).toHaveText(`${two(from)} to ${two(from + shown - 1)} of 17`);
   // End and Home jump to the last and the first site.
   await page.keyboard.press('End');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('17');
-  await expect(page.getByTestId('strip-range')).toHaveText('13 to 17 of 17');
+  await expect(page.getByTestId('strip-range')).toHaveText(`${two(18 - shown)} to 17 of 17`);
   await expect(page.locator('[data-testid="ranked-row"][aria-selected="true"] [data-testid="row-rank"]')).toHaveText('17');
   await page.keyboard.press('Home');
   await expect(page.getByTestId('spotlight-rank')).toHaveText('01');

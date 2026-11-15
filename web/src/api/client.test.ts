@@ -264,5 +264,12 @@ describe('live mode: transit, the backend’s own errors, and the JPL Horizons c
     const file = { format: 'common-horizon/horizons-check-summary', format_version: 1, sites: { nobile: { sun_max_angle_deg: 0.005991 } } };
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(file), { status: 200 })));
     expect((await api.horizonsCheck())?.sites.nobile.sun_max_angle_deg).toBe(0.005991);
+    // The Moon Trek file is read the same way, from its own address; missing, it is null.
+    const trekSpy = vi.fn(async (_url: string) => new Response(JSON.stringify({ format: 'x', format_version: 1, sites: { nobile: { sun_max_angle_deg: 0.006025 } } }), { status: 200 }));
+    vi.stubGlobal('fetch', trekSpy);
+    expect((await api.moonTrekCheck())?.sites.nobile.sun_max_angle_deg).toBe(0.006025);
+    expect(trekSpy.mock.calls[0][0]).toBe('data/moon-trek-sun-check.json');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('Not found', { status: 404 })));
+    expect(await api.moonTrekCheck()).toBeNull();
   });
 });

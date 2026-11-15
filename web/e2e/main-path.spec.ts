@@ -45,11 +45,93 @@ function watchEvaluate(page: Page): Record<string, unknown>[] {
 
 const RESULT_ORDER: Record<string, number> = { pass: 0, unknown: 1, fail: 2 };
 
+/** The stored Sun check against NASA Moon Trek: the layout of the backend's web/public/data/moon-trek-sun-check.json (feat/moon-trek-slope). */
+const MOON_TREK_CHECK = {
+  format: 'common-horizon/moon-trek-sun-check-summary',
+  format_version: 1,
+  sites: Object.fromEntries(
+    Object.keys(HORIZONS_CHECK.sites).map((id) => [
+      id,
+      { sun_max_angle_deg: 0.006048, samples: 8761, period: { start_utc: '2027-01-01T00:00Z', stop_utc: '2028-01-01T00:00Z', step_minutes: 60 }, retrieved_utc: '2026-11-15T16:34:39Z', moon_trek_url: 'https://trek.nasa.gov/getAzElfromT1' },
+    ]),
+  ),
+};
+
+const MOON_TREK_SLOPE = 'slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek)';
+/** The synthetic engine's slope_source (backend on main): the label the live main path shows. */
+const SYNTHETIC_SLOPE = 'synthetic engine: terrain is not modelled, 0 is a placeholder, not a measured slope';
+
+/** What the backend's Moon Trek slope change (PR #23) sends: slope_source on each result, and the longer landing-slope sentence. */
+/** The same, written to sit inside parentheses, as the backend's landing-slope sentence has it. */
+const MOON_TREK_SLOPE_INLINE = 'slope of the best-fit plane to LOLA heights within 500 m, NASA Moon Trek';
+/** The landing-slope sentence for Starship HLS, which publishes no slope limit (main's wording, b5c219b). */
+const SLOPE_UNCHECKED = `Regional slope 6.58 deg (${MOON_TREK_SLOPE_INLINE}); no published slope limit for Starship HLS, so no pass or fail.`;
+/** The longest sentence: a lander with a limit, so the slope is checked, and the screening note after it. */
+const SLOPE_CHECKED = `Regional slope 6.58 deg (${MOON_TREK_SLOPE_INLINE}); Griffin accepts up to 10 deg. Regional terrain screening over a circle 1 km across, not a touchdown safety assessment.`;
+
+/**
+ * The live backend's answers given the fields of PR #23 (merged into main): every site gets a Moon
+ * Trek slope and its source. `checked`: the slope passes a lander's limit, with the longest sentence.
+ */
+async function answersLikePR23(page: Page, checked = false): Promise<void> {
+  await page.route('**/evaluate', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    const res = await route.fetch();
+    const body = await res.json();
+    for (const r of body.results ?? []) {
+      r.slope_deg = 6.58;
+      r.slope_source = MOON_TREK_SLOPE;
+      for (const q of r.requirements ?? []) {
+        if (q.requirement !== 'landing slope') continue;
+        q.detail = checked ? SLOPE_CHECKED : SLOPE_UNCHECKED;
+        if (checked) q.passed = true;
+      }
+      if (checked && r.verdict) {
+        r.verdict.unknown_requirements = (r.verdict.unknown_requirements ?? []).filter((n: string) => n !== 'landing slope');
+        if (r.verdict.result === 'unknown' && r.verdict.unknown_requirements.length === 0) r.verdict.result = 'pass';
+      }
+    }
+    await route.fulfill({ response: res, json: body });
+  });
+}
+
+type Rect = { left: number; top: number; right: number; bottom: number };
+async function rect(page: Page, testId: string): Promise<Rect> {
+  return page.getByTestId(testId).first().evaluate((e) => {
+    const r = e.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  });
+}
+
+/** True when every part of the element's text lies inside the box (half a pixel of slack). */
+async function inside(page: Page, testId: string, box: Rect): Promise<boolean> {
+  return page.getByTestId(testId).first().evaluate((e, b) => {
+    const rects = [...e.getClientRects()];
+    const range = document.createRange();
+    range.selectNodeContents(e);
+    rects.push(...range.getClientRects());
+    return rects.every((r) => r.left >= b.left - 0.5 && r.right <= b.right + 0.5 && r.top >= b.top - 0.5 && r.bottom <= b.bottom + 0.5);
+  }, box);
+}
+
+/** The Data checks band at 1440 x 900: all of it in view, above the console, and nothing in it scrolled away. */
+async function checksAllVisible(page: Page): Promise<void> {
+  const panel = await rect(page, 'site-checks-panel');
+  const consoleBox = await rect(page, 'site-console');
+  expect(panel.top).toBeGreaterThanOrEqual(0);
+  expect(panel.bottom).toBeLessThanOrEqual(consoleBox.top);
+  const body = page.getByTestId('site-checks-body');
+  expect(await body.evaluate((e) => e.scrollHeight - e.clientHeight)).toBeLessThanOrEqual(0);
+  expect(await body.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
+}
+
 test.beforeEach(async ({ page }) => {
   test.skip((page.viewportSize()?.width ?? 1440) < 768, 'the main path is checked at a desktop width; the phone layouts have their own tests');
   // The stored Horizons check is a static file served with the website; this branch does not carry
   // it (it comes with the backend's feat/horizons-live), so the test serves the file's shape.
   await page.route('**/data/horizons-check.json', (route) => route.fulfill({ json: HORIZONS_CHECK }));
+  // The Moon Trek check comes with the backend's feat/moon-trek-slope (not merged): the test serves its layout.
+  await page.route('**/data/moon-trek-sun-check.json', (route) => route.fulfill({ json: MOON_TREK_CHECK }));
 });
 
 test('main path: hardware, ranking, launch delay, a site and its horizon chart', async ({ page }) => {
@@ -120,8 +202,8 @@ test('main path: hardware, ranking, launch delay, a site and its horizon chart',
   if ((await first.getAttribute('data-answer-result')) === 'unknown' && (await first.getAttribute('data-result')) === 'pass') {
     await expect(first).toHaveAttribute('title', 'pass. Slope not checked: no published slope limit for this lander');
   }
-  // The slope, when the answer has it, under the backend's name for it.
-  await expect(page.getByTestId('spotlight-slope')).toHaveText(/^Landing slope \d+\.\d°$/);
+  // The slope, when the answer has it: the figure, then what it is (its slope_source, or the requirement's name).
+  await expect(page.getByTestId('spotlight-slope')).toHaveText(live ? `0.0° ${SYNTHETIC_SLOPE}` : /^\d+\.\d° example model: an invented slope, not a measured one$/);
 
   // Transit: our estimate, beside the landing date; the landing is the answer's own.
   await expect(page.getByTestId('transit')).toHaveText('5 days (our estimate)');
@@ -158,15 +240,29 @@ test('main path: hardware, ranking, launch delay, a site and its horizon chart',
   await expect(page.getByTestId('horizon-sun').first()).toHaveAttribute('data-state', /lit|dark/);
   expect(['lit', 'dark']).toContain(await readout(page, 'sun_state'));
 
-  // The Site stage's notes: terrain, the answer's warnings, and the stored JPL Horizons figures.
-  const checks = page.getByTestId('site-checks').first();
+  // The Site stage's Data checks: the stored checks first (JPL Horizons, then NASA Moon Trek), then
+  // the slope and terrain notes; all of it in view at 1440 x 900, with nothing scrolled away.
+  const checks = page.getByTestId('site-checks-panel');
   await expect(checks.getByTestId('horizons-check')).toContainText('Checked against NASA JPL Horizons');
   await expect(checks.getByTestId('horizons-check')).toContainText('0.005991°');
+  await expect(checks.getByTestId('moon-trek-check')).toHaveText('Checked against NASA Moon Trek: Sun within 0.006048°');
+  await expect(checks.getByTestId('horizons-check')).toBeInViewport({ ratio: 1 });
+  await expect(checks.getByTestId('moon-trek-check')).toBeInViewport({ ratio: 1 });
+  await checksAllVisible(page);
+  const order = await checks.locator('[data-testid]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.testid));
+  expect(order.indexOf('horizons-check')).toBeLessThan(order.indexOf('moon-trek-check'));
+  expect(order.indexOf('moon-trek-check')).toBeLessThan(order.indexOf('site-slope'));
   if (live) {
     await expect(checks.getByTestId('site-terrain-note')).toHaveText('smooth Moon, terrain not included');
-    // The synthetic engine reports the slope as 0.
-    await expect(checks.getByTestId('site-slope')).toContainText('Landing slope 0.0°');
+    expect(order.indexOf('site-slope')).toBeLessThan(order.indexOf('site-terrain-note'));
+    // The synthetic engine reports the slope as 0, and its slope_source says what that 0 is.
+    await expect(checks.getByTestId('site-slope')).toHaveText(`0.0° ${SYNTHETIC_SLOPE}`);
+    await expect(checks.getByTestId('horizons-compare')).toBeInViewport({ ratio: 1 });
+    // The answer's warnings, on request.
+    await expect(checks.getByTestId('horizon-warnings')).toBeHidden();
+    await checks.getByTestId('horizon-warnings-toggle').click();
     await expect(checks.getByTestId('horizon-warnings').locator('li').first()).toBeVisible();
+    await checks.getByTestId('horizon-warnings-toggle').click();
     // Compare now: this backend cannot reach JPL Horizons from here, so the stored figure stands, and it says so.
     await checks.getByTestId('horizons-compare').click();
     await expect(checks.getByTestId('horizons-compare-failed')).toContainText('Showing the stored figure above instead.', { timeout: 20_000 });
@@ -200,7 +296,7 @@ test('live mode: Compare now shows both directions and the angle between them', 
   await expect(page.getByTestId('ranked-row').first()).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('zoom-to-site').click();
   await expect(page.getByTestId('site-scrub')).toBeEnabled({ timeout: 60_000 });
-  const checks = page.getByTestId('site-checks').first();
+  const checks = page.getByTestId('site-checks-panel');
   await checks.getByTestId('horizons-compare').click();
   const result = checks.getByTestId('horizons-compare-result');
   await expect(result).toContainText('az 20.5475°, el −1.0880°');
@@ -235,4 +331,136 @@ test('live mode: the assistant is not available in this version, and a 422 shows
   await page.route('**/evaluate', (route) => (route.request().method() === 'POST' ? route.fulfill({ status: 503, json: { detail: 'engine down' } }) : route.continue()));
   await page.getByTestId('slip').fill('4');
   await expect(page.getByTestId('evaluation-error')).toContainText('The physics engine is unavailable right now', { timeout: 30_000 });
+});
+
+test('live mode, with the backend’s Moon Trek slopes (PR #23): the long label and sentence wrap, and nothing overflows', async ({ page }) => {
+  test.skip(!isLive(), 'live mode only: the answers are the backend’s, given PR #23’s fields');
+  test.setTimeout(120_000);
+  await answersLikePR23(page);
+  await page.goto('/');
+  await page.getByTestId('begin').click();
+  await page.getByTestId('enter-mission').click();
+  await expect(page.getByTestId('ranked-row').first()).toBeVisible({ timeout: 60_000 });
+  // The spotlight: the slope with slope_source as its label, wrapping inside the panel.
+  const slope = page.getByTestId('spotlight-slope');
+  await expect(slope).toHaveText(`6.6° ${MOON_TREK_SLOPE}`);
+  await expect(slope).toHaveAttribute('title', /so no pass or fail\.$/);
+  const spot = await rect(page, 'spotlight');
+  expect(await inside(page, 'spotlight-slope', spot)).toBe(true);
+  expect(await slope.evaluate((e) => e.getClientRects().length > 0 && e.getBoundingClientRect().height > 20)).toBe(true);
+  // Every line of text in the spotlight lies inside it. (Its scroll width says nothing here: the corner brackets are drawn 4 px outside every panel.)
+  expect(await inside(page, 'spotlight', spot)).toBe(true);
+  // The Site stage: the same, in the Data checks band, all of it in view.
+  await page.getByTestId('zoom-to-site').click();
+  await expect(page.getByTestId('site-scrub')).toBeEnabled({ timeout: 60_000 });
+  const checks = page.getByTestId('site-checks-panel');
+  await expect(checks.getByTestId('site-slope')).toHaveText(`6.6° ${MOON_TREK_SLOPE}`);
+  await expect(checks.getByTestId('site-slope-note')).toHaveText('Slope not checked: no published slope limit for this lander');
+  await expect(checks.getByTestId('site-slope-note')).toHaveAttribute('title', SLOPE_UNCHECKED);
+  const band = await rect(page, 'site-checks-panel');
+  for (const id of ['horizons-check', 'moon-trek-check', 'site-slope', 'site-slope-note', 'site-terrain-note']) expect(await inside(page, id, band), id).toBe(true);
+  await checksAllVisible(page);
+});
+
+test('live mode, PR #23, a checked slope: the longest sentence, with the screening note, wraps inside the Data checks band', async ({ page }) => {
+  test.skip(!isLive(), 'live mode only: the answers are the backend’s, given PR #23’s fields');
+  test.setTimeout(120_000);
+  await answersLikePR23(page, true);
+  await page.goto('/');
+  await page.getByTestId('begin').click();
+  await page.getByTestId('enter-mission').click();
+  await expect(page.getByTestId('ranked-row').first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('spotlight-slope')).toHaveAttribute('title', SLOPE_CHECKED);
+  await page.getByTestId('zoom-to-site').click();
+  await expect(page.getByTestId('site-scrub')).toBeEnabled({ timeout: 60_000 });
+  const checks = page.getByTestId('site-checks-panel');
+  // With the slope checked there is no "not checked" note: the backend's sentence stands in its place, whole.
+  await expect(checks.getByTestId('site-slope-note')).toHaveCount(0);
+  const detail = checks.getByTestId('site-slope-detail');
+  await expect(detail).toHaveText(SLOPE_CHECKED);
+  expect(await detail.evaluate((e) => e.getClientRects().length > 0 && e.getBoundingClientRect().height > 30)).toBe(true);
+  const band = await rect(page, 'site-checks-panel');
+  for (const id of ['horizons-check', 'moon-trek-check', 'site-slope', 'site-slope-detail']) expect(await inside(page, id, band), id).toBe(true);
+  await checksAllVisible(page);
+});
+
+test('a short window (1280 x 720): the Data checks band is shown on request, so the picture keeps its height', async ({ page }) => {
+  test.setTimeout(150_000);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/');
+  await page.getByTestId('begin').click();
+  await page.getByTestId('enter-mission').click();
+  await expect(page.getByTestId('ranked-row').first()).toBeVisible({ timeout: 60_000 });
+  // A site where the Sun stands low in the east at the landing: its tag needs the picture's full height.
+  await page.getByTestId('drawer-toggle').click();
+  await page.getByTestId('preset-search').fill('Apollo 14');
+  await page.getByTestId('preset').first().click();
+  await expect(page.getByTestId('spotlight-name')).toHaveText('Apollo 14');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('zoom-to-site').click();
+  await expect(page.getByTestId('site-scrub')).toBeEnabled({ timeout: 60_000 });
+  const show = page.getByTestId('site-checks-show');
+  await expect(show).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('site-checks-panel')).toHaveCount(0);
+  await expect(page.getByTestId('body-label-sun')).toHaveAttribute('data-visible', 'true', { timeout: 30_000 });
+  // On request: the band, the stored check first, above the console.
+  await show.click();
+  await expect(show).toHaveAttribute('aria-expanded', 'true');
+  const checks = page.getByTestId('site-checks-panel');
+  await expect(checks.getByTestId('horizons-check')).toBeInViewport({ ratio: 1 });
+  const order = await checks.locator('[data-testid]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.testid));
+  expect(order.indexOf('horizons-check')).toBeLessThan(order.indexOf('site-slope'));
+  expect((await rect(page, 'site-checks-panel')).bottom).toBeLessThanOrEqual((await rect(page, 'site-console')).top);
+  // Put away again: the focus goes back to the button that showed it.
+  await checks.getByTestId('site-checks-hide').click();
+  await expect(page.getByTestId('site-checks-panel')).toHaveCount(0);
+  await expect(show).toBeFocused();
+  await expect(show).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('live mode: with no Moon Trek file there is no Moon Trek line', async ({ page }) => {
+  test.skip(!isLive(), 'checked once, in live mode');
+  test.setTimeout(120_000);
+  await page.unroute('**/data/moon-trek-sun-check.json');
+  await page.route('**/data/moon-trek-sun-check.json', (route) => route.fulfill({ status: 404, body: 'Not found' }));
+  await page.goto('/');
+  await page.getByTestId('begin').click();
+  await page.getByTestId('enter-mission').click();
+  await expect(page.getByTestId('ranked-row').first()).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('zoom-to-site').click();
+  await expect(page.getByTestId('site-scrub')).toBeEnabled({ timeout: 60_000 });
+  await expect(page.getByTestId('site-checks-panel').getByTestId('horizons-check')).toBeVisible();
+  await expect(page.getByTestId('moon-trek-check')).toHaveCount(0);
+});
+
+test('a score range and its "/ 100" stay inside the spotlight at every tested size', async ({ page }) => {
+  test.skip(!isLive(), 'live mode, where the answer can be given the widest range, 85–100');
+  test.setTimeout(150_000);
+  await page.route('**/evaluate', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    const res = await route.fetch();
+    const body = await res.json();
+    for (const r of body.results ?? []) Object.assign(r, { score: null, score_min: 85, score_max: 100 });
+    await route.fulfill({ response: res, json: body });
+  });
+  await page.goto('/');
+  await page.getByTestId('begin').click();
+  await page.getByTestId('enter-mission').click();
+  const score = page.getByTestId('spotlight').locator('[data-q="score"]');
+  await expect(score.locator('[data-q-text]')).toHaveText('85–100', { timeout: 60_000 });
+  await expect(score.locator('[data-q-unit]')).toHaveText('/ 100');
+  for (const [width, height] of [
+    [1280, 720],
+    [1440, 760],
+    [1440, 900],
+    [1920, 1080],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await expect
+      .poll(async () => {
+        const spot = await rect(page, 'spotlight');
+        return score.evaluate((e, b) => [...e.querySelectorAll('[data-q-text], [data-q-unit]')].every((x) => x.getBoundingClientRect().right <= b.right + 0.5), spot);
+      }, { message: `${width} x ${height}` })
+      .toBe(true);
+  }
 });

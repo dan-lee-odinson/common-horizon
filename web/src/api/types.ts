@@ -152,6 +152,12 @@ export interface SiteEvaluation {
   /** Share of the sky not blocked by terrain, 0..100. null without a terrain skyline for the site. */
   clear_sky_percent: number | null;
   slope_deg: number | null;
+  /**
+   * What slope_deg is, when it is given (from the backend's Moon Trek slopes, feat/moon-trek-slope):
+   * for example "slope of the best-fit plane to LOLA heights within 500 m (NASA Moon Trek)". Absent
+   * from backends without it, and null where there is no slope (a custom point). Shown as the slope's label.
+   */
+  slope_source?: string | null;
   earth_link: EarthLink;
   /** null when the planner cannot decide (several capacity figures, a mass missing). */
   hardware_fits: boolean | null;
@@ -475,6 +481,26 @@ export interface HorizonsCompareResponse {
   earth: BodyComparison;
   engine_unavailable_reason: string | null;
   provenance: { horizons: { service: string; url: string; api_url: string; api_version: string | null; retrieved_utc: IsoUtc; from_cache: boolean } & Record<string, unknown> } & Record<string, unknown>;
+}
+
+// ---------- /data/moon-trek-sun-check.json (a static file served with the website) ----------
+// The same layout as horizons-check.json, for the Sun only: the physics engine against NASA Moon
+// Trek's Sun angle service (backend/scripts/validate_against_moon_trek.py).
+
+export interface MoonTrekCheckSite {
+  sun_max_angle_deg: number;
+  samples?: number;
+  period?: { start_utc: string; stop_utc: string; step_minutes: number };
+  retrieved_utc?: string;
+  moon_trek_url?: string;
+}
+
+export interface MoonTrekCheckFile {
+  format: string;
+  format_version: number;
+  what?: string;
+  source?: string;
+  sites: Record<string, MoonTrekCheckSite>;
 }
 
 // ---------- /data/horizons-check.json (a static file served with the website) ----------
