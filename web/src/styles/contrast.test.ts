@@ -49,6 +49,14 @@ describe('text contrast on glass', () => {
     }
   }
 
+  // A tilted wing's glass must hold with no dimming of the backdrop at all: the tint alone over white.
+  for (const name of TEXT_TOKENS) {
+    it(`${name} on a wing's glass is at least 4.5 to 1 over white with no dimming behind it`, () => {
+      const undimmed = over(parseColor(token('--ch-glass-sheen')), over(parseColor(token('--ch-glass-wing')), WHITE));
+      expect(contrast(parseColor(token(name)), undimmed)).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+
   for (const name of GRAPHIC_TOKENS) {
     it(`${name} as a line or mark on glass is at least 3 to 1 over a white backdrop`, () => {
       expect(contrast(parseColor(token(name)), worstGlass('--ch-glass'))).toBeGreaterThanOrEqual(3);

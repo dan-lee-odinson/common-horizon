@@ -1,9 +1,9 @@
 // Stage 1, ORBIT: the HUD around the Moon and its ring system.
 //
-// Four glass panels float on two wings, tilted toward the viewer: the Sun and the mission clock at
-// the upper left, Earth and the launch at the lower right, under the corner of sky where Earth
-// stands. The middle of the screen is kept for the scene: the Sun on its ring, Earth and their tags
-// never pass behind a panel. Every readout is a Quantity from the data layer, rewritten once per
+// Four glass panels float on two wings, tilted toward the viewer: the Sun, the mission clock and
+// the launch on the right, Earth's panel at the lower left, under the corner of sky that Earth's
+// limb fills. The middle of the screen is kept for the scene: the Sun on its ring, Earth's limb and
+// their tags never pass behind a panel. Every readout is a Quantity from the data layer, rewritten once per
 // frame as the previewed time runs: the calculations are seen running.
 
 import { useId, useMemo, useRef, useState } from 'react';
@@ -25,7 +25,7 @@ import { PREVIEW_HOURS_PER_SECOND } from './Playback';
 import { useEntrance } from './useEntrance';
 
 
-export function OrbitHud({ revealed }: { revealed: boolean }) {
+export function OrbitHud({ revealed, webgl = true }: { revealed: boolean; webgl?: boolean }) {
   const { track, orbitHorizon, reference, landingMs, orbitEndMs, windowEndMs, landingGeometry, rows } = useData();
   const launchUtcMs = useStore(appStore, (s) => s.launchUtcMs);
   const slipDays = useStore(appStore, (s) => s.slipDays);
@@ -286,9 +286,11 @@ export function OrbitHud({ revealed }: { revealed: boolean }) {
               <Icon name={playing ? 'pause' : 'play'} size={14} />
               {playing ? 'Pause preview' : 'Play preview'}
             </button>
+            {/* The zoom belongs to the 3D picture; the flat stand-in has no Earth to zoom out to. */}
             <button
               type="button"
               className="btn"
+              hidden={!webgl}
               onClick={() => actions.setOrbitZoom(zoomedOut ? 0 : 1)}
               aria-pressed={zoomedOut}
               title="Zoom out until the whole Earth is in view, or back to the Moon. The mouse wheel zooms too."
@@ -303,7 +305,7 @@ export function OrbitHud({ revealed }: { revealed: boolean }) {
             </button>
           </div>
           <p className="m-0 max-w-[36rem] text-balance text-center text-[13px] leading-snug text-ink-2" data-testid="not-to-scale">
-            Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only.{' '}
+            {webgl ? 'Earth and Moon sizes to scale. Distances not to scale. The Sun is a direction marker only.' : 'This flat picture stands in where 3D is not available: Earth is not drawn, and the Sun’s mark shows a direction only.'}{' '}
             <span data-testid="moon-surface-note" data-surface={moonSurface}>
               {moonSurface === 'map' ? 'The Moon’s surface is NASA’s CGI Moon Kit color map, made for visual use.' : 'The Moon’s surface pattern is an illustration, not a map.'}
             </span>

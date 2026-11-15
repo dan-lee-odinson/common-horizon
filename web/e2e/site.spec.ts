@@ -609,7 +609,7 @@ test('site: Orbit opens straight from the site, with the camera back in the Moon
   await expect.poll(() => readout(page, 'utc')).toMatch(/^\d{4}-\d{2}-\d{2} /);
   // The camera came back from the site's world (metres) to the Moon's: Earth stands in the Orbit
   // picture with its tag, inside the window.
-  const earth = page.getByTestId('body-label-earth');
+  const earth = page.getByTestId('body-label-earthLimb');
   await expect(earth).toHaveAttribute('data-visible', 'true', { timeout: 15_000 });
   const view = page.viewportSize()!;
   await expect

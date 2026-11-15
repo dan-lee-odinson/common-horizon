@@ -227,9 +227,9 @@ screen says it: *Earth and Moon sizes to scale. Distances not to scale. The Sun 
 marker only.* (Really Earth is about 221 Moon radii away.) The navigation bar keeps a dark backing
 so its words stay readable over Earth's sunlit limb.
 
-The camera looks from the side of the Moon away from Earth, so Earth stands behind the Moon and off
-to one side. Which side is chosen so that the camera sees as much of the Moon's sunlit half as it
-can at the landing; the panels arrange themselves around it. The camera sways a few degrees and
+The camera looks from the side of the Moon away from Earth, so Earth stands behind the Moon, always
+at the left, where its limb holds the top-left corner; the camera keeps to the longitude Earth is
+over, so the limb stays put while time runs. The camera sways a few degrees and
 leans a little with the pointer. The panels are laid out so the Sun on its ring, Earth and their
 tags never pass behind a glass panel (`src/scene/orbitView.test.ts` checks the arithmetic, and a
 browser test checks the real screen through a whole lunar day).
@@ -440,6 +440,9 @@ web/
   src/assets/fonts/        the three font families and their licences
   e2e/path.spec.ts         the browser tests: landing card, Orbit, mission select
   e2e/site.spec.ts         the browser tests: the site stage
+  e2e/hud.spec.ts          the browser tests: glass panels keep a dark backing; a press after a rest
+  e2e/moon.spec.ts         the browser tests: the right Moon maps for the device, from the app itself
+  e2e/phone.spec.ts        the browser test: a walk through the three stages at phone width
   e2e/screens.capture.ts   takes the pictures in docs/screens/
   docs/screens/            pictures of the app
   public/textures/moon/    the Moon's surface maps, made from NASA's CGI Moon Kit (see its README)

@@ -23,6 +23,9 @@
   /* Glass: a tint laid over the scene after the scene behind it is blurred and dimmed (see .glass). */
   --ch-glass: rgb(7 18 30 / 0.58);
   --ch-glass-strong: rgb(6 15 26 / 0.8);
+  /* Glass in a tilted wing: dense enough that its text keeps its contrast with no help from the
+     blur and dimming of what is behind it (a browser does not always apply them to a tilted panel). */
+  --ch-glass-wing: rgb(7 18 30 / 0.84);
   /* How much the glass dims what is behind it (backdrop-filter brightness), 0..1. */
   --ch-glass-dim: 0.42;
   /* The sheen across the upper left of a glass panel: its colour at full strength. */

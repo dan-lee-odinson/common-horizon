@@ -138,6 +138,15 @@
       0 26px 60px -22px var(--ch-shadow),
       0 0 52px -16px var(--ch-glow);
   }
+  /* In a tilted wing the blur and dimming of the backdrop cannot be counted on: seen in a browser,
+     a tilted panel sometimes shows the lit scene through undimmed. So a wing's glass is denser and
+     its text keeps 4.5 to 1 by the tint alone (styles/contrast.test.ts, e2e/hud.spec.ts). */
+  .wing-l .glass,
+  .wing-r .glass {
+    background:
+      linear-gradient(142deg, var(--ch-glass-sheen), transparent 42%),
+      var(--ch-glass-wing);
+  }
   .glass-strong {
     background:
       linear-gradient(142deg, var(--ch-glass-sheen), transparent 42%),

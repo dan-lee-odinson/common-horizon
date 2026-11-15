@@ -73,7 +73,7 @@ export function TopBar() {
         </span>
       ) : null}
 
-      {/* About sits with the title: the upper right is left clear for the scene (Earth stands there in Orbit). */}
+      {/* About sits with the title: the upper right is left clear for the scene and the panels. */}
       <button type="button" className="btn btn-quiet pointer-events-auto shrink-0 max-md:ml-auto max-md:w-11 max-md:px-0" onClick={actions.openCard} aria-haspopup="dialog" aria-expanded={cardOpen} aria-label="About Common Horizon" data-testid="about">
         <Icon name="info" size={16} />
         <span className="max-md:hidden">About</span>

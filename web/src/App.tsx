@@ -72,7 +72,7 @@ function Shell() {
         {/* Under every panel: the reticle that rides the landing point from the Moon down to the site. */}
         {webgl ? <LanderReticle /> : null}
         <TopBar />
-        {stage === 'orbit' ? <OrbitHud revealed={revealed} /> : null}
+        {stage === 'orbit' ? <OrbitHud revealed={revealed} webgl={webgl} /> : null}
         {stage === 'mission' ? <MissionHud /> : null}
         {stage === 'site' ? <SiteHud webgl={webgl} /> : null}
         {stage !== 'mission' ? <AssistantSheet phone={isPhone} /> : null}

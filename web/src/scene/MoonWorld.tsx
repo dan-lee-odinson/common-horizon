@@ -1,11 +1,13 @@
 // The Moon world: stages 1 (orbit) and 2 (mission select).
-//   The Moon, lit from the direction the data gives for the Sun, with the day-night line and the
-//   two overhead points marked on its surface.
+//   The Moon, showing NASA's CGI Moon Kit maps (a drawn surface until they load), lit from the
+//   direction the data gives for the Sun, with the day-night line and the two overhead points
+//   marked on its surface.
 //   The ring system in the Moon's equatorial plane: a longitude scale, the Sun ring, a ring of days
 //   and a short bracket for the range Earth's overhead point moves through over the stay.
-//   The Sun rides its ring at the longitude where it is overhead. Earth is a distant, larger body
-//   out along its true direction, joined to its bracket by a line. Sizes and distances are NOT to
-//   scale. Earth is never drawn between the camera and the Moon.
+//   The Sun rides its ring at the longitude where it is overhead: a direction marker, not a body
+//   to scale. Earth is drawn at its true size beside the Moon, behind it and out along its true
+//   direction, joined to its bracket by a line; its distance is not to scale. Earth is never drawn
+//   between the camera and the Moon.
 //   Site markers, and a pulsing reticle on the site in the spotlight. (Both fade out as the camera
 //   dives to a site: the HUD's own reticle carries the landing point from there.)
 
@@ -120,6 +122,12 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
         loader.load(
           `${import.meta.env.BASE_URL}${path}`,
           (t) => {
+            if (!alive) {
+              // Finished after this effect was cleaned up: nothing will use it.
+              t.dispose();
+              reject(new Error('no longer needed'));
+              return;
+            }
             made.push(t);
             // The color map is an ordinary picture; the relief map is numbers, not colors.
             t.colorSpace = isColor ? THREE.SRGBColorSpace : THREE.NoColorSpace;
@@ -147,11 +155,16 @@ export function MoonWorld({ data, visible }: { data: SceneData; visible: boolean
     return () => {
       alive = false;
       const m = moon.current;
-      if (m) m.uniforms.uUseMap.value = 0;
+      if (m) {
+        // Take the maps off the material before freeing them, or the next frame would upload them again.
+        m.uniforms.uUseMap.value = 0;
+        m.uniforms.uMap.value = blank;
+        m.uniforms.uNormalMap.value = blank;
+      }
       actions.setMoonSurface('drawn');
       for (const t of made) t.dispose();
     };
-  }, [data.isPhone, gl]);
+  }, [data.isPhone, gl, blank]);
 
   // The rings, the bodies and the surface marks belong to the Orbit stage: they fade out on the
   // way to mission select, where nothing may stand between the camera and the sites.

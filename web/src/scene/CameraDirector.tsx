@@ -1,8 +1,9 @@
 // Moves the one camera through the three stages with GSAP. The space is continuous: the camera
 // flies, nothing reloads.
 //   orbit    back from the Moon, looking down on the ring system at an angle. The camera sits on
-//            the side away from Earth, turned so Earth stands behind the Moon and to the right;
-//            it sways a few degrees and leans a little with the pointer.
+//            the side away from Earth, turned so Earth stands behind the Moon and to the left,
+//            its limb in the top-left corner; it sways a few degrees, leans a little with the
+//            pointer, and zooms out until the whole Earth is in view.
 //   mission  close to the Moon, turned to the site in the spotlight, the Moon set off-centre and
 //            the picture shifted so the site's marker and tag stay clear of the glass panels (see
 //            missionView.ts); the visitor can turn and zoom the Moon

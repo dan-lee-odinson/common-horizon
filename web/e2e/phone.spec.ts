@@ -46,7 +46,14 @@ test('phone: the three stages load and can be used at 390 px wide', async ({ pag
   await page.getByTestId('site-drawer-close').click();
   await expect(page.getByTestId('site-drawer')).toHaveAttribute('data-open', 'false');
 
-  // Site: arrive, play, and come back.
+  // Back to Orbit and in again: the top bar's stage names do not fit a phone, so the column has its own way back.
+  await page.getByTestId('back-to-orbit').scrollIntoViewIfNeeded();
+  await page.getByTestId('back-to-orbit').click();
+  await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'orbit');
+  await page.getByTestId('enter-mission').click();
+  await expect(page.getByTestId('spotlight-name')).not.toHaveText('', { timeout: 30_000 });
+
+  // Site: arrive and come back.
   const name = (await page.getByTestId('spotlight-name').textContent())!;
   await page.getByTestId('zoom-to-site').scrollIntoViewIfNeeded();
   await page.getByTestId('zoom-to-site').click();

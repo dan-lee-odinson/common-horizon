@@ -38,24 +38,29 @@ test('orbit: a press on "Enter mission select" counts after the pointer has rest
   await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'mission', { timeout: 15_000 });
 });
 
-test('site: the glass panels dim the lit ground behind them', async ({ page }) => {
-  test.skip(isPhone(page), 'the wings are a desktop layout');
-  test.setTimeout(120_000);
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
-  await page.getByTestId('begin').click();
-  await page.getByTestId('enter-mission').click();
-  await expect(page.getByTestId('spotlight-name')).not.toHaveText('', { timeout: 30_000 });
-  await page.getByTestId('zoom-to-site').click();
-  await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'site', { timeout: 20_000 });
-  const panel = page.getByTestId('sun-panel');
-  await expect(panel).toBeVisible();
-  await page.waitForTimeout(2500);
-  const box = (await panel.boundingBox())!;
-  // The panel's own bottom padding (no text there) against the open scene just below the panel.
-  const inside = await brightness(page, box.x + box.width / 2, box.y + box.height - 9);
-  const outside = await brightness(page, box.x + box.width / 2, box.y + box.height + 14);
-  // With the glass working, what is behind it is cut to under half; without it the two are alike.
-  expect(outside).toBeGreaterThan(40);
-  expect(inside).toBeLessThan(outside * 0.62);
-});
+for (const motion of ['reduce', 'no-preference'] as const) {
+  test(`site: the side panels keep a dark backing over lit ground (motion: ${motion})`, async ({ page }) => {
+    test.skip(isPhone(page), 'the wings are a desktop layout');
+    test.setTimeout(150_000);
+    await page.emulateMedia({ reducedMotion: motion });
+    await page.goto('/');
+    await page.getByTestId('begin').click();
+    await page.getByTestId('enter-mission').click();
+    await expect(page.getByTestId('spotlight-name')).not.toHaveText('', { timeout: 30_000 });
+    await page.getByTestId('zoom-to-site').click();
+    await expect(page.getByTestId('app')).toHaveAttribute('data-stage', 'site', { timeout: 30_000 });
+    const panel = page.getByTestId('sun-panel');
+    await expect(panel).toBeVisible();
+    // Sampled several times after the arrival: the fault this guards came and went with the entrance.
+    for (const wait of [3000, 2500, 2500]) {
+      await page.waitForTimeout(wait);
+      const box = (await panel.boundingBox())!;
+      // The panel's own bottom padding (no text there) against the open scene just below the panel.
+      const inside = await brightness(page, box.x + box.width / 2, box.y + box.height - 9);
+      const outside = await brightness(page, box.x + box.width / 2, box.y + box.height + 14);
+      expect(outside).toBeGreaterThan(40);
+      // Whether or not the browser dims the backdrop, the backing is under half as bright as the scene.
+      expect(inside).toBeLessThan(outside * 0.5);
+    }
+  });
+}

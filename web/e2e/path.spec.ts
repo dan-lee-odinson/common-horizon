@@ -123,7 +123,7 @@ function overlap(a: Box, b: Box): boolean {
   return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
 
-test('orbit: through a whole lunar day, markers and their tags never touch a glass panel, and Earth never covers the Moon', async ({ page }) => {
+test('orbit: through a whole lunar day, markers and their tags never touch a glass panel, and the zoom control goes out to the whole Earth and back', async ({ page }) => {
   test.skip(isPhone(page), 'on phones the panels are two short cards above the scene; checked by the phone layout test');
   await page.goto('/');
   await page.getByTestId('begin').click();

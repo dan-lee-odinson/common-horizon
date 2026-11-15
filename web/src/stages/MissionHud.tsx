@@ -60,6 +60,11 @@ export function MissionHud() {
            presets and coordinates. It ends above the assistant's question row. */
         <div className="hud-layer" data-depth="0.6">
           <div className="absolute inset-x-3 bottom-[5.25rem] top-[4.25rem] flex flex-col gap-2.5 overflow-y-auto overscroll-contain pb-1" data-enter="lead" data-testid="mission-phone-column">
+            {/* The stage names in the top bar do not fit a phone: this is the way back to Orbit. */}
+            <button type="button" className="btn btn-glass shrink-0 self-start" onClick={actions.backToOrbit} data-testid="back-to-orbit">
+              <Icon name="back" size={14} />
+              Orbit
+            </button>
             <MissionBar />
             <Spotlight />
             <RankStrip rows={STRIP_ROWS} />
