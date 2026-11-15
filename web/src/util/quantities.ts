@@ -365,14 +365,69 @@ export interface SiteQuantities {
   powerMargin: Quantity;
   /** The energy the site's darkness adds (the planner's site_energy), or the net energy when an answer gives one. */
   energy: Quantity;
-  /** "pass", "fail: night power" or "UNKNOWN: landing slope". */
+  /** "pass", "fail: night power" or "UNKNOWN: hardware fit". */
   verdict: Quantity;
   /** The verdict's one word: "pass", "fail" or "unknown". */
   verdictWord: string;
-  /** The verdict as the answer gives it; null with no result. */
+  /**
+   * The verdict as shown; null with no result. An answer of "unknown" whose only unknown requirement
+   * is the landing slope is shown as "pass", with `slopeNote` saying why the slope was not checked.
+   */
   result: 'pass' | 'fail' | 'unknown' | null;
-  /** True only for a pass, false for a fail, null for unknown or no result: unknown is never a pass. */
+  /** The verdict as the answer gives it, before that rule. */
+  answerResult: 'pass' | 'fail' | 'unknown' | null;
+  /** "Slope not checked: ..." when the pass above stands without a slope check; otherwise null. */
+  slopeNote: string | null;
+  /** The site's slope (`slope_deg`), labelled with the backend's name for its requirement; a dash when the answer has none. */
+  slope: Quantity;
+  /** The backend's own sentence for the slope requirement ("Slope 4 deg; Griffin accepts up to 10 deg."), or null. */
+  slopeDetail: string | null;
+  /** True for a pass (including a pass without a slope check), false for a fail, null for unknown or no result. */
   passes: boolean | null;
+}
+
+export const SLOPE_NOT_CHECKED_LANDER = 'Slope not checked: no published slope limit for this lander';
+export const SLOPE_NOT_CHECKED_POINT = 'Slope not checked: no slope data for this point';
+
+/** What decides which slope note applies: whether the site is a custom point, and the chosen lander's published slope limit. */
+export interface SlopeContext {
+  /** A point typed, clicked or saved by the visitor (not a preset). */
+  custom: boolean;
+  /** The chosen lander's published slope limit in degrees; null when none is published or no lander is chosen. */
+  landerLimitDeg: number | null;
+}
+
+/** True when nothing failed and the landing slope is the only requirement the backend could not check. */
+export function onlySlopeUnknown(v: SiteEvaluation['verdict']): boolean {
+  const unknown = Array.isArray(v.unknown_requirements) ? v.unknown_requirements : v.requirement ? [v.requirement] : [];
+  return v.result === 'unknown' && unknown.length === 1 && unknown[0] === 'landing slope';
+}
+
+/**
+ * Why the slope was not checked, when it is the only requirement left unchecked: no slope data for a
+ * custom point, or for a point whose lander does publish a limit; otherwise the lander publishes
+ * none (the backend checks the limit first). null when the rule does not apply.
+ */
+export function slopeNote(e: Pick<SiteEvaluation, 'site_id' | 'slope_deg' | 'verdict'>, ctx?: Partial<SlopeContext> | null): string | null {
+  if (!onlySlopeUnknown(e.verdict)) return null;
+  const custom = ctx?.custom ?? e.site_id.startsWith('custom:');
+  const limit = ctx?.landerLimitDeg ?? null;
+  const noSlope = typeof e.slope_deg !== 'number' || !Number.isFinite(e.slope_deg);
+  return noSlope && (custom || limit !== null) ? SLOPE_NOT_CHECKED_POINT : SLOPE_NOT_CHECKED_LANDER;
+}
+
+/** The slope requirement's line in the answer, if it has one. */
+function slopeRequirement(e: SiteEvaluation) {
+  return Array.isArray(e.requirements) ? (e.requirements.find((r) => r.requirement === 'landing slope') ?? null) : null;
+}
+
+/** `slope_deg` when the answer has it, labelled with the backend's name for the slope requirement. */
+function slopeQuantity(e: SiteEvaluation): Quantity {
+  const req = slopeRequirement(e);
+  const name = req ? req.requirement : 'slope';
+  const label = name.charAt(0).toUpperCase() + name.slice(1);
+  const v = e.slope_deg;
+  return typeof v === 'number' && Number.isFinite(v) ? quantity('slope', label, v, v.toFixed(1), '°') : missing('slope', label);
 }
 
 /** "unknown" as shown: in capitals, with the requirement that could not be checked. */
@@ -398,8 +453,11 @@ export function scoreQuantity(e: Pick<SiteEvaluation, 'score' | 'score_min' | 's
   return quantity('score', 'Score, range', null, a === b ? String(a) : `${a}–${b}`, '/ 100');
 }
 
-/** The spotlight readouts for one ranked site. `check` (the planner's own check) wins for power when present. */
-export function siteQuantities(rank: number | null, e: SiteEvaluation | null, check: CheckResponse | null = null): SiteQuantities {
+/**
+ * The spotlight readouts for one ranked site. `check` (the planner's own check) wins for power when
+ * present. `slope` says which note applies when the slope is the only requirement not checked.
+ */
+export function siteQuantities(rank: number | null, e: SiteEvaluation | null, check: CheckResponse | null = null, slope: Partial<SlopeContext> | null = null): SiteQuantities {
   if (!e) {
     return {
       rank: missing('rank', 'Rank'),
@@ -413,6 +471,10 @@ export function siteQuantities(rank: number | null, e: SiteEvaluation | null, ch
       verdict: missing('verdict', 'Result'),
       verdictWord: '',
       result: null,
+      answerResult: null,
+      slopeNote: null,
+      slope: missing('slope', 'Slope'),
+      slopeDetail: null,
       passes: null,
     };
   }
@@ -420,7 +482,10 @@ export function siteQuantities(rank: number | null, e: SiteEvaluation | null, ch
   const level = levelFromStatus(check ? check.balance.status : e.power_status);
   const marginText = formatMargin(margin, level);
   const hasNumber = margin !== null && Number.isFinite(margin);
-  const result = e.verdict.result;
+  const answerResult = e.verdict.result;
+  const note = slopeNote(e, slope);
+  // Only the slope unchecked, nothing failed: shown as a pass, with the note. The order stays the backend's.
+  const result = note ? 'pass' : answerResult;
   return {
     rank: rank === null ? missing('rank', 'Rank') : quantity('rank', 'Rank', rank, String(rank).padStart(2, '0'), ''),
     score: scoreQuantity(e),
@@ -435,9 +500,13 @@ export function siteQuantities(rank: number | null, e: SiteEvaluation | null, ch
       ? quantity('power_margin', 'Power margin', margin, marginText.replace('%', ''), '%', LEVEL_TONE[level])
       : quantity('power_margin', 'Power margin', null, marginText === DASH ? 'no load' : marginText, '', LEVEL_TONE[level]),
     energy: energyQuantity(e, LEVEL_TONE[level]),
-    verdict: quantity('verdict', 'Result', null, verdictText(e.verdict), '', VERDICT_TONE[result] ?? 'muted'),
+    verdict: quantity('verdict', 'Result', null, note ? 'pass' : verdictText(e.verdict), '', VERDICT_TONE[result] ?? 'muted'),
     verdictWord: result,
     result,
+    answerResult,
+    slopeNote: note,
+    slope: slopeQuantity(e),
+    slopeDetail: slopeRequirement(e)?.detail ?? null,
     passes: result === 'pass' ? true : result === 'fail' ? false : null,
   };
 }

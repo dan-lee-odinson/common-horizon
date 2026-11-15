@@ -104,15 +104,24 @@ test('main path: hardware, ranking, launch delay, a site and its horizon chart',
   const rows = page.getByTestId('ranked-row');
   await expect(rows.first()).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('spotlight-name')).not.toHaveText('');
-  const results = await page.getByTestId('verdict').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.result ?? ''));
-  expect(results.length).toBeGreaterThan(0);
-  for (const r of results) expect(['pass', 'unknown', 'fail']).toContain(r);
-  // Passing sites first, then unknown, then failing: never re-sorted by score.
-  for (let i = 1; i < results.length; i++) expect(RESULT_ORDER[results[i]]).toBeGreaterThanOrEqual(RESULT_ORDER[results[i - 1]]);
-  // Starship HLS publishes no slope limit: a site that fails nothing is UNKNOWN, with the requirement, never a pass.
+  // The answer's own words, in the answer's order: passing sites first, then unknown, then failing (never re-sorted by score).
+  const answered = await page.getByTestId('verdict').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.answerResult ?? ''));
+  expect(answered.length).toBeGreaterThan(0);
+  for (const r of answered) expect(['pass', 'unknown', 'fail']).toContain(r);
+  for (let i = 1; i < answered.length; i++) expect(RESULT_ORDER[answered[i]]).toBeGreaterThanOrEqual(RESULT_ORDER[answered[i - 1]]);
+  // Starship HLS publishes no slope limit: where the slope is the only requirement left unchecked,
+  // the verdict shows as PASS with the reason beside it, in the backend's place in the order.
   const verdict = page.getByTestId('spotlight-verdict');
-  if ((await verdict.getAttribute('data-result')) === 'unknown') await expect(verdict).toHaveText(/^UNKNOWN: landing slope$/i);
-  await expect(page.getByTestId('verdict').first()).not.toHaveText('pass');
+  if ((await verdict.getAttribute('data-result')) === 'pass') {
+    await expect(verdict).toHaveText(/^pass$/i);
+    await expect(page.getByTestId('slope-note')).toHaveText('Slope not checked: no published slope limit for this lander');
+  }
+  const first = page.getByTestId('verdict').first();
+  if ((await first.getAttribute('data-answer-result')) === 'unknown' && (await first.getAttribute('data-result')) === 'pass') {
+    await expect(first).toHaveAttribute('title', 'pass. Slope not checked: no published slope limit for this lander');
+  }
+  // The slope, when the answer has it, under the backend's name for it.
+  await expect(page.getByTestId('spotlight-slope')).toHaveText(/^Landing slope \d+\.\d°$/);
 
   // Transit: our estimate, beside the landing date; the landing is the answer's own.
   await expect(page.getByTestId('transit')).toHaveText('5 days (our estimate)');
@@ -155,6 +164,8 @@ test('main path: hardware, ranking, launch delay, a site and its horizon chart',
   await expect(checks.getByTestId('horizons-check')).toContainText('0.005991°');
   if (live) {
     await expect(checks.getByTestId('site-terrain-note')).toHaveText('smooth Moon, terrain not included');
+    // The synthetic engine reports the slope as 0.
+    await expect(checks.getByTestId('site-slope')).toContainText('Landing slope 0.0°');
     await expect(checks.getByTestId('horizon-warnings').locator('li').first()).toBeVisible();
     // Compare now: this backend cannot reach JPL Horizons from here, so the stored figure stands, and it says so.
     await checks.getByTestId('horizons-compare').click();

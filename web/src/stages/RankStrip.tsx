@@ -16,7 +16,7 @@ import gsap from 'gsap';
 import { Icon } from '../components/Icon';
 import { Glass } from '../hud/Glass';
 import { actions, appStore } from '../state/app';
-import { useData } from '../state/data';
+import { slopeContext, useData } from '../state/data';
 import { useStore } from '../state/store';
 import { prefersReducedMotion } from '../state/useMedia';
 import { siteQuantities } from '../util/quantities';
@@ -26,7 +26,7 @@ import { movedText, rankWindow, type RankedRow } from '../util/ranking';
 export const STRIP_ROWS = 5;
 
 export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
-  const { rows: ranked, siteById, focus, updating } = useData();
+  const { rows: ranked, siteById, focus, updating, landerSlopeLimitDeg } = useData();
   const slipDays = useStore(appStore, (s) => s.slipDays);
   const saved = useStore(appStore, (s) => s.saved);
   const listRef = useRef<HTMLDivElement>(null);
@@ -129,7 +129,7 @@ export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
           const site = siteById.get(row.siteId);
           if (!site) return null;
           const e = row.evaluation;
-          const q = siteQuantities(row.rank, e);
+          const q = siteQuantities(row.rank, e, null, slopeContext(site, landerSlopeLimitDeg));
           const active = site.id === focus?.id;
           const lit = Math.max(0, Math.min(100, e.sunlight_percent));
           return (
@@ -176,10 +176,17 @@ export function RankStrip({ rows = STRIP_ROWS }: { rows?: number }) {
                 <span className="sr-only">score </span>
                 {q.score.text}
               </span>
-              <span className="text-right font-display text-[12px] font-semibold uppercase tracking-[0.1em]" data-tone={q.verdict.tone} data-testid="verdict" data-result={q.result ?? ''} title={q.verdict.text}>
+              <span
+                className="text-right font-display text-[12px] font-semibold uppercase tracking-[0.1em]"
+                data-tone={q.verdict.tone}
+                data-testid="verdict"
+                data-result={q.result ?? ''}
+                data-answer-result={q.answerResult ?? ''}
+                title={q.slopeNote ? `pass. ${q.slopeNote}` : q.verdict.text}
+              >
                 {q.verdictWord}
-                {/* The requirement behind a fail or an unknown, for screen readers (the title carries it on hover). */}
-                {q.result !== 'pass' && e.verdict.requirement ? <span className="sr-only">: {e.verdict.requirement}</span> : null}
+                {/* The requirement behind a fail or an unknown, or why the slope was not checked, for screen readers (the title carries it on hover). */}
+                {q.slopeNote ? <span className="sr-only">. {q.slopeNote}</span> : q.result !== 'pass' && e.verdict.requirement ? <span className="sr-only">: {e.verdict.requirement}</span> : null}
               </span>
             </div>
           );

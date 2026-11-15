@@ -155,6 +155,16 @@ describe('the backend’s rules in the example model', () => {
     expect(fitCheck([{ id: 'griffin', count: 1 }])).toMatchObject({ fits: true, verdict: 'nothing to fit' });
   });
 
+  it('has no slope for a custom point, as the backend: the score is a range and the slope is the requirement left unchecked', () => {
+    const point = { id: 'custom:-45.0000:10.0000', name: 'Custom point', lat: -45, lon_east: 10 };
+    const e = evaluateSite(point, LANDING, STAY, [{ id: 'griffin', count: 1 }], 0).evaluation;
+    expect(e.slope_deg).toBeNull();
+    expect(e.score).toBeNull();
+    expect(e.score_max - e.score_min).toBeCloseTo(15, 6);
+    expect(e.verdict).toEqual({ result: 'unknown', requirement: 'landing slope', unknown_requirements: ['landing slope'] });
+    expect(e.requirements.find((r) => r.requirement === 'landing slope')!.detail).toBe('Site slope is unknown; Griffin accepts up to 10 deg.');
+  });
+
   it('says UNKNOWN, not pass, when a requirement cannot be checked (no published slope limit), and ranks pass, unknown, fail', () => {
     const hls = evaluateSite(SHORT_DARK, LANDING, STAY, NUCLEAR, 0).evaluation;
     expect(hls.verdict).toEqual({ result: 'unknown', requirement: 'landing slope', unknown_requirements: ['landing slope'] });

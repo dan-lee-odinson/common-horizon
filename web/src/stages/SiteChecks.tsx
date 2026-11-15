@@ -1,5 +1,6 @@
-// The Site stage's notes on the data behind the sky: whether the terrain is included, the horizon
-// answer's own warnings, and the check against NASA's JPL Horizons System.
+// The Site stage's notes on the data behind the sky: the site's slope (when the answer has it) and
+// why it was not checked (when it was not), whether the terrain is included, the horizon answer's
+// own warnings, and the check against NASA's JPL Horizons System.
 //
 // "Checked against NASA JPL Horizons" gives the stored figures for this site, read at run time from
 // data/horizons-check.json (written by backend/scripts/validate_against_horizons.py). When the file
@@ -14,6 +15,7 @@ import { isAbortError } from '../api/errors';
 import type { HorizonResponse, HorizonsCheckFile, HorizonsCompareResponse, SiteEvaluation, SiteRef } from '../api/types';
 import { Glass } from '../hud/Glass';
 import { simClock } from '../state/app';
+import type { Quantity } from '../util/quantities';
 import { formatUtcMinute, toIsoUtc } from '../util/time';
 import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
@@ -36,6 +38,9 @@ export function SiteChecks({
   horizon,
   check,
   landingMs,
+  slope = null,
+  slopeNote = null,
+  slopeDetail = null,
   bare = false,
 }: {
   site: SiteRef | null;
@@ -43,6 +48,10 @@ export function SiteChecks({
   horizon: HorizonResponse | null;
   check: HorizonsCheckFile | null;
   landingMs: number | null;
+  /** The site's slope readout (a dash when the answer has none), its "Slope not checked" note and the backend's sentence for it. */
+  slope?: Quantity | null;
+  slopeNote?: string | null;
+  slopeDetail?: string | null;
   bare?: boolean;
 }) {
   const live = !isMockMode();
@@ -87,10 +96,30 @@ export function SiteChecks({
       });
   }
 
-  if (!site || (!smooth && warnings.length === 0 && !stored && !live)) return null;
+  const hasSlope = slope !== null && slope.value !== null;
+  if (!site || (!smooth && warnings.length === 0 && !stored && !live && !hasSlope && !slopeNote)) return null;
 
   const body = (
     <div className="flex flex-col gap-2 text-[13px] leading-snug" data-testid="site-checks">
+      {hasSlope ? (
+        <p className="m-0 text-ink" data-q={slope.key} data-testid="site-slope">
+          <span className="text-ink-2" data-q-label>
+            {slope.label}
+          </span>{' '}
+          <span className="num" data-q-text>
+            {slope.text}
+          </span>
+          <span className="num" data-q-unit>
+            {slope.unit}
+          </span>
+          {slopeDetail ? <span className="text-ink-2"> ({slopeDetail})</span> : null}
+        </p>
+      ) : null}
+      {slopeNote ? (
+        <p className="m-0 text-ink-2" data-testid="site-slope-note">
+          {slopeNote}
+        </p>
+      ) : null}
       {smooth ? (
         <p className="m-0" data-tone="warn" data-testid="site-terrain-note">
           {TERRAIN_NOT_INCLUDED}

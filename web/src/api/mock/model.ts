@@ -449,7 +449,9 @@ export function evaluateSite(
   const fit = fitCheck(hardware, catalog);
   // The backend's classes: none at 0 %, clear at 100 %, intermittent in between.
   const earthLink: EarthLink = earthShare >= 1 ? 'clear' : earthShare <= 0 ? 'none' : 'intermittent';
-  const slope = terrainFor(site).slope_deg;
+  // A slope only for the presets, whose terrain the example model describes; a custom point has
+  // none, as with the backend's real engine.
+  const slope: number | null = Object.hasOwn(TERRAIN, site.id) ? TERRAIN[site.id].slope_deg : null;
   const lander = selectedItems(hardware, catalog).find((x) => x.item.kind === 'lander')?.item ?? null;
   const slopeLimit = lander?.max_slope_deg ?? null;
 
@@ -457,15 +459,18 @@ export function evaluateSite(
     { requirement: 'hardware fit', passed: fit.fits, detail: fit.verdict },
     { requirement: 'night power', passed: power.night.passes, detail: `night status ${power.night.status}` },
     { requirement: 'day power', passed: power.day.passes, detail: `day status ${power.day.status}` },
+    // The backend's checks and words, in its order: lander, then its limit, then the site's slope.
     {
       requirement: 'landing slope',
-      passed: lander === null || slopeLimit === null ? null : slope <= slopeLimit,
+      passed: lander === null || slopeLimit === null || slope === null ? null : slope <= slopeLimit,
       detail:
         lander === null
-          ? 'No lander chosen.'
+          ? 'No lander chosen: no slope limit.'
           : slopeLimit === null
             ? `No published slope limit for ${lander.name}.`
-            : `Ground slope ${slope}° against the ${slopeLimit}° limit of ${lander.name}.`,
+            : slope === null
+              ? `Site slope is unknown; ${lander.name} accepts up to ${slopeLimit} deg.`
+              : `Slope ${slope} deg; ${lander.name} accepts up to ${slopeLimit} deg.`,
     },
     { requirement: 'Earth contact', passed: earthLink !== 'none', detail: `Earth link ${earthLink}` },
   ];
@@ -478,7 +483,9 @@ export function evaluateSite(
       : { result: 'pass', requirement: null, unknown_requirements: [] };
 
   const components = scoreComponents(lit * 100, darkH, earthShare * 100, slope);
-  const score = scoreOf(components, components.slope ?? 0);
+  // With the slope unknown, the score is not known: its worst case (slope term 0) and best (100) bound it.
+  const scoreMin = scoreOf(components, components.slope ?? 0);
+  const scoreMax = scoreOf(components, components.slope ?? 100);
   const sunlitH = lit * stayHours;
   const siteEnergy = siteEnergyOf(p, Math.max(0, stayHours - sunlitH), darkSpells(samples));
   const warnings: string[] = [];
@@ -486,9 +493,9 @@ export function evaluateSite(
   const evaluation: SiteEvaluation = {
     site_id: site.id,
     rank: 1,
-    score: round(score, 4),
-    score_min: round(score, 4),
-    score_max: round(score, 4),
+    score: components.slope === null ? null : round(scoreMin, 4),
+    score_min: round(scoreMin, 4),
+    score_max: round(scoreMax, 4),
     score_components: components,
     sunlight_hours: round(sunlitH, 1),
     sunlight_percent: round(lit * 100, 1),

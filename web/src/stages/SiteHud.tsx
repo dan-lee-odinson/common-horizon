@@ -28,7 +28,7 @@ import { useTicker } from '../hud/useTicker';
 import { hideAnchors } from '../scene/anchors';
 import { lookAtBody, lookAtLander, siteFrame, SITE_VIEW } from '../scene/siteView';
 import { actions, appStore, simClock, SPEEDS } from '../state/app';
-import { useData } from '../state/data';
+import { slopeContext, useData } from '../state/data';
 import { modelShapes, primaryLanderId, useModelMetas } from '../state/models';
 import { createStore, useStore } from '../state/store';
 import { useIsPhone, useShortWindow } from '../state/useMedia';
@@ -142,7 +142,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
 
   const q = live();
   const fixed = siteStageQuantities({ site, landingMs, plannedLandingMs, stayEndMs: windowEndMs, stayDays, evaluation: focusRow?.evaluation ?? null, check: focusCheck });
-  const result = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck);
+  const result = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck, slopeContext(focus, d.landerSlopeLimitDeg));
   const dates = missionDates(launchUtcMs, slipDays, landingMs, landingGeometry);
   const hardware = hardwareQuantities(hardwareChosen, catalogItems ?? [], models);
   const speeds = useMemo(() => speedQuantities(SPEEDS), []);
@@ -207,7 +207,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
     </span>
   ) : null;
   const checks = (bare: boolean) => (
-    <SiteChecks site={site} evaluation={focusRow?.evaluation ?? null} horizon={horizonData} check={d.horizonsCheck.data ?? null} landingMs={landingMs} bare={bare} />
+    <SiteChecks site={site} evaluation={focusRow?.evaluation ?? null} horizon={horizonData} check={d.horizonsCheck.data ?? null} landingMs={landingMs} slope={result.slope} slopeNote={result.slopeNote} slopeDetail={result.slopeDetail} bare={bare} />
   );
   const plotLabel = `Horizon plot for ${name}: compass direction across, height above level upward. It shows the terrain skyline, the Sun’s path from ${slipDays > 0 ? 'the planned landing' : 'the landing'} to the end of the stay (solid where the Sun is above the skyline, dashed where the terrain hides it) and the part of the sky Earth moves through. The running figures are in the Sun and Earth panels.`;
   // The legend names the height where the plot's scale changes, when this site's plot has two bands.
@@ -446,7 +446,7 @@ export function SiteHud({ webgl }: { webgl: boolean }) {
             </span>
           )}
           {result.verdict.text === DASH ? null : (
-            <span className={`${passTag} min-h-9 shrink-0 px-2.5`} data-q={result.verdict.key} data-testid="site-verdict">
+            <span className={`${passTag} min-h-9 shrink-0 px-2.5`} data-q={result.verdict.key} title={result.slopeNote ?? undefined} data-testid="site-verdict">
               <span data-q-text>{result.verdict.text}</span>
             </span>
           )}

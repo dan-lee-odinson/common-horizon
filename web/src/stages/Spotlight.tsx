@@ -10,7 +10,7 @@ import { Icon } from '../components/Icon';
 import { Glass } from '../hud/Glass';
 import { Readout } from '../hud/Readout';
 import { actions, appStore } from '../state/app';
-import { useData, type DataValue } from '../state/data';
+import { slopeContext, useData, type DataValue } from '../state/data';
 import { useStore } from '../state/store';
 import { formatLatLon } from '../util/geo';
 import { balanceWords, levelFromStatus } from '../util/power';
@@ -20,7 +20,7 @@ import { TERRAIN_NOT_INCLUDED, terrainNotIncluded } from '../util/terrain';
 
 export function Spotlight() {
   const data = useData();
-  const { focus, focusRow, focusCheck, highlighted, updating, evaluation } = data;
+  const { focus, focusRow, focusCheck, highlighted, updating, evaluation, landerSlopeLimitDeg } = data;
   // A newer ranking failed while the previous one is still on screen: say so, in the backend's words.
   const failedRefresh = evaluation.status === 'error' && focusRow !== null;
   const flight = useStore(appStore, (s) => s.flight);
@@ -33,7 +33,7 @@ export function Spotlight() {
 
   // The planner's own check wins for power, once it is the check of this site and this ranking;
   // until then the row's own figure is shown.
-  const q = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck);
+  const q = siteQuantities(focusRow?.rank ?? null, focusRow?.evaluation ?? null, focusCheck, slopeContext(focus, landerSlopeLimitDeg));
   const words = focusCheck ? balanceWords(levelFromStatus(focusCheck.balance.status), focusCheck.balance.limiting) : null;
   const isSaved = saved.some((s) => s.id === focus.id);
   const fail = q.result === 'fail';
@@ -116,12 +116,21 @@ export function Spotlight() {
               {q.verdict.text}
             </span>
           )}
-          {smooth ? (
-            <span className="tag min-h-8 min-w-0 flex-1 whitespace-normal px-2 py-0.5 normal-case leading-snug tracking-[0.02em]" data-tone="warn" data-testid="terrain-note">
-              {TERRAIN_NOT_INCLUDED}
+          {/* Beside the verdict: why the slope was not checked, and whether the terrain is included. The site's own note when neither applies. */}
+          {q.slopeNote || smooth ? (
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-[12px] leading-snug max-md:basis-40">
+              {q.slopeNote ? (
+                <span className="text-ink-2" data-testid="slope-note">
+                  {q.slopeNote}
+                </span>
+              ) : null}
+              {smooth ? (
+                <span data-tone="warn" data-testid="terrain-note">
+                  {TERRAIN_NOT_INCLUDED}
+                </span>
+              ) : null}
             </span>
-          ) : null}
-          {focus.note && !smooth ? (
+          ) : focus.note ? (
             <span className="line-clamp-2 min-w-0 flex-1 text-[13px] leading-snug text-ink-2 max-md:basis-40" title={focus.note}>
               {focus.note}
             </span>
@@ -137,7 +146,18 @@ export function Spotlight() {
               {q.sunlightHours.value === null ? null : ' lit'}
             </span>
           </div>
-          <Readout q={q.score} size="xl" />
+          <div className="flex flex-col gap-0.5">
+            <Readout q={q.score} size="xl" />
+            {/* The slope, one of the score's terms, when the answer has it, under the backend's name for it. */}
+            <span className="num min-h-[1.125rem] text-[13px] leading-[1.125rem] text-ink-2" data-q="slope" title={q.slopeDetail ?? undefined} data-testid="spotlight-slope">
+              {q.slope.value === null ? null : (
+                <>
+                  <span data-q-label>{q.slope.label}</span> <span data-q-text>{q.slope.text}</span>
+                  <span data-q-unit>{q.slope.unit}</span>
+                </>
+              )}
+            </span>
+          </div>
           <Readout q={q.earthLink} />
           <div className="flex flex-col gap-0.5">
             <Readout q={q.powerMargin} />

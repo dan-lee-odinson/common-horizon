@@ -16,6 +16,7 @@ import type {
   SiteListResponse,
   SiteRef,
 } from '../api/types';
+import type { SlopeContext } from '../util/quantities';
 import { rankRows, type RankedRow } from '../util/ranking';
 import { DAY_MS, SYNODIC_MONTH_DAYS, toIsoUtc } from '../util/time';
 import type { GeometryTrack } from '../util/track';
@@ -70,6 +71,8 @@ export interface DataValue {
   dataSource: DataSourceKind;
   /** Transit from launch to landing, days, as the evaluation answer gives it; null when the answer does not state one. */
   transitDays: number | null;
+  /** The chosen lander's published slope limit (catalog `max_slope_deg`), degrees; null when none is published or no lander is chosen. */
+  landerSlopeLimitDeg: number | null;
   /** Presets, the custom point and saved custom points: everything that gets ranked. */
   allSites: KnownSite[];
   siteById: Map<string, KnownSite>;
@@ -99,6 +102,11 @@ export interface DataValue {
   windowEndMs: number | null;
   /** Orbit preview window: the landing to one lunar day later. */
   orbitEndMs: number | null;
+}
+
+/** What decides a site's "Slope not checked" note: whether it is a custom point, and the lander's published limit. */
+export function slopeContext(site: (SiteRef & { custom?: boolean }) | null | undefined, landerSlopeLimitDeg: number | null): SlopeContext {
+  return { custom: Boolean(site?.custom) || Boolean(site?.id.startsWith('custom:')), landerLimitDeg: landerSlopeLimitDeg };
 }
 
 /** Exported so a test can render a panel with data it built itself. The app uses <DataProvider>. */
@@ -160,6 +168,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const siteById = useMemo(() => new Map(allSites.map((s) => [s.id, s])), [allSites]);
   const highlighted = highlightedId ? (siteById.get(highlightedId) ?? null) : null;
   const hardwareChosen = useMemo(() => hardwareChoices(hardware), [hardware]);
+  const landerSlopeLimitDeg = useMemo(() => {
+    const lander = (catalog.data?.items ?? []).find((i) => i.kind === 'lander' && hardwareChosen.some((h) => h.id === i.id));
+    const limit = lander?.max_slope_deg;
+    return typeof limit === 'number' && Number.isFinite(limit) ? limit : null;
+  }, [catalog.data, hardwareChosen]);
 
   const siteRefs = useMemo<SiteRef[]>(() => allSites.map(({ id, name, lat, lon_east }) => ({ id, name, lat, lon_east })), [allSites]);
   const missionKey = JSON.stringify([stayDays, hardwareChosen, storageKwh]);
@@ -239,6 +252,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     horizonsCheck,
     dataSource,
     transitDays,
+    landerSlopeLimitDeg,
     allSites,
     siteById,
     highlighted,
