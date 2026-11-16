@@ -21,7 +21,7 @@ through the dark.
   [backend/docs/AI_USE_LOG.md](backend/docs/AI_USE_LOG.md). The API contract and FastAPI
   service, the integration of the physics engine, the website API and site ranking, reviews, and
   AWS testing, including the Mission Assistant's model on Amazon Bedrock.
-- **Cam**: mission planning. The three reference missions, the research notes with a
+- **Camille Fourrier**: mission planning. The three reference missions, the research notes with a
   published source for each figure, and the mission plan.
 
 ## The horizon decides the answer
