@@ -152,6 +152,43 @@ Every library, dataset, image, font and figure is listed with its license in the
 [tools/models/SOURCES-models.md](tools/models/SOURCES-models.md) and
 [web/SOURCES-web.md](web/SOURCES-web.md).
 
+## Wishlist
+
+What we would build next, roughly in order:
+
+- **Terrain in every sunlight figure.** The real ground is drawn at all seventeen preset sites;
+  the skyline calculation behind the sunlight figures covers six. The other eleven come first.
+- **A skyline for any point.** Computed on request for a typed latitude and longitude, from the
+  same LOLA models.
+- **Landing hazards at the scale of a lander's footprint.** Slope and roughness from the
+  finest LOLA models, in place of one regional slope per site.
+- **Relay links.** A relay satellite as a selectable item, for sites that never see the Earth.
+- **More of the mission plan's site criteria.** Distance to permanently shadowed ice and
+  surface temperatures, each as a scored line with its source.
+- **A battery timeline.** The state of charge hour by hour through the stay, beside the
+  margin the planner gives now.
+- **Shadows cast by terrain in the Site view,** and finer surface pictures close to the lander.
+- **A camera that walks the site.** Move to each piece of hardware, not only turn and zoom
+  about the lander.
+- **A model for every piece of hardware in NASA's Moon Base plans.** Built so far: Starship
+  HLS, Blue Moon Mark 1, Griffin, the VIPER rover, Astrolab's crew rover, JAXA's pressurized
+  rover, a habitation module, the solar array mast and the fission surface power unit. Not yet
+  created: Blue Moon Mark 2, the Nova-C lander, the MoonFall drones, Lunar Outpost's lunar
+  terrain vehicle, Astrolab's FLIP rover, the IPEx rover, the 100-cubic-meter-class habitat
+  module, a solar power station, cargo containers and a communications mast. Also planned: an
+  astronaut figure for scale, and markers for the Apollo Lunar Module, SLIM and Chandrayaan-3's
+  lander at their sites.
+- **Published sizes for every model.** Replace each "our estimate" as the makers publish
+  figures.
+- **One time step at every stay length,** so a long stay reads the same whether one site or
+  seventeen is asked.
+- **More from the Mission Assistant.** Turn a plain-language mission request into planner
+  settings for the visitor to confirm, and add interactive mapping, launch cost calculations,
+  fuel requirements, crew requirements, science mission suggestions and resource extraction
+  options.
+- **Export.** Save a mission plan as a CSV or PDF file.
+- **Coordinated Lunar Time,** once NASA's standard is set.
+
 ## SI/AI use
 
 The team used AI tools to help write and review software and text. No figure in the app comes
