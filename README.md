@@ -170,12 +170,23 @@ What we would build next, roughly in order:
 - **Shadows cast by terrain in the Site view,** and finer surface pictures close to the lander.
 - **A camera that walks the site.** Move to each piece of hardware, not only turn and zoom
   about the lander.
+- **A model for every piece of hardware in NASA's Moon Base plans.** Built so far: Starship
+  HLS, Blue Moon Mark 1, Griffin, the VIPER rover, Astrolab's crew rover, JAXA's pressurized
+  rover, a habitation module, the solar array mast and the fission surface power unit. Not yet
+  created: Blue Moon Mark 2, the Nova-C lander, the MoonFall drones, Lunar Outpost's lunar
+  terrain vehicle, Astrolab's FLIP rover, the IPEx rover, the 100-cubic-meter-class habitat
+  module, a solar power station, cargo containers and a communications mast. Also planned: an
+  astronaut figure for scale, and markers for the Apollo Lunar Module, SLIM and Chandrayaan-3's
+  lander at their sites.
 - **Published sizes for every model.** Replace each "our estimate" as the makers publish
-  figures, and add the catalog's remaining landers and rovers.
+  figures.
 - **One time step at every stay length,** so a long stay reads the same whether one site or
   seventeen is asked.
 - **More from the Mission Assistant.** Turn a plain-language mission request into planner
-  settings for the visitor to confirm.
+  settings for the visitor to confirm, and add interactive mapping, launch cost calculations,
+  fuel requirements, crew requirements, science mission suggestions and resource extraction
+  options.
+- **Export.** Save a mission plan as a CSV or PDF file.
 - **Coordinated Lunar Time,** once NASA's standard is set.
 
 ## SI/AI use
