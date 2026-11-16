@@ -57,8 +57,36 @@ with how terrain close to the observer is treated. The limits are set out in
 - **The planner.** A hardware catalog holds each figure with its source and a status label
   (NASA figure, company figure or our estimate). It checks whether a payload fits a lander and
   whether power sources and storage carry the loads through day and night (`planner/`).
+- **Landing slope.** For each preset site, the slope of the best-fit plane to LOLA heights within
+  500 m, from NASA Moon Trek, is compared with the lander's published limit where one exists.
+  Where a lander has no published limit the app says "not known" and gives no pass or fail.
+- **The ground in the Site view.** For every preset site the website draws the real ground at
+  true scale from two LOLA height grids fetched through Moon Trek (10 m spacing across 1.28 km,
+  and 250 m spacing across 64 km with the Moon's curvature included). A surface picture lies
+  over it: the Lunar Reconnaissance Orbiter wide-angle camera mosaic at fifteen sites, and a
+  relief picture worked out from LOLA heights at the ridge and in the Nobile region, where the
+  mosaic is mostly permanent shadow (`tools/site-terrain/`, `tools/site-texture/`).
+- **The Mission Assistant.** One route on the service runs the same evaluation the page shows
+  and passes its results to a language model, which words the answer. It answers in text only
+  and never changes the planner.
 - **The service and the website.** A FastAPI service on AWS Lambda (`backend/`) and a React and
   three.js website on AWS Amplify (`web/`).
+
+**What the sunlight figures include.** At the six sites with stored skylines the sunlight
+figures use the real terrain. At the other eleven preset sites they use a smooth horizon. The
+Site view draws the real ground at all seventeen and says, on each of those eleven, that the
+drawn terrain (which rises as high as 14° above the horizon, at Apollo 17) is not in the figures.
+
+## Three reference missions
+
+The team's mission plan defines three reference missions as test cases. Each was set through
+the website's own controls on the frozen site (15 November 2026).
+
+| Mission | Site and launch | Result |
+|---|---|---|
+| 1. Crewed base stay: Starship HLS, Surface Habitat, a 40 kWe fission unit, one solar array mast | Shackleton Connecting Ridge, 15 January 2027 | Ranked first of seventeen. Sun in view 93.8% of a 30-day stay, 76.1% of 90 days, 68.6% of 180 days and 82.0% of 365 days; the longest dark period grows from 27 to 157 hours; power margin 50% at every stage. Launched 14 days late, the 30-day stay has 79.4% and a longest dark period of 104 hours, and the ridge ranks fourth |
+| 2. Griffin cargo delivery with a science rover | Nobile region, 11 August 2027, 14-day stay | On time: Sun in view 100%, slope 7.6° against Griffin's 10° limit, a pass, ranked first. Launched 14 days late: 26% sunlight, 248 hours of darkness, a fail on night power, ranked last; the ridge ranks first |
+| 3. Cargo stay on solar power and 240 kWh of storage | Apollo 11 site, 7 February 2027, 30-day stay | Fails on night power: 353 hours of darkness, margin -97%. With the 40 kWe fission unit added the margin is +97% |
 
 ## How it is checked
 
@@ -72,6 +100,10 @@ with how terrain close to the observer is treated. The limits are set out in
   same file.
 - **Two horizon calculations.** The skyline code was written twice, separately, on different
   LOLA models. At the Shackleton Connecting Ridge the two differ by a median of 0.01°.
+- **The Mission Assistant.** Seven questions were put to the deployed assistant and each answer
+  was compared with the engine's results for the same mission. Every figure it gave was the
+  engine's, and it declined a question the data does not cover. See
+  [backend/docs/AI_USE_LOG.md](backend/docs/AI_USE_LOG.md), "Real model checks".
 - **Automated tests.** The backend's tests run before every deployment
   (`.github/workflows/deploy-backend.yml`). Tests that need the large NASA files skip when the
   files are absent.
@@ -83,7 +115,8 @@ with how terrain close to the observer is treated. The limits are set out in
 | `backend/` | The service, the physics engine, the stored skylines and the checks | [backend/README.md](backend/README.md) |
 | `planner/` | The hardware catalog, the fit check and the power arithmetic | [planner/README.md](planner/README.md) |
 | `web/` | The website | [web/README.md](web/README.md) |
-| `tools/models/` | Scripts that build the 3D hardware models from published dimensions | [tools/models/README.md](tools/models/README.md) |
+| `tools/models/` | Scripts that build, finish and check the 3D hardware models | [tools/models/README.md](tools/models/README.md) |
+| `tools/site-terrain/`, `tools/site-texture/`, `tools/site-context/` | Scripts that fetch each preset site's height grids, surface picture and map picture from NASA Moon Trek | [web/public/site-terrain/README.md](web/public/site-terrain/README.md) |
 
 Each folder's README says how to run it and its tests on your own computer.
 
@@ -96,11 +129,16 @@ NASA data and resources used:
 - **NAIF SPICE kernels** (<https://naif.jpl.nasa.gov/pub/naif/generic_kernels/>): every Sun and
   Earth position.
 - **NASA Moon Trek** (<https://trek.nasa.gov/moon/>): the LOLA elevation patches behind the preset
-  sites' slopes (`backend/data/site_slopes.json`), and a second check of the engine's Sun directions.
+  sites' slopes (`backend/data/site_slopes.json`), a second check of the engine's Sun directions,
+  the height grids and surface pictures of the real ground in the Site view (the surface pictures
+  from the Lunar Reconnaissance Orbiter wide-angle camera mosaics, credit NASA/GSFC/Arizona State
+  University), and the map in the Site map panel.
 - **LOLA elevation models**, Lunar Reconnaissance Orbiter (<https://pgda.gsfc.nasa.gov/products/90>
   and the USGS global model): every terrain skyline.
 - **CGI Moon Kit**, NASA's Scientific Visualization Studio (<https://svs.gsfc.nasa.gov/4720>):
   the Moon's surface in the website.
+- **Blue Marble Next Generation**, NASA Visible Earth (credit Reto Stöckli, NASA Earth
+  Observatory): the Earth's surface in the Orbit view.
 - **NSSDC Apollo landing site coordinates**
   (<https://nssdc.gsfc.nasa.gov/planetary/lunar/lunar_sites.html>), the CLPS landing sites page
   and the NASA Technical Reports Server: preset sites and hardware figures.
